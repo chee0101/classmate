@@ -1,0 +1,34 @@
+// android/settings.gradle
+
+// Block 1: MUST be the first code block (after comments)
+pluginManagement {
+    def flutterSdkPath = {
+        def properties = new Properties()
+        file("local.properties").withInputStream { properties.load(it) }
+        def flutterSdkPath = properties.getProperty("flutter.sdk")
+        assert flutterSdkPath != null, "flutter.sdk not set in local.properties"
+        return flutterSdkPath
+    }()
+    
+    // Include Flutter's Gradle tools for building the project.
+    includeBuild("$flutterSdkPath/packages/flutter_tools/gradle") 
+
+    repositories {
+        google() 
+        mavenCentral() 
+        gradlePluginPortal() 
+    }
+}
+
+// Block 2: MUST immediately follow the pluginManagement {} block
+plugins {
+    // Plugin for Flutter builds.
+    id "dev.flutter.flutter-plugin-loader" version "1.0.0" 
+    // Android application plugin. Adjust version if needed
+    id "com.android.application" version "8.1.2" apply false 
+    // Kotlin plugin for Android. Adjust version if needed
+    id "org.jetbrains.kotlin.android" version "1.9.24" apply false
+}
+
+// Block 3: Other declarations go here
+include ':app'

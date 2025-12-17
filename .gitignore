@@ -1,0 +1,11 @@
+# IDE - JetBrains (Android Studio / IntelliJ)
+.idea/
+*.iml
+*.iws
+
+# IDE - VS Code
+.vscode/
+
+# Operating System
+.DS_Store
+Thumbs.db
