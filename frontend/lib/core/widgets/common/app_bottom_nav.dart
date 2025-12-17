@@ -1,15 +1,14 @@
 import 'package:flutter/material.dart';
+import 'add_new_bottom_sheet.dart';
 
 class AppBottomNav extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int> onTap;
-  final VoidCallback onAddTap;
 
   const AppBottomNav({
     super.key,
     required this.currentIndex,
     required this.onTap,
-    required this.onAddTap,
   });
 
   @override
@@ -52,7 +51,7 @@ class AppBottomNav extends StatelessWidget {
               Expanded(
                 child: Center(
                   child: GestureDetector(
-                    onTap: onAddTap,
+                    onTap: () => AddNewBottomSheet.show(context),
                     child: Container(
                       width: 50,
                       height: 50,
@@ -110,7 +109,7 @@ class AppBottomNav extends StatelessWidget {
       child: InkWell(
         onTap: () => onTap(index),
         child: SizedBox(
-          height: double.infinity, // 🔥 FULL HEIGHT
+          height: double.infinity,
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [

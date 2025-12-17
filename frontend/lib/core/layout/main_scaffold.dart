@@ -36,42 +36,7 @@ class _MainScaffoldState extends State<MainScaffold> {
             _screenIndex = index;
           });
         },
-        onAddTap: () => _onAddPressed(context),
       ),
-    );
-  }
-
-  void _onAddPressed(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (_) {
-        return Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                'Add New',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.document_scanner),
-                title: const Text('Auto Extract'),
-                onTap: () => Navigator.pop(context),
-              ),
-              ListTile(
-                leading: const Icon(Icons.text_fields),
-                title: const Text('Manual Input'),
-                onTap: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 }
