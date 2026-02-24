@@ -1,5 +1,7 @@
 class AppRoutes {
   static const String splash = '/';
   static const String authChecker = '/auth-check';
-  static const String welcome = '/welcome';
+  static const String login = '/login';
+  static const String verifyEmail = '/verify-email';
+  static const String forgotPassword = '/forgot-password';
 }

@@ -1,8 +1,11 @@
+import 'package:classmate/screens/auth/auth_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'core/constants/app_colors.dart';
 import 'core/constants/routes.dart';
 import 'core/layout/main_scaffold.dart';
+import 'screens/auth/forgot_password_screen.dart';
+import 'screens/auth/verify_email_screen.dart';
 import 'splash_screen.dart';
 
 class MyApp extends StatelessWidget {
@@ -19,26 +22,104 @@ class MyApp extends StatelessWidget {
       // ===================================================
       theme: ThemeData(
         useMaterial3: true,
-
         colorScheme: ColorScheme.fromSeed(
           seedColor: AppPrimarySwatch,
           brightness: Brightness.light,
           primary: AppPrimarySwatch.shade700,
           surface: AppPrimarySwatch.shade50,
         ),
+        textTheme: GoogleFonts.poppinsTextTheme().copyWith(
+          /// App title / splash title
+          headlineLarge: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w700,
+          ),
 
-        textTheme: GoogleFonts.poppinsTextTheme(
-          Theme.of(context).textTheme,
+          /// Screen title
+          headlineMedium: const TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w600,
+          ),
+
+          /// Section title (Cards, lists)
+          titleLarge: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+
+          /// Body text
+          bodyLarge: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+          ),
+
+          /// Secondary body text
+          bodyMedium: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w400,
+          ),
+
+          /// Caption / helper text
+          bodySmall: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w400,
+          ),
+
+          /// Button text
+          labelLarge: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
         ),
-
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             backgroundColor: AppPrimarySwatch.shade700,
             foregroundColor: Colors.white,
-            minimumSize: const Size(double.infinity, 50),
+            minimumSize: const Size(double.infinity, 56),
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(12),
             ),
+            textStyle: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.white,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 16,
+          ),
+
+          /// Input text style
+          hintStyle: TextStyle(
+            fontSize: 14,
+            color: Colors.grey.shade400,
+          ),
+
+          labelStyle: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+            color: Colors.grey.shade700,
+          ),
+
+          errorStyle: const TextStyle(
+            fontSize: 12,
+          ),
+
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey.shade200),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: AppPrimarySwatch.shade700),
           ),
         ),
       ),
@@ -50,7 +131,9 @@ class MyApp extends StatelessWidget {
       routes: {
         AppRoutes.splash: (context) => const SplashScreen(),
         AppRoutes.authChecker: (context) => const AuthChecker(),
-        AppRoutes.welcome: (context) => const WelcomeScreen(),
+        AppRoutes.login: (context) => const AuthScreen(),
+        AppRoutes.verifyEmail: (context) => const VerifyEmailScreen(),
+        AppRoutes.forgotPassword: (context) => const ForgotPasswordScreen(),
       },
     );
   }
@@ -71,11 +154,10 @@ class AuthChecker extends StatelessWidget {
     if (userIsLoggedIn) {
       return const MainScaffold();
     } else {
-      return const WelcomeScreen();
+      return const AuthScreen();
     }
   }
 }
-
 
 // ----------------------------------------------------
 // Dummy/Placeholder Screens for compilation purposes
