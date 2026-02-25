@@ -28,6 +28,13 @@ class MyApp extends StatelessWidget {
           primary: AppPrimarySwatch.shade700,
           surface: AppPrimarySwatch.shade50,
         ),
+        appBarTheme: AppBarTheme(
+          backgroundColor: AppPrimarySwatch.shade50,
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          surfaceTintColor: Colors.transparent,
+        ),
+        scaffoldBackgroundColor: AppPrimarySwatch.shade50,
         textTheme: GoogleFonts.poppinsTextTheme().copyWith(
           /// App title / splash title
           headlineLarge: const TextStyle(
