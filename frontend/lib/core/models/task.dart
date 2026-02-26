@@ -20,6 +20,7 @@ class Task {
   final String? description;
   final DateTime dueDateTime;
   final TaskStatus status;
+  final String? parentTaskId;
 
   const Task({
     required this.id,
@@ -29,6 +30,7 @@ class Task {
     this.description,
     required this.dueDateTime,
     required this.status,
+    this.parentTaskId,
   });
 
   Task copyWith({
@@ -39,6 +41,7 @@ class Task {
     String? description,
     DateTime? dueDateTime,
     TaskStatus? status,
+    String? parentTaskId,
   }) {
     return Task(
       id: id ?? this.id,
@@ -48,6 +51,7 @@ class Task {
       description: description ?? this.description,
       dueDateTime: dueDateTime ?? this.dueDateTime,
       status: status ?? this.status,
+      parentTaskId: parentTaskId ?? this.parentTaskId,
     );
   }
 }

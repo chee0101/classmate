@@ -7,6 +7,7 @@ import '../models/task.dart';
 /// This lets you build and fine-tune the UI before wiring up Firebase
 /// or a backend. Later you can replace this with real data providers.
 final List<Task> mockTasks = [
+  // Top-level tasks
   Task(
     id: 't1',
     courseCode: 'CAT401',
@@ -20,8 +21,8 @@ final List<Task> mockTasks = [
     id: 't2',
     courseCode: 'CST435',
     courseColor: const Color(0xFF4C6FFF),
-    title: 'Project 2 · Draft Proposal',
-    description: 'Submit draft proposal for final project.',
+    title: 'Project 2',
+    description: 'Work on final project proposal and related tasks.',
     dueDateTime: DateTime.now().add(const Duration(days: 3)),
     status: TaskStatus.ongoing,
   ),
@@ -43,5 +44,42 @@ final List<Task> mockTasks = [
     dueDateTime: DateTime.now().subtract(const Duration(days: 1)),
     status: TaskStatus.completed,
   ),
+
+  // Subtasks for Project 2 (t2)
+  Task(
+    id: 'st1',
+    parentTaskId: 't2',
+    courseCode: 'CST435',
+    courseColor: const Color(0xFF4C6FFF),
+    title: 'Draft Proposal',
+    description: 'Create initial draft of project proposal.',
+    dueDateTime: DateTime.now().add(const Duration(days: 2)),
+    status: TaskStatus.overdue,
+  ),
+  Task(
+    id: 'st2',
+    parentTaskId: 't2',
+    courseCode: 'CST435',
+    courseColor: const Color(0xFF4C6FFF),
+    title: 'Review Literature',
+    description: 'Review relevant papers and articles.',
+    dueDateTime: DateTime.now().add(const Duration(days: 3)),
+    status: TaskStatus.ongoing,
+  ),
+  Task(
+    id: 'st3',
+    parentTaskId: 't2',
+    courseCode: 'CST435',
+    courseColor: const Color(0xFF4C6FFF),
+    title: 'Finalize Proposal',
+    description: 'Polish and submit final proposal.',
+    dueDateTime: DateTime.now().add(const Duration(days: 4)),
+    status: TaskStatus.completed,
+  ),
 ];
 
+List<Task> mockTopLevelTasks() =>
+    mockTasks.where((t) => t.parentTaskId == null).toList();
+
+List<Task> mockSubtasksFor(String parentTaskId) =>
+    mockTasks.where((t) => t.parentTaskId == parentTaskId).toList();

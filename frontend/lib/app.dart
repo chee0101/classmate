@@ -6,6 +6,8 @@ import 'core/constants/routes.dart';
 import 'core/layout/main_scaffold.dart';
 import 'screens/auth/forgot_password_screen.dart';
 import 'screens/auth/verify_email_screen.dart';
+import 'screens/task/task_detail_screen.dart';
+import 'core/models/task.dart';
 import 'splash_screen.dart';
 
 class MyApp extends StatelessWidget {
@@ -78,6 +80,21 @@ class MyApp extends StatelessWidget {
             fontWeight: FontWeight.w600,
           ),
         ),
+        dialogTheme: DialogThemeData(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          titleTextStyle: GoogleFonts.poppins(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: Colors.black87,
+          ),
+          contentTextStyle: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+            color: Colors.black87,
+          ),
+        ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
             backgroundColor: AppPrimarySwatch.shade700,
@@ -141,6 +158,10 @@ class MyApp extends StatelessWidget {
         AppRoutes.login: (context) => const AuthScreen(),
         AppRoutes.verifyEmail: (context) => const VerifyEmailScreen(),
         AppRoutes.forgotPassword: (context) => const ForgotPasswordScreen(),
+        AppRoutes.taskDetail: (context) {
+          final task = ModalRoute.of(context)!.settings.arguments as Task;
+          return TaskDetailScreen(task: task);
+        },
       },
     );
   }

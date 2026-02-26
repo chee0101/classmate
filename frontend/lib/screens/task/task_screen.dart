@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
+import '../../core/constants/routes.dart';
 import '../../core/mock/mock_tasks.dart';
 import '../../core/models/task.dart';
 import '../../core/widgets/task/task_card.dart';
@@ -23,7 +24,8 @@ class _TaskScreenState extends State<TaskScreen> {
   @override
   void initState() {
     super.initState();
-    _tasks = List<Task>.from(mockTasks);
+    // Only show top-level tasks in the list (subtasks are shown in detail view).
+    _tasks = mockTopLevelTasks();
   }
 
   @override
@@ -99,9 +101,12 @@ class _TaskScreenState extends State<TaskScreen> {
                           const SizedBox(height: AppSpacing.md),
                       itemBuilder: (context, index) {
                         final task = tasks[index];
+                        final nextSubtaskTitle = _getNextSubtaskTitle(task.id);
                         return TaskCard(
                           task: task,
                           onMarkDone: () => _markTaskAsCompleted(task),
+                          onTap: () => _navigateToTaskDetail(task),
+                          nextSubtaskTitle: nextSubtaskTitle,
                         );
                       },
                     ),
@@ -129,5 +134,28 @@ class _TaskScreenState extends State<TaskScreen> {
         content: Text('Task marked as completed'),
       ),
     );
+  }
+
+  void _navigateToTaskDetail(Task task) {
+    Navigator.pushNamed(
+      context,
+      AppRoutes.taskDetail,
+      arguments: task,
+    );
+  }
+
+  /// Returns the title of the nearest-due (and not yet completed) subtask,
+  /// or null if there is no such subtask.
+  String? _getNextSubtaskTitle(String parentTaskId) {
+    final subtasks = mockSubtasksFor(parentTaskId);
+    if (subtasks.isEmpty) return null;
+
+    final remaining = subtasks
+        .where((t) => t.status != TaskStatus.completed)
+        .toList()
+      ..sort((a, b) => a.dueDateTime.compareTo(b.dueDateTime));
+
+    if (remaining.isEmpty) return null;
+    return remaining.first.title;
   }
 }
