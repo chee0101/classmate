@@ -13,15 +13,21 @@ class TaskEditBottomSheet extends StatefulWidget {
     super.key,
     required this.task,
     required this.sheetTitle,
+    this.isSubtask = false,
+    this.parentDueDateTime,
   });
 
   final Task task;
   final String sheetTitle;
+  final bool isSubtask;
+  final DateTime? parentDueDateTime;
 
   static Future<Task?> show(
     BuildContext context, {
     required Task task,
     required String sheetTitle,
+    bool isSubtask = false,
+    DateTime? parentDueDateTime,
   }) {
     return showModalBottomSheet<Task>(
       context: context,
@@ -29,8 +35,12 @@ class TaskEditBottomSheet extends StatefulWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (context) =>
-          TaskEditBottomSheet(task: task, sheetTitle: sheetTitle),
+      builder: (context) => TaskEditBottomSheet(
+        task: task,
+        sheetTitle: sheetTitle,
+        isSubtask: isSubtask,
+        parentDueDateTime: parentDueDateTime,
+      ),
     );
   }
 
@@ -44,6 +54,9 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
   late String _selectedCourseCode;
   late DateTime _selectedDueDateTime;
   late List<String> _courseOptions;
+  String? _titleError;
+  String? _timeError;
+  bool _hasTime = true;
 
   @override
   void initState() {
@@ -67,11 +80,19 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
 
   Future<void> _pickDate() async {
     final baseTheme = Theme.of(context);
+    final lastDate = widget.isSubtask && widget.parentDueDateTime != null
+        ? DateTime(
+            widget.parentDueDateTime!.year,
+            widget.parentDueDateTime!.month,
+            widget.parentDueDateTime!.day,
+          )
+        : DateTime.now().add(const Duration(days: 365 * 5));
+
     final picked = await showDatePicker(
       context: context,
       initialDate: _selectedDueDateTime,
       firstDate: DateTime.now().subtract(const Duration(days: 365)),
-      lastDate: DateTime.now().add(const Duration(days: 365 * 5)),
+      lastDate: lastDate,
       builder: (context, child) {
         return Theme(
           data: baseTheme,
@@ -80,14 +101,17 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
       },
     );
     if (picked != null) {
+      final candidate = DateTime(
+        picked.year,
+        picked.month,
+        picked.day,
+        _selectedDueDateTime.hour,
+        _selectedDueDateTime.minute,
+      );
+
       setState(() {
-        _selectedDueDateTime = DateTime(
-          picked.year,
-          picked.month,
-          picked.day,
-          _selectedDueDateTime.hour,
-          _selectedDueDateTime.minute,
-        );
+        _selectedDueDateTime = candidate;
+        _timeError = null;
       });
     }
   }
@@ -105,23 +129,59 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
       },
     );
     if (picked != null) {
+      final candidate = DateTime(
+        _selectedDueDateTime.year,
+        _selectedDueDateTime.month,
+        _selectedDueDateTime.day,
+        picked.hour,
+        picked.minute,
+      );
+
+      if (widget.isSubtask &&
+          widget.parentDueDateTime != null &&
+          candidate.isAfter(widget.parentDueDateTime!)) {
+        setState(() {
+          _hasTime = false;
+          _timeError =
+              'Subtask due time must be on or before the main task due time.';
+        });
+        return;
+      }
+
       setState(() {
-        _selectedDueDateTime = DateTime(
-          _selectedDueDateTime.year,
-          _selectedDueDateTime.month,
-          _selectedDueDateTime.day,
-          picked.hour,
-          picked.minute,
-        );
+        _selectedDueDateTime = candidate;
+        _hasTime = true;
+        _timeError = null;
       });
     }
   }
 
   void _handleSave() {
+    final trimmedTitle = _titleController.text.trim();
+    if (trimmedTitle.isEmpty) {
+      setState(() {
+        _titleError = 'Title cannot be empty';
+      });
+      return;
+    } else {
+      _titleError = null;
+    }
+
+    if (widget.isSubtask && widget.parentDueDateTime != null) {
+      if (_selectedDueDateTime.isAfter(widget.parentDueDateTime!)) {
+        setState(() {
+          _timeError =
+              'Subtask due date/time must be on or before the main task.';
+        });
+        return;
+      } else {
+        _timeError = null;
+        _hasTime = true;
+      }
+    }
+
     final updated = widget.task.copyWith(
-      title: _titleController.text.trim().isEmpty
-          ? widget.task.title
-          : _titleController.text.trim(),
+      title: trimmedTitle,
       description: _descriptionController.text.trim().isEmpty
           ? null
           : _descriptionController.text.trim(),
@@ -133,7 +193,11 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
+    final canSave = _titleController.text.trim().isNotEmpty &&
+        _titleError == null &&
+        _timeError == null &&
+        (!widget.isSubtask || _hasTime);
+    return SingleChildScrollView(
       padding: EdgeInsets.only(
         left: AppSpacing.lg,
         right: AppSpacing.lg,
@@ -154,7 +218,22 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
             decoration: const InputDecoration(
               labelText: 'Title',
             ),
+            onChanged: (_) {
+              if (_titleError != null) {
+                setState(() => _titleError = null);
+              }
+            },
           ),
+          if (_titleError != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              _titleError!,
+              style: TextStyle(
+                color: Colors.red.shade600,
+                fontSize: 12,
+              ),
+            ),
+          ],
           const SizedBox(height: AppSpacing.md),
           DropdownButtonFormField<String>(
             value: _selectedCourseCode,
@@ -169,12 +248,14 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
                   ),
                 )
                 .toList(),
-            onChanged: (value) {
-              if (value == null) return;
-              setState(() {
-                _selectedCourseCode = value;
-              });
-            },
+            onChanged: widget.isSubtask
+                ? null
+                : (value) {
+                    if (value == null) return;
+                    setState(() {
+                      _selectedCourseCode = value;
+                    });
+                  },
           ),
           const SizedBox(height: AppSpacing.md),
           Row(
@@ -245,12 +326,16 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Text(
-                          formatTime12h(_selectedDueDateTime),
+                          _hasTime
+                              ? formatTime12h(_selectedDueDateTime)
+                              : 'Select time',
                           style: Theme.of(context)
                               .textTheme
                               .bodyMedium
                               ?.copyWith(
-                                color: Colors.grey.shade800,
+                                color: _hasTime
+                                    ? Colors.grey.shade800
+                                    : Colors.grey.shade500,
                               ),
                         ),
                       ),
@@ -260,6 +345,16 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
               ),
             ],
           ),
+          if (_timeError != null) ...[
+            const SizedBox(height: 4),
+            Text(
+              _timeError!,
+              style: TextStyle(
+                color: Colors.red.shade600,
+                fontSize: 12,
+              ),
+            ),
+          ],
           const SizedBox(height: AppSpacing.md),
           TextField(
             controller: _descriptionController,
@@ -272,7 +367,7 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _handleSave,
+              onPressed: canSave ? _handleSave : null,
               child: const Text('Save'),
             ),
           ),

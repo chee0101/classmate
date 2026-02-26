@@ -278,6 +278,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       context,
       task: draftSubtask,
       sheetTitle: 'Add Subtask',
+      isSubtask: true,
+      parentDueDateTime: _task.dueDateTime,
     ).then((createdSubtask) {
       if (createdSubtask == null) return;
       setState(() {
@@ -345,6 +347,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       context,
       task: subtask,
       sheetTitle: 'Edit Subtask',
+      isSubtask: true,
+      parentDueDateTime: _task.dueDateTime,
     ).then((updatedSubtask) {
       if (updatedSubtask == null) return;
       setState(() {
