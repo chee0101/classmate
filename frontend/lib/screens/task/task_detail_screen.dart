@@ -262,10 +262,34 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   void _handleAddSubtask() {
-    // TODO: Navigate to add/edit subtask screen
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Add subtask (not implemented yet)')),
+    // Create a draft subtask seeded from the parent task.
+    final draftSubtask = Task(
+      id: 'sub-${DateTime.now().millisecondsSinceEpoch}',
+      parentTaskId: _task.id,
+      courseCode: _task.courseCode,
+      courseColor: _task.courseColor,
+      title: '',
+      description: null,
+      dueDateTime: _task.dueDateTime,
+      status: TaskStatus.ongoing,
     );
+
+    TaskEditBottomSheet.show(
+      context,
+      task: draftSubtask,
+      sheetTitle: 'Add Subtask',
+    ).then((createdSubtask) {
+      if (createdSubtask == null) return;
+      setState(() {
+        _subtasks = [..._subtasks, createdSubtask];
+        _sortSubtasks();
+      });
+      // Keep mock data in sync so "Next subtask" labels use the new one.
+      mockTasks.add(createdSubtask);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Subtask added')),
+      );
+    });
   }
 
   void _handleSubtaskMarkDone(Task subtask) {
