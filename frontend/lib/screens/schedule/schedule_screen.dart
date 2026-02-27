@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../core/mock/mock_academic_session.dart';
+import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
+import '../../core/widgets/common/empty_state_card.dart';
 
 class ScheduleScreen extends StatelessWidget {
   const ScheduleScreen({super.key});
@@ -9,7 +12,20 @@ class ScheduleScreen extends StatelessWidget {
         title: const Text('Schedule'),
         automaticallyImplyLeading: false,
       ),
-      body: const Center(child: Text('Your Main App Content')),
+      body: ValueListenableBuilder(
+        valueListenable: currentAcademicSessionNotifier,
+        builder: (context, session, _) {
+          if (session == null) {
+            return EmptyStateCard(
+              onPressed: () {
+                AcademicSessionSetupBottomSheet.show(context);
+              },
+            );
+          }
+
+          return const Center(child: Text('Your Main App Content'));
+        },
+      ),
     );
   }
 }

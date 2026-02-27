@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/routes.dart';
+import '../../core/mock/mock_academic_session.dart';
 import '../../core/mock/mock_tasks.dart';
 import '../../core/models/task.dart';
+import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
+import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/task/task_card.dart';
 import '../../core/widgets/task/task_course_filter.dart';
 import '../../core/widgets/task/task_status_tabs.dart';
@@ -49,70 +52,86 @@ class _TaskScreenState extends State<TaskScreen> {
         title: const Text('Tasks'),
         automaticallyImplyLeading: false,
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.lg,
-              AppSpacing.lg,
-              AppSpacing.lg,
-              0,
-            ),
-            child: TaskStatusTabs(
-              selected: _selectedStatus,
-              onChanged: (status) {
-                setState(() => _selectedStatus = status);
+      body: ValueListenableBuilder(
+        valueListenable: currentAcademicSessionNotifier,
+        builder: (context, session, _) {
+          if (session == null) {
+            return EmptyStateCard(
+              onPressed: () {
+                AcademicSessionSetupBottomSheet.show(context);
               },
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
-            child: TaskCourseFilter(
-              textTheme: textTheme,
-              courseCodes: courseCodes,
-              selectedCourseCode: _selectedCourseCode,
-              onChanged: (code) {
-                setState(() => _selectedCourseCode = code);
-              },
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Expanded(
-            child: Padding(
-              padding: EdgeInsets.zero,
-              child: tasks.isEmpty
-                  ? Center(
-                      child: Text(
-                        'No tasks found. Looks like you\'re all caught up!',
-                        style: textTheme.bodyLarge,
-                        textAlign: TextAlign.center,
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.only(
-                        bottom: AppSpacing.lg,
-                        left: AppSpacing.lg,
-                        right: AppSpacing.lg,
-                      ),
-                      itemCount: tasks.length,
-                      separatorBuilder: (_, __) =>
-                          const SizedBox(height: AppSpacing.md),
-                      itemBuilder: (context, index) {
-                        final task = tasks[index];
-                        final nextSubtaskTitle = _getNextSubtaskTitle(task.id);
-                        return TaskCard(
-                          task: task,
-                          onMarkDone: () => _markTaskAsCompleted(task),
-                          onTap: () => _navigateToTaskDetail(task),
-                          nextSubtaskTitle: nextSubtaskTitle,
-                        );
-                      },
-                    ),
-            ),
-          ),
-        ],
+              subtitle:
+                  'Add your academic calendar to begin tracking tasks in your semester.',
+            );
+          }
+
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                  0,
+                ),
+                child: TaskStatusTabs(
+                  selected: _selectedStatus,
+                  onChanged: (status) {
+                    setState(() => _selectedStatus = status);
+                  },
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                child: TaskCourseFilter(
+                  textTheme: textTheme,
+                  courseCodes: courseCodes,
+                  selectedCourseCode: _selectedCourseCode,
+                  onChanged: (code) {
+                    setState(() => _selectedCourseCode = code);
+                  },
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Expanded(
+                child: Padding(
+                  padding: EdgeInsets.zero,
+                  child: tasks.isEmpty
+                      ? Center(
+                          child: Text(
+                            'No tasks found. Looks like you\'re all caught up!',
+                            style: textTheme.bodyLarge,
+                            textAlign: TextAlign.center,
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.only(
+                            bottom: AppSpacing.lg,
+                            left: AppSpacing.lg,
+                            right: AppSpacing.lg,
+                          ),
+                          itemCount: tasks.length,
+                          separatorBuilder: (_, __) =>
+                              const SizedBox(height: AppSpacing.md),
+                          itemBuilder: (context, index) {
+                            final task = tasks[index];
+                            final nextSubtaskTitle =
+                                _getNextSubtaskTitle(task.id);
+                            return TaskCard(
+                              task: task,
+                              onMarkDone: () => _markTaskAsCompleted(task),
+                              onTap: () => _navigateToTaskDetail(task),
+                              nextSubtaskTitle: nextSubtaskTitle,
+                            );
+                          },
+                        ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

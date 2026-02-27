@@ -1,10 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../constants/app_spacing.dart';
+import '../../mock/mock_academic_session.dart';
+import 'academic_session_setup_bottom_sheet.dart';
 
 class AddNewBottomSheet extends StatelessWidget {
   const AddNewBottomSheet({super.key});
 
   static void show(BuildContext context) {
+    if (!hasAcademicSession()) {
+      AcademicSessionSetupBottomSheet.show(context);
+      return;
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -105,11 +112,11 @@ class _OptionCard extends StatelessWidget {
           border: Border.all(color: Colors.grey.shade200),
           borderRadius: BorderRadius.circular(20),
           color: Colors.white,
-          boxShadow: [
+          boxShadow: const [
             BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
+              blurRadius: 8,
+              color: Colors.black12,
+              offset: Offset(0, 4),
             ),
           ],
         ),
