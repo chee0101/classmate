@@ -13,6 +13,7 @@ import '../../core/widgets/schedule/class_slot_sheet.dart';
 import '../../core/widgets/add/task_form.dart';
 import '../../core/widgets/add/class_form.dart';
 import '../../core/widgets/add/event_form.dart';
+import '../../core/widgets/add/add_course_dialog.dart';
 
 enum _AddType { task, classSlot, event }
 
@@ -204,6 +205,35 @@ class _AddNewScreenState extends State<AddNewScreen> {
     if (slot == null) return;
     setState(() => _classSlots.add(slot));
   }
+  Future<void> _showAddCourseDialogForTask(String sessionId) async {
+    final newCode = await AddCourseDialog.show(
+      context,
+      sessionId: sessionId,
+    );
+    if (newCode == null) return;
+    setState(() {
+      _taskCourseCode = newCode;
+    });
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$newCode added successfully!')),
+    );
+  }
+
+  Future<void> _showAddCourseDialogForClass(String sessionId) async {
+    final newCode = await AddCourseDialog.show(
+      context,
+      sessionId: sessionId,
+    );
+    if (newCode == null) return;
+    setState(() {
+      _classCourseCode = newCode;
+    });
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('$newCode added successfully!')),
+    );
+  }
 
   Future<void> _editClassSlot(ClassSlotDraft slot) async {
     final updated = await AddClassSlotSheet.show(
@@ -367,6 +397,8 @@ class _AddNewScreenState extends State<AddNewScreen> {
                   setState(() => _taskCourseCode = value),
               onPickDate: () => _pickTaskDate(selectedTerm),
               onPickTime: _pickTaskTime,
+              onAddCourseRequested: () =>
+                  _showAddCourseDialogForTask(selectedSession.id),
             );
           } else if (_selectedType == _AddType.classSlot) {
             typeSpecificForm = ClassForm(
@@ -379,6 +411,8 @@ class _AddNewScreenState extends State<AddNewScreen> {
               onEditSlot: _editClassSlot,
               onRemoveSlot: (slot) =>
                   setState(() => _classSlots.remove(slot)),
+              onAddCourseRequested: () =>
+                  _showAddCourseDialogForClass(selectedSession.id),
             );
           } else {
             typeSpecificForm = EventForm(

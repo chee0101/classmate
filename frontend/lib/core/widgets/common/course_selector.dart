@@ -6,11 +6,13 @@ class CourseSelector extends StatelessWidget {
     required this.courseCodes,
     required this.selected,
     required this.onChanged,
+    this.onAddCourseRequested,
   });
 
   final List<String> courseCodes;
   final String? selected;
   final ValueChanged<String?> onChanged;
+  final VoidCallback? onAddCourseRequested;
 
   @override
   Widget build(BuildContext context) {
@@ -65,11 +67,15 @@ class CourseSelector extends StatelessWidget {
               dropdownMenuEntries: entries,
               onSelected: (value) {
                 if (value == addCourseValue) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Add course (mock).'),
-                    ),
-                  );
+                  if (onAddCourseRequested != null) {
+                    onAddCourseRequested!();
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Add course (mock).'),
+                      ),
+                    );
+                  }
                   return;
                 }
                 onChanged(value);

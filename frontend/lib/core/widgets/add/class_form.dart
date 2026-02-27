@@ -15,6 +15,7 @@ class ClassForm extends StatelessWidget {
     required this.onAddSlot,
     required this.onEditSlot,
     required this.onRemoveSlot,
+    required this.onAddCourseRequested,
   });
 
   final List<String> courseCodes;
@@ -24,6 +25,7 @@ class ClassForm extends StatelessWidget {
   final VoidCallback onAddSlot;
   final ValueChanged<ClassSlotDraft> onEditSlot;
   final ValueChanged<ClassSlotDraft> onRemoveSlot;
+  final VoidCallback onAddCourseRequested;
 
   @override
   Widget build(BuildContext context) {
@@ -36,6 +38,7 @@ class ClassForm extends StatelessWidget {
           courseCodes: courseCodes,
           selected: selectedCourseCode,
           onChanged: onCourseChanged,
+          onAddCourseRequested: onAddCourseRequested,
         ),
         const SizedBox(height: AppSpacing.md),
         Text(

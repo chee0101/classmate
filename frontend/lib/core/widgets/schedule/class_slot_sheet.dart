@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../constants/app_spacing.dart';
 import '../../utils/date_time_format.dart';
+import '../common/form_fields.dart';
 
 class ClassSlotDraft {
   const ClassSlotDraft({
@@ -165,16 +166,15 @@ class _AddClassSlotSheetState extends State<AddClassSlotSheet> {
             style: Theme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: AppSpacing.md),
-          DropdownButtonFormField<String>(
+          DropdownField<String>(
+            label: 'Day',
             value: _selectedDay,
-            decoration: const InputDecoration(
-              labelText: 'Day',
-            ),
+            hintText: 'Select day',
             items: days
                 .map(
-                  (day) => DropdownMenuItem<String>(
+                  (day) => DropdownMenuEntry<String>(
                     value: day,
-                    child: Text(day),
+                    label: day,
                   ),
                 )
                 .toList(),
@@ -184,38 +184,18 @@ class _AddClassSlotSheetState extends State<AddClassSlotSheet> {
           Row(
             children: [
               Expanded(
-                child: InkWell(
+                child: TapField(
+                  label: 'Start time',
+                  value: timeLabel(_start),
                   onTap: _pickStart,
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 16,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(timeLabel(_start)),
-                  ),
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
-                child: InkWell(
+                child: TapField(
+                  label: 'End time',
+                  value: timeLabel(_end),
                   onTap: _pickEnd,
-                  borderRadius: BorderRadius.circular(10),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 16,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(timeLabel(_end)),
-                  ),
                 ),
               ),
             ],
@@ -265,14 +245,11 @@ class _AddClassSlotSheetState extends State<AddClassSlotSheet> {
           ),
           if (requiresVenue) ...[
             const SizedBox(height: AppSpacing.md),
-            Text('Venue', style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 4),
-            TextField(
+            LabeledTextField(
+              label: 'Venue',
+              hintText: 'Enter venue',
               controller: _venueController,
               onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(
-                hintText: 'Enter venue',
-              ),
             ),
           ],
           const SizedBox(height: AppSpacing.lg),

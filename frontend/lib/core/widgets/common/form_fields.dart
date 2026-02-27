@@ -8,6 +8,7 @@ class LabeledTextField extends StatelessWidget {
     required this.controller,
     required this.onChanged,
     this.maxLines = 1,
+    this.errorText,
   });
 
   final String label;
@@ -15,6 +16,7 @@ class LabeledTextField extends StatelessWidget {
   final TextEditingController controller;
   final ValueChanged<String> onChanged;
   final int maxLines;
+  final String? errorText;
 
   @override
   Widget build(BuildContext context) {
@@ -27,7 +29,10 @@ class LabeledTextField extends StatelessWidget {
           controller: controller,
           maxLines: maxLines,
           onChanged: onChanged,
-          decoration: InputDecoration(hintText: hintText),
+          decoration: InputDecoration(
+            hintText: hintText,
+            errorText: errorText,
+          ),
         ),
       ],
     );

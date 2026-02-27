@@ -19,6 +19,7 @@ class TaskForm extends StatelessWidget {
     required this.onCourseChanged,
     required this.onPickDate,
     required this.onPickTime,
+    required this.onAddCourseRequested,
   });
 
   final TextEditingController titleController;
@@ -31,6 +32,7 @@ class TaskForm extends StatelessWidget {
   final ValueChanged<String?> onCourseChanged;
   final VoidCallback onPickDate;
   final VoidCallback onPickTime;
+  final VoidCallback onAddCourseRequested;
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +50,7 @@ class TaskForm extends StatelessWidget {
           courseCodes: courseCodes,
           selected: selectedCourseCode,
           onChanged: onCourseChanged,
+          onAddCourseRequested: onAddCourseRequested,
         ),
         const SizedBox(height: AppSpacing.md),
         Row(
