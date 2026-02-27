@@ -19,21 +19,16 @@ class TaskCourseFilter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final menuItemStyle = ButtonStyle(
-      textStyle: WidgetStateProperty.all<TextStyle?>(textTheme.bodyLarge),
-    );
 
     final entries = <DropdownMenuEntry<String?>>[
       DropdownMenuEntry<String?>(
         value: null,
         label: 'All courses',
-        style: menuItemStyle,
       ),
       ...courseCodes.map(
         (code) => DropdownMenuEntry<String?>(
           value: code,
           label: code,
-          style: menuItemStyle,
         ),
       ),
     ];

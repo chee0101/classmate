@@ -5,4 +5,5 @@ class AppRoutes {
   static const String verifyEmail = '/verify-email';
   static const String forgotPassword = '/forgot-password';
   static const String taskDetail = '/task-detail';
+  static const String addNew = '/add-new';
 }

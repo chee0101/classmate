@@ -6,6 +6,7 @@ import 'core/constants/routes.dart';
 import 'core/layout/main_scaffold.dart';
 import 'screens/auth/forgot_password_screen.dart';
 import 'screens/auth/verify_email_screen.dart';
+import 'screens/add/add_new_screen.dart';
 import 'screens/task/task_detail_screen.dart';
 import 'core/models/task.dart';
 import 'splash_screen.dart';
@@ -39,43 +40,43 @@ class MyApp extends StatelessWidget {
         scaffoldBackgroundColor: AppPrimarySwatch.shade50,
         textTheme: GoogleFonts.poppinsTextTheme().copyWith(
           /// App title / splash title
-          headlineLarge: const TextStyle(
+          headlineLarge: GoogleFonts.poppins(
             fontSize: 24,
             fontWeight: FontWeight.w700,
           ),
 
           /// Screen title
-          headlineMedium: const TextStyle(
+          headlineMedium: GoogleFonts.poppins(
             fontSize: 20,
             fontWeight: FontWeight.w600,
           ),
 
           /// Section title (Cards, lists)
-          titleLarge: const TextStyle(
+          titleLarge: GoogleFonts.poppins(
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
 
           /// Body text
-          bodyLarge: const TextStyle(
+          bodyLarge: GoogleFonts.poppins(
             fontSize: 14,
             fontWeight: FontWeight.w400,
           ),
 
           /// Secondary body text
-          bodyMedium: const TextStyle(
+          bodyMedium: GoogleFonts.poppins(
             fontSize: 13,
             fontWeight: FontWeight.w400,
           ),
 
           /// Caption / helper text
-          bodySmall: const TextStyle(
+          bodySmall: GoogleFonts.poppins(
             fontSize: 12,
             fontWeight: FontWeight.w400,
           ),
 
           /// Button text
-          labelLarge: const TextStyle(
+          labelLarge: GoogleFonts.poppins(
             fontSize: 16,
             fontWeight: FontWeight.w600,
           ),
@@ -103,7 +104,7 @@ class MyApp extends StatelessWidget {
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            textStyle: const TextStyle(
+            textStyle: GoogleFonts.poppins(
               fontSize: 16,
               fontWeight: FontWeight.w600,
             ),
@@ -118,18 +119,18 @@ class MyApp extends StatelessWidget {
           ),
 
           /// Input text style
-          hintStyle: TextStyle(
+          hintStyle: GoogleFonts.poppins(
             fontSize: 14,
             color: Colors.grey.shade400,
           ),
 
-          labelStyle: TextStyle(
+          labelStyle: GoogleFonts.poppins(
             fontSize: 14,
             fontWeight: FontWeight.w500,
             color: Colors.grey.shade700,
           ),
 
-          errorStyle: const TextStyle(
+          errorStyle: GoogleFonts.poppins(
             fontSize: 12,
           ),
 
@@ -146,6 +147,55 @@ class MyApp extends StatelessWidget {
             borderSide: BorderSide(color: AppPrimarySwatch.shade700),
           ),
         ),
+        dropdownMenuTheme: DropdownMenuThemeData(
+          textStyle: GoogleFonts.poppins(
+            fontSize: 14,
+            fontWeight: FontWeight.w400,
+            color: Colors.black87,
+          ),
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            fillColor: Colors.white,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 16,
+            ),
+            hintStyle: GoogleFonts.poppins(
+              fontSize: 14,
+              color: Colors.grey.shade400,
+            ),
+            labelStyle: GoogleFonts.poppins(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.grey.shade700,
+            ),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: Colors.grey.shade200),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppPrimarySwatch.shade700),
+            ),
+          ),
+          menuStyle: const MenuStyle(
+            backgroundColor: WidgetStatePropertyAll<Color>(Colors.white),
+          ),
+        ),
+        menuButtonTheme: MenuButtonThemeData(
+          style: ButtonStyle(
+            textStyle: WidgetStatePropertyAll<TextStyle?>(
+              GoogleFonts.poppins(
+                fontSize: 14,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ),
+        ),
       ),
 
       // ===================================================
@@ -158,6 +208,7 @@ class MyApp extends StatelessWidget {
         AppRoutes.login: (context) => const AuthScreen(),
         AppRoutes.verifyEmail: (context) => const VerifyEmailScreen(),
         AppRoutes.forgotPassword: (context) => const ForgotPasswordScreen(),
+        AppRoutes.addNew: (context) => const AddNewScreen(),
         AppRoutes.taskDetail: (context) {
           final task = ModalRoute.of(context)!.settings.arguments as Task;
           return TaskDetailScreen(task: task);
@@ -174,10 +225,15 @@ class MyApp extends StatelessWidget {
 class AuthChecker extends StatelessWidget {
   const AuthChecker({super.key});
 
+  bool _mockIsLoggedIn() {
+    // Placeholder until auth persistence is wired.
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
-    // TODO: Replace with real auth check (SharedPreferences / token)
-    final bool userIsLoggedIn = true;
+    // TODO: Replace with real auth check (SharedPreferences / token).
+    final userIsLoggedIn = _mockIsLoggedIn();
 
     if (userIsLoggedIn) {
       return const MainScaffold();

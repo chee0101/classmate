@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import '../../constants/app_spacing.dart';
+import '../../constants/routes.dart';
 import '../../mock/mock_academic_session.dart';
 import 'academic_session_setup_bottom_sheet.dart';
 
@@ -16,7 +18,7 @@ class AddNewBottomSheet extends StatelessWidget {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => const AddNewBottomSheet(),
+      builder: (_) => const AddNewBottomSheet(),
     );
   }
 
@@ -32,12 +34,12 @@ class AddNewBottomSheet extends StatelessWidget {
       decoration: BoxDecoration(
         color: colorScheme.surface,
         borderRadius: const BorderRadius.vertical(
-            top: Radius.circular(AppSpacing.xl)),
+          top: Radius.circular(AppSpacing.xl),
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Handle bar
           Container(
             width: 40,
             height: 4,
@@ -47,7 +49,6 @@ class AddNewBottomSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-
           Text(
             'Add New',
             style: TextStyle(
@@ -57,7 +58,6 @@ class AddNewBottomSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppSpacing.lg),
-
           Row(
             children: [
               Expanded(
@@ -65,7 +65,14 @@ class AddNewBottomSheet extends StatelessWidget {
                   icon: Icons.document_scanner_outlined,
                   title: 'Auto Extract',
                   subtitle: 'Auto-fill from documents',
-                  onTap: () => Navigator.pop(context),
+                  onTap: () {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Auto Extract flow will be added next.'),
+                      ),
+                    );
+                  },
                 ),
               ),
               const SizedBox(width: AppSpacing.md),
@@ -74,7 +81,10 @@ class AddNewBottomSheet extends StatelessWidget {
                   icon: Icons.edit_note_rounded,
                   title: 'Manual Input',
                   subtitle: 'Enter details manually',
-                  onTap: () => Navigator.pop(context),
+                  onTap: () {
+                    Navigator.pop(context);
+                    Navigator.pushNamed(context, AppRoutes.addNew);
+                  },
                 ),
               ),
             ],
@@ -87,11 +97,6 @@ class AddNewBottomSheet extends StatelessWidget {
 }
 
 class _OptionCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
   const _OptionCard({
     required this.icon,
     required this.title,
@@ -99,10 +104,14 @@ class _OptionCard extends StatelessWidget {
     required this.onTap,
   });
 
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
   @override
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
-
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
@@ -147,3 +156,4 @@ class _OptionCard extends StatelessWidget {
     );
   }
 }
+
