@@ -172,39 +172,54 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _isEditingName
-                ? SizedBox(
-                    width: 200,
+        _isEditingName
+            ? Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    width: 250,
                     child: TextField(
                       controller: _nameController,
                       style: textTheme.titleLarge,
                       textAlign: TextAlign.center,
-                      decoration: const InputDecoration(
-                        border: InputBorder.none,
-                        isDense: true,
-                        contentPadding: EdgeInsets.zero,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.sm,
+                        ),
                       ),
                       autofocus: true,
                       onSubmitted: (_) => _handleEditName(),
                     ),
-                  )
-                : Text(
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  IconButton(
+                    icon: const Icon(Icons.check),
+                    onPressed: _handleEditName,
+                    iconSize: 24,
+                  ),
+                ],
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
                     _userName,
                     style: textTheme.titleLarge,
                   ),
-            const SizedBox(width: AppSpacing.xs),
-            IconButton(
-              icon: Icon(_isEditingName ? Icons.check : Icons.edit_outlined),
-              onPressed: _handleEditName,
-              iconSize: 20,
-              padding: EdgeInsets.zero,
-              constraints: const BoxConstraints(),
-            ),
-          ],
-        ),
+                  const SizedBox(width: AppSpacing.xs),
+                  IconButton(
+                    icon: const Icon(Icons.edit_outlined),
+                    onPressed: _handleEditName,
+                    iconSize: 20,
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                  ),
+                ],
+              ),
         const SizedBox(height: AppSpacing.xs),
         Text(
           _userEmail,

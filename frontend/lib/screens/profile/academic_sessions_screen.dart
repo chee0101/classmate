@@ -22,7 +22,7 @@ class _AcademicSessionsScreenState extends State<AcademicSessionsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Academic Session'),
+        title: const Text('Academic Sessions'),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -65,7 +65,7 @@ class _AcademicSessionsScreenState extends State<AcademicSessionsScreen> {
                     const SizedBox(height: AppSpacing.lg),
                     ElevatedButton(
                       onPressed: () {
-                        AcademicSessionSetupBottomSheet.show(context);
+                        AcademicSessionSetupBottomSheet.show(context, title: 'Add New Academic Session');
                       },
                       child: const Text('Add Session'),
                     ),
@@ -159,11 +159,30 @@ class _AcademicSessionsScreenState extends State<AcademicSessionsScreen> {
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          AcademicSessionSetupBottomSheet.show(context);
+      floatingActionButton: ValueListenableBuilder(
+        valueListenable: currentAcademicSessionNotifier,
+        builder: (context, activeSession, _) {
+          final sessions = [...mockAcademicSessions];
+          if (activeSession != null &&
+              !sessions.any((s) => s.id == activeSession.id)) {
+            sessions.add(activeSession);
+          }
+          
+          // Only show FAB when sessions are not empty
+          if (sessions.isEmpty) {
+            return const SizedBox.shrink();
+          }
+          
+          return FloatingActionButton(
+            onPressed: () {
+              AcademicSessionSetupBottomSheet.show(
+                context,
+                title: 'Add New Academic Session',
+              );
+            },
+            child: const Icon(Icons.add),
+          );
         },
-        child: const Icon(Icons.add),
       ),
     );
   }

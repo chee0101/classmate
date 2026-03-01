@@ -7,16 +7,24 @@ import '../../utils/date_time_format.dart';
 import 'form_fields.dart';
 
 class AcademicSessionSetupBottomSheet extends StatefulWidget {
-  const AcademicSessionSetupBottomSheet({super.key});
+  const AcademicSessionSetupBottomSheet({
+    super.key,
+    this.title,
+  });
 
-  static Future<AcademicSession?> show(BuildContext context) {
+  final String? title;
+
+  static Future<AcademicSession?> show(
+    BuildContext context, {
+    String? title,
+  }) {
     return showModalBottomSheet<AcademicSession>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => const AcademicSessionSetupBottomSheet(),
+      builder: (_) => AcademicSessionSetupBottomSheet(title: title),
     );
   }
 
@@ -114,7 +122,7 @@ class _AcademicSessionSetupBottomSheetState
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Set Up Academic Session',
+            widget.title ?? 'Set Up Academic Session',
             style: Theme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: AppSpacing.sm),
