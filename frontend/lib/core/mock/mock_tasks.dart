@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../models/task.dart';
@@ -6,7 +7,7 @@ import '../models/task.dart';
 ///
 /// This lets you build and fine-tune the UI before wiring up Firebase
 /// or a backend. Later you can replace this with real data providers.
-final List<Task> mockTasks = [
+final ValueNotifier<List<Task>> mockTasksNotifier = ValueNotifier<List<Task>>([
   // Top-level tasks
   Task(
     id: 't1',
@@ -76,10 +77,10 @@ final List<Task> mockTasks = [
     dueDateTime: DateTime.now().add(const Duration(days: 4)),
     status: TaskStatus.completed,
   ),
-];
+]);
 
 List<Task> mockTopLevelTasks() =>
-    mockTasks.where((t) => t.parentTaskId == null).toList();
+    mockTasksNotifier.value.where((t) => t.parentTaskId == null).toList();
 
 List<Task> mockSubtasksFor(String parentTaskId) =>
-    mockTasks.where((t) => t.parentTaskId == parentTaskId).toList();
+    mockTasksNotifier.value.where((t) => t.parentTaskId == parentTaskId).toList();

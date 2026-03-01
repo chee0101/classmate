@@ -8,18 +8,21 @@ class AddCourseDialog extends StatefulWidget {
   const AddCourseDialog({
     super.key,
     required this.sessionId,
+    required this.termId,
   });
 
   final String sessionId;
+  final String termId;
 
   static Future<String?> show(
     BuildContext context, {
     required String sessionId,
+    required String termId,
   }) {
     return showDialog<String>(
       context: context,
       barrierDismissible: true,
-      builder: (_) => AddCourseDialog(sessionId: sessionId),
+      builder: (_) => AddCourseDialog(sessionId: sessionId, termId: termId),
     );
   }
 
@@ -56,8 +59,9 @@ class _AddCourseDialogState extends State<AddCourseDialog> {
       return;
     }
 
-    if (courseCodeExistsInSession(
+    if (courseCodeExistsInSessionAndTerm(
       sessionId: widget.sessionId,
+      termId: widget.termId,
       courseCode: code,
     )) {
       setState(() => _errorText = 'This course code already exists.');
@@ -70,6 +74,7 @@ class _AddCourseDialogState extends State<AddCourseDialog> {
 
     addCourse(
       sessionId: widget.sessionId,
+      termId: widget.termId,
       courseCode: code,
       courseColor: hex,
     );

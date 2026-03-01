@@ -208,10 +208,11 @@ class _AddNewScreenState extends State<AddNewScreen> {
     if (slot == null) return;
     setState(() => _classSlots.add(slot));
   }
-  Future<void> _showAddCourseDialogForTask(String sessionId) async {
+  Future<void> _showAddCourseDialogForTask(String sessionId, String termId) async {
     final newCode = await AddCourseDialog.show(
       context,
       sessionId: sessionId,
+      termId: termId,
     );
     if (newCode == null) return;
     setState(() {
@@ -223,10 +224,11 @@ class _AddNewScreenState extends State<AddNewScreen> {
     );
   }
 
-  Future<void> _showAddCourseDialogForClass(String sessionId) async {
+  Future<void> _showAddCourseDialogForClass(String sessionId, String termId) async {
     final newCode = await AddCourseDialog.show(
       context,
       sessionId: sessionId,
+      termId: termId,
     );
     if (newCode == null) return;
     setState(() {
@@ -266,19 +268,18 @@ class _AddNewScreenState extends State<AddNewScreen> {
     final colorHex = matched.isEmpty ? '#6C4DD9' : matched.first.courseColor;
     final colorValue = int.tryParse(colorHex.replaceFirst('#', '0xFF'));
 
-    mockTasks.add(
-      Task(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        courseCode: _taskCourseCode!,
-        courseColor: Color(colorValue ?? 0xFF6C4DD9),
-        title: title,
-        description: _taskNoteController.text.trim().isEmpty
-            ? null
-            : _taskNoteController.text.trim(),
-        dueDateTime: _taskDueDateTime,
-        status: TaskStatus.ongoing,
-      ),
+    final newTask = Task(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      courseCode: _taskCourseCode!,
+      courseColor: Color(colorValue ?? 0xFF6C4DD9),
+      title: title,
+      description: _taskNoteController.text.trim().isEmpty
+          ? null
+          : _taskNoteController.text.trim(),
+      dueDateTime: _taskDueDateTime,
+      status: TaskStatus.ongoing,
     );
+    mockTasksNotifier.value = [...mockTasksNotifier.value, newTask];
     if (!mounted) return;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -358,10 +359,12 @@ class _AddNewScreenState extends State<AddNewScreen> {
             orElse: () => termWindows.first,
           );
 
-          final sessionCourses = courses
-              .where((c) => c.sessionId == selectedSession.id)
+          // Filter courses by session and term
+          final sessionAndTermCourses = courses
+              .where((c) => c.sessionId == selectedSession.id && c.termId == selectedTerm.id)
               .toList(growable: false);
-          final courseCodes = sessionCourses.map((c) => c.courseCode).toSet().toList()
+          
+          final courseCodes = sessionAndTermCourses.map((c) => c.courseCode).toSet().toList()
             ..sort();
 
           if (_taskCourseCode != null && !courseCodes.contains(_taskCourseCode)) {
@@ -406,7 +409,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
               onPickDate: () => _pickTaskDate(selectedTerm),
               onPickTime: _pickTaskTime,
               onAddCourseRequested: () =>
-                  _showAddCourseDialogForTask(selectedSession.id),
+                  _showAddCourseDialogForTask(selectedSession.id, selectedTerm.id),
             );
           } else if (_selectedType == AddType.classSlot) {
             typeSpecificForm = ClassForm(
@@ -420,7 +423,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
               onRemoveSlot: (slot) =>
                   setState(() => _classSlots.remove(slot)),
               onAddCourseRequested: () =>
-                  _showAddCourseDialogForClass(selectedSession.id),
+                  _showAddCourseDialogForClass(selectedSession.id, selectedTerm.id),
             );
           } else {
             typeSpecificForm = EventForm(

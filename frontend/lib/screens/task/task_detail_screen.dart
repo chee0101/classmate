@@ -287,7 +287,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         _sortSubtasks();
       });
       // Keep mock data in sync so "Next subtask" labels use the new one.
-      mockTasks.add(createdSubtask);
+      mockTasksNotifier.value = [...mockTasksNotifier.value, createdSubtask];
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Subtask added')),
       );

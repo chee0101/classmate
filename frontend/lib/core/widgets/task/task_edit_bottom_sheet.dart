@@ -67,7 +67,7 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
     _selectedCourseCode = widget.task.courseCode;
     _selectedDueDateTime = widget.task.dueDateTime;
 
-    _courseOptions = mockTasks.map((t) => t.courseCode).toSet().toList()
+    _courseOptions = mockTasksNotifier.value.map((t) => t.courseCode).toSet().toList()
       ..sort();
   }
 

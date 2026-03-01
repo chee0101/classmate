@@ -65,45 +65,56 @@ class _HomeScreenState extends State<HomeScreen> {
             orElse: () => termWindows.first,
           );
 
-          final upcomingTasks = TaskUtils.getUpcomingTasks(mockTopLevelTasks());
+          return ValueListenableBuilder(
+            valueListenable: mockTasksNotifier,
+            builder: (context, tasks, _) {
+              // Get upcoming tasks and filter by selected term
+              final allUpcomingTasks = TaskUtils.getUpcomingTasks(
+                tasks.where((t) => t.parentTaskId == null).toList(),
+              );
+              final upcomingTasks = allUpcomingTasks.where((task) {
+                return isInTerm(task.dueDateTime, selectedTerm);
+              }).toList();
 
-          return Column(
-            children: [
-              Padding(
-                padding: const EdgeInsets.only(
-                  top: AppSpacing.lg,
-                  left: AppSpacing.lg,
-                  right: AppSpacing.lg,
-                ),
-                child: SessionHeader(
-                  sessionName: session.name,
-                  termWindows: termWindows,
-                  selectedTerm: selectedTerm,
-                  onTermChanged: (id) {
-                    setState(() => _selectedTermId = id);
-                  },
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.only(
-                    top: AppSpacing.md,
-                    left: AppSpacing.lg,
-                    right: AppSpacing.lg,
-                    bottom: AppSpacing.lg,
+              return Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(
+                      top: AppSpacing.lg,
+                      left: AppSpacing.lg,
+                      right: AppSpacing.lg,
+                    ),
+                    child: SessionHeader(
+                      sessionName: session.name,
+                      termWindows: termWindows,
+                      selectedTerm: selectedTerm,
+                      onTermChanged: (id) {
+                        setState(() => _selectedTermId = id);
+                      },
+                    ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const TodayClassesCard(hasClasses: false),
-                      const SizedBox(height: AppSpacing.lg),
-                      UpcomingDeadlinesCard(tasks: upcomingTasks),
-                    ],
+                  const SizedBox(height: AppSpacing.sm),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.only(
+                        top: AppSpacing.md,
+                        left: AppSpacing.lg,
+                        right: AppSpacing.lg,
+                        bottom: AppSpacing.lg,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const TodayClassesCard(hasClasses: false),
+                          const SizedBox(height: AppSpacing.lg),
+                          UpcomingDeadlinesCard(tasks: upcomingTasks),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           );
         },
       ),

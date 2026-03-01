@@ -21,31 +21,11 @@ class TaskScreen extends StatefulWidget {
 class _TaskScreenState extends State<TaskScreen> {
   TaskStatus _selectedStatus = TaskStatus.ongoing;
 
-  late List<Task> _tasks;
   String? _selectedCourseCode; // null = All courses
-
-  @override
-  void initState() {
-    super.initState();
-    // Only show top-level tasks in the list (subtasks are shown in detail view).
-    _tasks = mockTopLevelTasks();
-  }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-
-    // Build distinct course codes for the filter.
-    final courseCodes = _tasks.map((t) => t.courseCode).toSet().toList()
-      ..sort();
-
-    final tasks = _tasks.where((t) {
-      final matchesStatus = t.status == _selectedStatus;
-      final matchesCourse =
-          _selectedCourseCode == null || t.courseCode == _selectedCourseCode;
-      return matchesStatus && matchesCourse;
-    }).toList()
-      ..sort((a, b) => a.dueDateTime.compareTo(b.dueDateTime));
 
     return Scaffold(
       appBar: AppBar(
@@ -70,7 +50,25 @@ class _TaskScreenState extends State<TaskScreen> {
             );
           }
 
-          return Column(
+          return ValueListenableBuilder(
+            valueListenable: mockTasksNotifier,
+            builder: (context, allTasks, _) {
+              // Only show top-level tasks in the list (subtasks are shown in detail view).
+              final _tasks = allTasks.where((t) => t.parentTaskId == null).toList();
+
+              // Build distinct course codes for the filter.
+              final courseCodes = _tasks.map((t) => t.courseCode).toSet().toList()
+                ..sort();
+
+              final tasks = _tasks.where((t) {
+                final matchesStatus = t.status == _selectedStatus;
+                final matchesCourse =
+                    _selectedCourseCode == null || t.courseCode == _selectedCourseCode;
+                return matchesStatus && matchesCourse;
+              }).toList()
+                ..sort((a, b) => a.dueDateTime.compareTo(b.dueDateTime));
+
+              return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
@@ -135,6 +133,8 @@ class _TaskScreenState extends State<TaskScreen> {
                 ),
               ),
             ],
+            );
+            },
           );
         },
       ),
@@ -144,14 +144,12 @@ class _TaskScreenState extends State<TaskScreen> {
   void _markTaskAsCompleted(Task task) {
     if (task.status == TaskStatus.completed) return;
 
-    setState(() {
-      _tasks = _tasks
-          .map(
-            (t) =>
-                t.id == task.id ? t.copyWith(status: TaskStatus.completed) : t,
-          )
-          .toList();
-    });
+    mockTasksNotifier.value = mockTasksNotifier.value
+        .map(
+          (t) =>
+              t.id == task.id ? t.copyWith(status: TaskStatus.completed) : t,
+        )
+        .toList();
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(

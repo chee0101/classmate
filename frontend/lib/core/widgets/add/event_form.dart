@@ -97,6 +97,7 @@ class EventForm extends StatelessWidget {
                           ),
                         ),
                   onTap: onPickStartTime,
+                  hintText: 'Select time',
                 ),
               ),
           ],
@@ -111,6 +112,7 @@ class EventForm extends StatelessWidget {
                     ? 'Select date'
                     : formatDateDdMmYyyy(endDate!),
                 onTap: onPickEndDate,
+                hintText: 'Select date',
               ),
             ),
             const SizedBox(width: AppSpacing.sm),
@@ -130,6 +132,7 @@ class EventForm extends StatelessWidget {
                           ),
                         ),
                   onTap: onPickEndTime,
+                  hintText: 'Select time',
                 ),
               ),
           ],

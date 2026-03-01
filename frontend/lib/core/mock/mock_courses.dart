@@ -25,12 +25,30 @@ bool courseCodeExistsInSession({
   );
 }
 
+bool courseCodeExistsInSessionAndTerm({
+  required String sessionId,
+  required String termId,
+  required String courseCode,
+}) {
+  final normalized = courseCode.trim().toUpperCase();
+  return mockCoursesNotifier.value.any(
+    (c) => c.sessionId == sessionId && 
+           c.termId == termId && 
+           c.courseCode.toUpperCase() == normalized,
+  );
+}
+
 void addCourse({
   required String sessionId,
+  required String termId,
   required String courseCode,
   required String courseColor,
 }) {
-  if (courseCodeExistsInSession(sessionId: sessionId, courseCode: courseCode)) {
+  if (courseCodeExistsInSessionAndTerm(
+    sessionId: sessionId,
+    termId: termId,
+    courseCode: courseCode,
+  )) {
     return;
   }
 
@@ -39,6 +57,7 @@ void addCourse({
       Course(
         id: DateTime.now().microsecondsSinceEpoch.toString(),
         sessionId: sessionId,
+        termId: termId,
         courseCode: courseCode.trim().toUpperCase(),
         courseColor: courseColor,
       ),

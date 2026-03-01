@@ -31,9 +31,18 @@ class LabeledTextField extends StatelessWidget {
           onChanged: onChanged,
           decoration: InputDecoration(
             hintText: hintText,
-            errorText: errorText,
           ),
         ),
+        if (errorText != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            errorText!,
+            style: TextStyle(
+              color: Colors.red.shade600,
+              fontSize: 12,
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -45,18 +54,37 @@ class TapField extends StatelessWidget {
     required this.label,
     required this.value,
     required this.onTap,
+    this.hintText,
   });
 
   final String label;
   final String value;
   final VoidCallback onTap;
+  final String? hintText;
+
+  bool _isPlaceholder(String value, String? hintText) {
+    if (hintText != null && value == hintText) {
+      return true;
+    }
+    // Check for common placeholder patterns
+    final lowerValue = value.toLowerCase();
+    return lowerValue.startsWith('select') || 
+           lowerValue == '' ||
+           (hintText != null && lowerValue == hintText.toLowerCase());
+  }
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final isPlaceholder = _isPlaceholder(value, hintText);
+    final textColor = isPlaceholder 
+        ? Colors.grey.shade400 
+        : Colors.black87;
+    
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: Theme.of(context).textTheme.titleSmall),
+        Text(label, style: textTheme.titleSmall),
         const SizedBox(height: 4),
         InkWell(
           onTap: onTap,
@@ -68,7 +96,12 @@ class TapField extends StatelessWidget {
               color: Colors.white,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Text(value),
+            child: Text(
+              value,
+              style: textTheme.bodyLarge?.copyWith(
+                color: textColor,
+              ),
+            ),
           ),
         ),
       ],
@@ -122,4 +155,3 @@ class DropdownField<T> extends StatelessWidget {
     );
   }
 }
-

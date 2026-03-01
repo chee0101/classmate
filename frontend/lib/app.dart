@@ -53,7 +53,17 @@ class MyApp extends StatelessWidget {
 
           /// Section title (Cards, lists)
           titleLarge: GoogleFonts.poppins(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+          ),
+          
+          titleMedium: GoogleFonts.poppins(
             fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+
+          titleSmall: GoogleFonts.poppins(
+            fontSize: 14,
             fontWeight: FontWeight.w600,
           ),
 

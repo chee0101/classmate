@@ -58,7 +58,7 @@ class CourseSelector extends StatelessWidget {
                     ? selected
                     : null;
             return DropdownMenu<String>(
-              key: ValueKey(currentSelection),
+              key: ValueKey('${courseCodes.join(',')}_$currentSelection'),
               width: constraints.maxWidth,
               hintText: courseCodes.isEmpty
                   ? 'No course yet'

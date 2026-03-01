@@ -4,6 +4,7 @@ import '../../constants/app_spacing.dart';
 import '../../mock/mock_academic_session.dart';
 import '../../models/academic_session.dart';
 import '../../utils/date_time_format.dart';
+import 'form_fields.dart';
 
 class AcademicSessionSetupBottomSheet extends StatefulWidget {
   const AcademicSessionSetupBottomSheet({super.key});
@@ -132,68 +133,24 @@ class _AcademicSessionSetupBottomSheetState
           Row(
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Start date',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 4),
-                    InkWell(
-                      onTap: _pickStartDate,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 14,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          _startDate == null
-                              ? 'Select date'
-                              : formatDateDdMmYyyy(_startDate!),
-                        ),
-                      ),
-                    ),
-                  ],
+                child: TapField(
+                  label: 'Start date',
+                  value: _startDate == null
+                      ? 'Select date'
+                      : formatDateDdMmYyyy(_startDate!),
+                  onTap: _pickStartDate,
+                  hintText: 'Select date',
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'End date',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 4),
-                    InkWell(
-                      onTap: _pickEndDate,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 14,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          _endDate == null
-                              ? 'Select date'
-                              : formatDateDdMmYyyy(_endDate!),
-                        ),
-                      ),
-                    ),
-                  ],
+                child: TapField(
+                  label: 'End date',
+                  value: _endDate == null
+                      ? 'Select date'
+                      : formatDateDdMmYyyy(_endDate!),
+                  onTap: _pickEndDate,
+                  hintText: 'Select date',
                 ),
               ),
             ],
