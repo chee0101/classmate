@@ -10,10 +10,24 @@ class MainScaffold extends StatefulWidget {
 
   @override
   State<MainScaffold> createState() => _MainScaffoldState();
+
+  /// Navigate to a specific tab by index
+  static void navigateToTab(BuildContext context, int index) {
+    final state = context.findAncestorStateOfType<_MainScaffoldState>();
+    state?.switchToTab(index);
+  }
 }
 
 class _MainScaffoldState extends State<MainScaffold> {
   int _screenIndex = 0;
+
+  void switchToTab(int index) {
+    if (index >= 0 && index < _screens.length) {
+      setState(() {
+        _screenIndex = index;
+      });
+    }
+  }
 
   final List<Widget> _screens = const [
     HomeScreen(),

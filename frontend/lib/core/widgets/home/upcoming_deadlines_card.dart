@@ -8,7 +8,7 @@ import '../../../screens/add/add_new_screen.dart' show AddType;
 import 'task_list_item.dart';
 
 /// A card widget that displays upcoming deadlines or an empty state.
-class UpcomingDeadlinesCard extends StatelessWidget {
+class UpcomingDeadlinesCard extends StatefulWidget {
   const UpcomingDeadlinesCard({
     super.key,
     required this.tasks,
@@ -17,10 +17,17 @@ class UpcomingDeadlinesCard extends StatelessWidget {
   final List<Task> tasks;
 
   @override
+  State<UpcomingDeadlinesCard> createState() => _UpcomingDeadlinesCardState();
+}
+
+class _UpcomingDeadlinesCardState extends State<UpcomingDeadlinesCard> {
+  bool _isExpanded = false;
+
+  @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
 
-    if (tasks.isEmpty) {
+    if (widget.tasks.isEmpty) {
       return EmptyStateCard(
         icon: Icons.task_alt,
         title: 'Upcoming Deadlines',
@@ -47,13 +54,40 @@ class UpcomingDeadlinesCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Upcoming Deadlines',
-              style: textTheme.titleLarge,
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Upcoming Deadlines',
+                  style: textTheme.titleLarge,
+                ),
+                if (widget.tasks.length > 5)
+                  TextButton(
+                    onPressed: () {
+                      setState(() {
+                        _isExpanded = !_isExpanded;
+                      });
+                    },
+                    style: TextButton.styleFrom(
+                      padding: EdgeInsets.zero,
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(
+                      _isExpanded ? 'Show Less' : 'View All',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+              ],
             ),
             Builder(
               builder: (context) {
-                final taskList = tasks.take(3).toList();
+                final taskList = _isExpanded
+                    ? widget.tasks
+                    : widget.tasks.take(5).toList();
                 return Column(
                   children: [
                     for (var i = 0; i < taskList.length; i++) ...[
