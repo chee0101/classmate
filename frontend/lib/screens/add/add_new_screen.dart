@@ -15,17 +15,19 @@ import '../../core/widgets/add/class_form.dart';
 import '../../core/widgets/add/event_form.dart';
 import '../../core/widgets/add/add_course_dialog.dart';
 
-enum _AddType { task, classSlot, event }
+enum AddType { task, classSlot, event }
 
 class AddNewScreen extends StatefulWidget {
-  const AddNewScreen({super.key});
+  const AddNewScreen({super.key, this.initialType});
+
+  final AddType? initialType;
 
   @override
   State<AddNewScreen> createState() => _AddNewScreenState();
 }
 
 class _AddNewScreenState extends State<AddNewScreen> {
-  _AddType _selectedType = _AddType.task;
+  late AddType _selectedType;
   String? _selectedSessionId;
   String? _selectedTermId;
 
@@ -48,6 +50,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
   @override
   void initState() {
     super.initState();
+    _selectedType = widget.initialType ?? AddType.task;
     final now = DateTime.now();
     _eventStartDate = now;
     _eventEndDate = now;
@@ -306,14 +309,19 @@ class _AddNewScreenState extends State<AddNewScreen> {
     if (activeSession == null) {
       return Scaffold(
         appBar: AppBar(title: const Text('Add New')),
-        body: EmptyStateCard(
-          title: 'No Session Yet',
-          subtitle:
-              'Set up your academic session first before adding task, class, or event.',
-          buttonText: 'Set up session',
-          onPressed: () {
-            AcademicSessionSetupBottomSheet.show(context);
-          },
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.lg),
+            child: EmptyStateCard(
+              title: 'No Session Yet',
+              subtitle:
+                  'Set up your academic session first before adding task, class, or event.',
+              buttonText: 'Set up session',
+              onPressed: () {
+                AcademicSessionSetupBottomSheet.show(context);
+              },
+            ),
+          ),
         ),
       );
     }
@@ -384,7 +392,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
               eventTimesValid;
 
           Widget typeSpecificForm;
-          if (_selectedType == _AddType.task) {
+          if (_selectedType == AddType.task) {
             typeSpecificForm = TaskForm(
               titleController: _taskTitleController,
               noteController: _taskNoteController,
@@ -400,7 +408,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
               onAddCourseRequested: () =>
                   _showAddCourseDialogForTask(selectedSession.id),
             );
-          } else if (_selectedType == _AddType.classSlot) {
+          } else if (_selectedType == AddType.classSlot) {
             typeSpecificForm = ClassForm(
               courseCodes: courseCodes,
               selectedCourseCode: _classCourseCode,
@@ -515,20 +523,20 @@ class _AddNewScreenState extends State<AddNewScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
-                    onPressed: _selectedType == _AddType.task
+                    onPressed: _selectedType == AddType.task
                         ? (canSaveTask
                             ? () => _saveTask(
                                   sessionId: selectedSession.id,
                                   courseCodes: courseCodes,
                                 )
                             : null)
-                        : _selectedType == _AddType.classSlot
+                        : _selectedType == AddType.classSlot
                             ? (canSaveClass ? _saveClass : null)
                             : (canSaveEvent ? _saveEvent : null),
                     child: Text(
-                      _selectedType == _AddType.task
+                      _selectedType == AddType.task
                           ? 'Add task'
-                          : _selectedType == _AddType.classSlot
+                          : _selectedType == AddType.classSlot
                               ? 'Add class'
                               : 'Add event',
                     ),
@@ -549,14 +557,14 @@ class _TypeTabs extends StatelessWidget {
     required this.onChanged,
   });
 
-  final _AddType selected;
-  final ValueChanged<_AddType> onChanged;
+  final AddType selected;
+  final ValueChanged<AddType> onChanged;
 
   @override
   Widget build(BuildContext context) {
     final primary = Theme.of(context).colorScheme.primary;
 
-    Widget tab(String label, _AddType value) {
+    Widget tab(String label, AddType value) {
       final isSelected = selected == value;
       return Expanded(
         child: InkWell(
@@ -588,9 +596,9 @@ class _TypeTabs extends StatelessWidget {
       ),
       child: Row(
         children: [
-          tab('Task', _AddType.task),
-          tab('Class', _AddType.classSlot),
-          tab('Event', _AddType.event),
+          tab('Task', AddType.task),
+          tab('Class', AddType.classSlot),
+          tab('Event', AddType.event),
         ],
       ),
     );

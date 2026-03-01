@@ -6,7 +6,7 @@ import 'core/constants/routes.dart';
 import 'core/layout/main_scaffold.dart';
 import 'screens/auth/forgot_password_screen.dart';
 import 'screens/auth/verify_email_screen.dart';
-import 'screens/add/add_new_screen.dart';
+import 'screens/add/add_new_screen.dart' show AddNewScreen, AddType;
 import 'screens/task/task_detail_screen.dart';
 import 'core/models/task.dart';
 import 'splash_screen.dart';
@@ -208,7 +208,11 @@ class MyApp extends StatelessWidget {
         AppRoutes.login: (context) => const AuthScreen(),
         AppRoutes.verifyEmail: (context) => const VerifyEmailScreen(),
         AppRoutes.forgotPassword: (context) => const ForgotPasswordScreen(),
-        AppRoutes.addNew: (context) => const AddNewScreen(),
+        AppRoutes.addNew: (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          final initialType = args is AddType ? args : null;
+          return AddNewScreen(initialType: initialType);
+        },
         AppRoutes.taskDetail: (context) {
           final task = ModalRoute.of(context)!.settings.arguments as Task;
           return TaskDetailScreen(task: task);

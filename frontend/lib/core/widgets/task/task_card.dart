@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../constants/app_spacing.dart';
 import '../../models/task.dart';
 import '../../utils/date_time_format.dart';
+import '../common/label_chip.dart';
 
 class TaskCard extends StatelessWidget {
   const TaskCard({
@@ -37,38 +38,25 @@ class TaskCard extends StatelessWidget {
         children: [
         Row(
           children: [
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.sm,
-                vertical: 4,
-              ),
-              decoration: BoxDecoration(
-                color: task.courseColor.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                task.courseCode,
-                style: textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: task.courseColor,
-                ),
-              ),
+            LabelChip(
+              label: task.courseCode,
+              color: task.courseColor,
             ),
             const Spacer(),
             if (task.status == TaskStatus.overdue)
-              const _StatusPill(
+              const LabelChip(
                 label: 'Overdue',
                 background: Color(0xFFFFE5E5),
                 foreground: Color(0xFFE53935),
               )
             else if (task.status == TaskStatus.ongoing)
-              const _StatusPill(
+              const LabelChip(
                 label: 'Ongoing',
                 background: Color(0xFFFFF3CD),
                 foreground: Color(0xFFF9A825),
               )
             else
-              _StatusPill(
+              LabelChip(
                 label: 'Completed',
                 background: colorScheme.primary.withOpacity(0.1),
                 foreground: colorScheme.primary,
@@ -168,37 +156,3 @@ class TaskCard extends StatelessWidget {
 
 }
 
-class _StatusPill extends StatelessWidget {
-  const _StatusPill({
-    required this.label,
-    required this.background,
-    required this.foreground,
-  });
-
-  final String label;
-  final Color background;
-  final Color foreground;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.sm,
-        vertical: 4,
-      ),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(
-        label,
-        style: textTheme.bodySmall?.copyWith(
-          fontWeight: FontWeight.w600,
-          color: foreground,
-        ),
-      ),
-    );
-  }
-}

@@ -56,12 +56,17 @@ class _TaskScreenState extends State<TaskScreen> {
         valueListenable: currentAcademicSessionNotifier,
         builder: (context, session, _) {
           if (session == null) {
-            return EmptyStateCard(
-              onPressed: () {
-                AcademicSessionSetupBottomSheet.show(context);
-              },
-              subtitle:
-                  'Add your academic calendar to begin tracking tasks in your semester.',
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: EmptyStateCard(
+                  onPressed: () {
+                    AcademicSessionSetupBottomSheet.show(context);
+                  },
+                  subtitle:
+                      'Add your academic calendar to begin tracking tasks in your semester.',
+                ),
+              ),
             );
           }
 

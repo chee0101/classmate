@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../core/constants/app_spacing.dart';
 import '../../core/mock/mock_academic_session.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
 import '../../core/widgets/common/empty_state_card.dart';
@@ -16,10 +17,15 @@ class ScheduleScreen extends StatelessWidget {
         valueListenable: currentAcademicSessionNotifier,
         builder: (context, session, _) {
           if (session == null) {
-            return EmptyStateCard(
-              onPressed: () {
-                AcademicSessionSetupBottomSheet.show(context);
-              },
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: EmptyStateCard(
+                  onPressed: () {
+                    AcademicSessionSetupBottomSheet.show(context);
+                  },
+                ),
+              ),
             );
           }
 
