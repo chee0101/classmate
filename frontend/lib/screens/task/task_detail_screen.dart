@@ -69,6 +69,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             )
           else
             PopupMenuButton<String>(
+              color: Colors.white,
               onSelected: (value) {
                 if (value == 'edit') {
                   setState(() => _isEditing = true);
@@ -225,6 +226,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
         title: const Text('Delete Task'),
         content: const Text('Are you sure you want to delete this task?'),
         actions: [

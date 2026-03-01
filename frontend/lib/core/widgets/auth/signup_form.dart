@@ -55,7 +55,7 @@ class _SignUpFormState extends State<SignUpForm> {
             focusNode: usernameFocus,
             hint: 'Enter your username',
             validator: (v) =>
-                v == null || v.isEmpty ? 'Username required' : null,
+                v == null || v.isEmpty ? 'Username is required' : null,
           ),
           _label('Email', textTheme),
           _field(

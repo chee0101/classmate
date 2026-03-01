@@ -8,6 +8,9 @@ import 'screens/auth/forgot_password_screen.dart';
 import 'screens/auth/verify_email_screen.dart';
 import 'screens/add/add_new_screen.dart' show AddNewScreen, AddType;
 import 'screens/task/task_detail_screen.dart';
+import 'screens/profile/academic_sessions_screen.dart';
+import 'screens/profile/courses_screen.dart';
+import 'screens/profile/timetables_screen.dart';
 import 'core/models/task.dart';
 import 'splash_screen.dart';
 
@@ -227,6 +230,10 @@ class MyApp extends StatelessWidget {
           final task = ModalRoute.of(context)!.settings.arguments as Task;
           return TaskDetailScreen(task: task);
         },
+        AppRoutes.academicSessions: (context) =>
+            const AcademicSessionsScreen(),
+        AppRoutes.courses: (context) => const CoursesScreen(),
+        AppRoutes.timetables: (context) => const TimetablesScreen(),
       },
     );
   }
