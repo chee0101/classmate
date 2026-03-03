@@ -32,9 +32,26 @@ bool courseCodeExistsInSessionAndTerm({
 }) {
   final normalized = courseCode.trim().toUpperCase();
   return mockCoursesNotifier.value.any(
-    (c) => c.sessionId == sessionId && 
-           c.termId == termId && 
-           c.courseCode.toUpperCase() == normalized,
+    (c) =>
+        c.sessionId == sessionId &&
+        c.termId == termId &&
+        c.courseCode.toUpperCase() == normalized,
+  );
+}
+
+bool courseCodeExistsInSessionAndTermExcludingCourse({
+  required String sessionId,
+  required String termId,
+  required String courseId,
+  required String courseCode,
+}) {
+  final normalized = courseCode.trim().toUpperCase();
+  return mockCoursesNotifier.value.any(
+    (c) =>
+        c.id != courseId &&
+        c.sessionId == sessionId &&
+        c.termId == termId &&
+        c.courseCode.toUpperCase() == normalized,
   );
 }
 
@@ -65,3 +82,38 @@ void addCourse({
   mockCoursesNotifier.value = next;
 }
 
+void updateCourse({
+  required String id,
+  required String sessionId,
+  required String termId,
+  required String courseCode,
+  required String courseColor,
+}) {
+  final exists = courseCodeExistsInSessionAndTermExcludingCourse(
+    sessionId: sessionId,
+    termId: termId,
+    courseId: id,
+    courseCode: courseCode,
+  );
+
+  if (exists) {
+    return;
+  }
+
+  final next = mockCoursesNotifier.value.map((course) {
+    if (course.id != id) return course;
+    return course.copyWith(
+      courseCode: courseCode.trim().toUpperCase(),
+      courseColor: courseColor,
+    );
+  }).toList(growable: false);
+
+  mockCoursesNotifier.value = next;
+}
+
+void deleteCourse(String id) {
+  final next = mockCoursesNotifier.value
+      .where((course) => course.id != id)
+      .toList(growable: false);
+  mockCoursesNotifier.value = next;
+}
