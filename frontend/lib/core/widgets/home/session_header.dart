@@ -2,22 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../constants/app_colors.dart';
+import '../../models/academic_session.dart';
 import '../../utils/term_windows.dart';
 
 /// A header widget that displays and allows selection of academic session and term.
 class SessionHeader extends StatelessWidget {
   const SessionHeader({
     super.key,
-    required this.sessionName,
-    required this.termWindows,
-    required this.selectedTerm,
-    required this.onTermChanged,
+    required this.sessions,
+    required this.selectedSessionId,
+    required this.selectedTermId,
+    required this.onSelectionChanged,
   });
 
-  final String sessionName;
-  final List<TermWindow> termWindows;
-  final TermWindow selectedTerm;
-  final ValueChanged<String> onTermChanged;
+  /// All available academic sessions.
+  final List<AcademicSession> sessions;
+
+  /// Currently selected session ID.
+  final String selectedSessionId;
+
+  /// Currently selected term ID (within the selected session).
+  final String selectedTermId;
+
+  /// Callback when user selects a different (session, term) pair.
+  final void Function(String sessionId, String termId) onSelectionChanged;
 
   @override
   Widget build(BuildContext context) {
@@ -27,18 +35,28 @@ class SessionHeader extends StatelessWidget {
       color: AppPrimarySwatch.shade900,
     );
 
-    final entries = termWindows
-        .map(
-          (t) => DropdownMenuEntry<String>(
-            value: t.id,
-            label: '$sessionName - ${t.label}',
+    // Build dropdown entries for all (session, term) combinations.
+    final entries = <DropdownMenuEntry<String>>[];
+
+    for (final session in sessions) {
+      final termWindows = buildTermWindows(session);
+      for (final term in termWindows) {
+        final key = '${session.id}::${term.id}';
+        final label = '${session.name} - ${term.label}';
+        entries.add(
+          DropdownMenuEntry<String>(
+            value: key,
+            label: label,
             labelWidget: Text(
-              '$sessionName - ${t.label}',
+              label,
               style: darkPurpleTextStyle,
             ),
           ),
-        )
-        .toList();
+        );
+      }
+    }
+
+    final initialKey = '$selectedSessionId::$selectedTermId';
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -56,11 +74,13 @@ class SessionHeader extends StatelessWidget {
           ),
           child: DropdownMenu<String>(
             width: constraints.maxWidth,
-            initialSelection: selectedTerm.id,
+            initialSelection: initialKey,
             dropdownMenuEntries: entries,
             onSelected: (value) {
               if (value == null) return;
-              onTermChanged(value);
+              final parts = value.split('::');
+              if (parts.length != 2) return;
+              onSelectionChanged(parts[0], parts[1]);
             },
             inputDecorationTheme: InputDecorationTheme(
               border: InputBorder.none,

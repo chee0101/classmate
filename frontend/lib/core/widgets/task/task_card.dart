@@ -66,7 +66,7 @@ class TaskCard extends StatelessWidget {
         const SizedBox(height: AppSpacing.sm),
         Text(
           task.title,
-          style: textTheme.headlineMedium,
+          style: textTheme.titleMedium,
         ),
         if (task.description != null) ...[
           const SizedBox(height: 4),
@@ -79,7 +79,7 @@ class TaskCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             'Next: $nextSubtaskTitle',
-            style: textTheme.bodySmall?.copyWith(
+            style: textTheme.bodyMedium?.copyWith(
               color: Colors.grey.shade700,
               fontStyle: FontStyle.italic,
             ),

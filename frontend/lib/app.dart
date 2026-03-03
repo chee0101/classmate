@@ -44,24 +44,24 @@ class MyApp extends StatelessWidget {
         textTheme: GoogleFonts.poppinsTextTheme().copyWith(
           /// App title / splash title
           headlineLarge: GoogleFonts.poppins(
-            fontSize: 24,
+            fontSize: 28,
             fontWeight: FontWeight.w700,
           ),
 
           /// Screen title
           headlineMedium: GoogleFonts.poppins(
-            fontSize: 20,
+            fontSize: 22,
             fontWeight: FontWeight.w600,
           ),
 
           /// Section title (Cards, lists)
           titleLarge: GoogleFonts.poppins(
-            fontSize: 18,
+            fontSize: 20,
             fontWeight: FontWeight.w600,
           ),
           
           titleMedium: GoogleFonts.poppins(
-            fontSize: 16,
+            fontSize: 18,
             fontWeight: FontWeight.w600,
           ),
 
@@ -72,13 +72,13 @@ class MyApp extends StatelessWidget {
 
           /// Body text
           bodyLarge: GoogleFonts.poppins(
-            fontSize: 14,
+            fontSize: 16,
             fontWeight: FontWeight.w400,
           ),
 
           /// Secondary body text
           bodyMedium: GoogleFonts.poppins(
-            fontSize: 13,
+            fontSize: 14,
             fontWeight: FontWeight.w400,
           ),
 

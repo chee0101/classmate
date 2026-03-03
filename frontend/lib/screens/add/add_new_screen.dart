@@ -4,6 +4,7 @@ import '../../core/constants/app_spacing.dart';
 import '../../core/mock/mock_academic_session.dart';
 import '../../core/mock/mock_courses.dart';
 import '../../core/mock/mock_tasks.dart';
+import '../../core/models/academic_session.dart';
 import '../../core/models/task.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
@@ -334,219 +335,226 @@ class _AddNewScreenState extends State<AddNewScreen> {
       body: ValueListenableBuilder(
         valueListenable: mockCoursesNotifier,
         builder: (context, courses, _) {
-          final menuItemStyle = ButtonStyle(
-            textStyle: WidgetStateProperty.all<TextStyle?>(
-              Theme.of(context).textTheme.bodyLarge,
-            ),
-          );
-          final sessions = [...mockAcademicSessions];
-          if (!sessions.any((s) => s.id == activeSession.id)) {
-            sessions.add(activeSession);
-          }
-
-          final selectedSession = sessions.firstWhere(
-            (s) => s.id == (_selectedSessionId ?? activeSession.id),
-            orElse: () => activeSession,
-          );
-          final termWindows = buildTermWindows(selectedSession);
-          final selectedTerm = termWindows.firstWhere(
-            (term) =>
-                term.id ==
-                ((_selectedTermId != null &&
-                        termWindows.any((t) => t.id == _selectedTermId))
-                    ? _selectedTermId
-                    : defaultTermId(termWindows)),
-            orElse: () => termWindows.first,
-          );
-
-          // Filter courses by session and term
-          final sessionAndTermCourses = courses
-              .where((c) => c.sessionId == selectedSession.id && c.termId == selectedTerm.id)
-              .toList(growable: false);
-          
-          final courseCodes = sessionAndTermCourses.map((c) => c.courseCode).toSet().toList()
-            ..sort();
-
-          if (_taskCourseCode != null && !courseCodes.contains(_taskCourseCode)) {
-            _taskCourseCode = null;
-          }
-          if (_classCourseCode != null && !courseCodes.contains(_classCourseCode)) {
-            _classCourseCode = null;
-          }
-
-          final canSaveTask =
-              _taskTitleController.text.trim().isNotEmpty &&
-              _taskCourseCode != null &&
-              isInTerm(_taskDueDateTime, selectedTerm);
-          final canSaveClass = _classCourseCode != null && _classSlots.isNotEmpty;
-          final eventDatesValid = isInTerm(_eventStartDate, selectedTerm) &&
-              _eventEndDate != null &&
-              isInTerm(_eventEndDate!, selectedTerm) &&
-              !_eventEndDate!.isBefore(_eventStartDate);
-
-          final eventTimesValid = _eventAllDay
-              ? true
-              : (_eventStartTime != null &&
-                  _eventEndTime != null &&
-                  _areEventTimesValid());
-
-          final canSaveEvent = _eventNameController.text.trim().isNotEmpty &&
-              eventDatesValid &&
-              eventTimesValid;
-
-          Widget typeSpecificForm;
-          if (_selectedType == AddType.task) {
-            typeSpecificForm = TaskForm(
-              titleController: _taskTitleController,
-              noteController: _taskNoteController,
-              dueDateTime: _taskDueDateTime,
-              selectedTerm: selectedTerm,
-              courseCodes: courseCodes,
-              selectedCourseCode: _taskCourseCode,
-              onTitleChanged: (value) => setState(() {}),
-              onCourseChanged: (value) =>
-                  setState(() => _taskCourseCode = value),
-              onPickDate: () => _pickTaskDate(selectedTerm),
-              onPickTime: _pickTaskTime,
-              onAddCourseRequested: () =>
-                  _showAddCourseDialogForTask(selectedSession.id, selectedTerm.id),
-            );
-          } else if (_selectedType == AddType.classSlot) {
-            typeSpecificForm = ClassForm(
-              courseCodes: courseCodes,
-              selectedCourseCode: _classCourseCode,
-              slots: _classSlots,
-              onCourseChanged: (value) =>
-                  setState(() => _classCourseCode = value),
-              onAddSlot: _addClassSlot,
-              onEditSlot: _editClassSlot,
-              onRemoveSlot: (slot) =>
-                  setState(() => _classSlots.remove(slot)),
-              onAddCourseRequested: () =>
-                  _showAddCourseDialogForClass(selectedSession.id, selectedTerm.id),
-            );
-          } else {
-            typeSpecificForm = EventForm(
-              eventNameController: _eventNameController,
-              allDay: _eventAllDay,
-              startDate: _eventStartDate,
-              endDate: _eventEndDate,
-              startTime: _eventStartTime,
-              endTime: _eventEndTime,
-              hideClassesInEvent: _hideClassesInEvent,
-              selectedTerm: selectedTerm,
-              datesValid: eventDatesValid,
-              timesValid: eventTimesValid,
-              onAllDayChanged: (value) {
-                setState(() {
-                  _eventAllDay = value;
-                  if (_eventAllDay) {
-                    _eventStartTime = null;
-                    _eventEndTime = null;
-                  } else {
-                    _eventStartTime ??= const TimeOfDay(hour: 9, minute: 0);
-                    _eventEndTime ??= const TimeOfDay(hour: 11, minute: 0);
-                  }
-                });
-              },
-              onNameChanged: (value) => setState(() {}),
-              onPickStartDate: () => _pickEventStartDate(selectedTerm),
-              onPickEndDate: () => _pickEventEndDate(selectedTerm),
-              onPickStartTime: _pickEventStartTime,
-              onPickEndTime: _pickEventEndTime,
-              onHideClassesChanged: (value) {
-                setState(() => _hideClassesInEvent = value);
-              },
-            );
-          }
-
-          return Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Column(
-              children: [
-                _TypeTabs(
-                  selected: _selectedType,
-                  onChanged: (value) => setState(() => _selectedType = value),
+          // activeSession is guaranteed to be non-null here due to early return above
+          final session = activeSession;
+          return ValueListenableBuilder<List<AcademicSession>>(
+            valueListenable: mockAcademicSessionsNotifier,
+            builder: (context, sessionsList, _) {
+              final menuItemStyle = ButtonStyle(
+                textStyle: WidgetStateProperty.all<TextStyle?>(
+                  Theme.of(context).textTheme.bodyLarge,
                 ),
-                const SizedBox(height: AppSpacing.md),
-                Expanded(
-                  child: SingleChildScrollView(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        DropdownField<String>(
-                          label: 'Academic Session',
-                          value: selectedSession.id,
-                          items: sessions
-                              .map(
-                                (s) => DropdownMenuEntry<String>(
-                                  value: s.id,
-                                  label: s.name,
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (value) {
-                            if (value == null) return;
-                            final nextSession = sessions.firstWhere(
-                              (s) => s.id == value,
-                              orElse: () => activeSession,
-                            );
-                            final nextTerms = buildTermWindows(nextSession);
-                            setState(() {
-                              _selectedSessionId = value;
-                              _selectedTermId = defaultTermId(nextTerms);
-                            });
-                          },
-                        ),
-                        const SizedBox(height: AppSpacing.sm),
-                        DropdownField<String>(
-                          label: 'Academic Term',
-                          value: selectedTerm.id,
-                          items: termWindows
-                              .map(
-                                (term) => DropdownMenuEntry<String>(
-                                  value: term.id,
-                                  label: term.label,
-                                  style: menuItemStyle,
-                                ),
-                              )
-                              .toList(),
-                          onChanged: (value) {
-                            if (value == null) return;
-                            setState(() => _selectedTermId = value);
-                          },
-                        ),
-                        const SizedBox(height: AppSpacing.md),
-                        typeSpecificForm,
-                      ],
+              );
+              final sessions = [...sessionsList];
+              if (!sessions.any((s) => s.id == session.id)) {
+                sessions.add(session);
+              }
+
+              final selectedSession = sessions.firstWhere(
+                (s) => s.id == (_selectedSessionId ?? session.id),
+                orElse: () => session,
+              );
+              final termWindows = buildTermWindows(selectedSession);
+              final selectedTerm = termWindows.firstWhere(
+                (term) =>
+                    term.id ==
+                    ((_selectedTermId != null &&
+                            termWindows.any((t) => t.id == _selectedTermId))
+                        ? _selectedTermId
+                        : defaultTermId(termWindows)),
+                orElse: () => termWindows.first,
+              );
+
+              // Filter courses by session and term
+              final sessionAndTermCourses = courses
+                  .where((c) => c.sessionId == selectedSession.id && c.termId == selectedTerm.id)
+                  .toList(growable: false);
+              
+              final courseCodes = sessionAndTermCourses.map((c) => c.courseCode).toSet().toList()
+                ..sort();
+
+              if (_taskCourseCode != null && !courseCodes.contains(_taskCourseCode)) {
+                _taskCourseCode = null;
+              }
+              if (_classCourseCode != null && !courseCodes.contains(_classCourseCode)) {
+                _classCourseCode = null;
+              }
+
+              final canSaveTask =
+                  _taskTitleController.text.trim().isNotEmpty &&
+                  _taskCourseCode != null &&
+                  isInTerm(_taskDueDateTime, selectedTerm);
+              final canSaveClass = _classCourseCode != null && _classSlots.isNotEmpty;
+              final eventDatesValid = isInTerm(_eventStartDate, selectedTerm) &&
+                  _eventEndDate != null &&
+                  isInTerm(_eventEndDate!, selectedTerm) &&
+                  !_eventEndDate!.isBefore(_eventStartDate);
+
+              final eventTimesValid = _eventAllDay
+                  ? true
+                  : (_eventStartTime != null &&
+                      _eventEndTime != null &&
+                      _areEventTimesValid());
+
+              final canSaveEvent = _eventNameController.text.trim().isNotEmpty &&
+                  eventDatesValid &&
+                  eventTimesValid;
+
+              Widget typeSpecificForm;
+              if (_selectedType == AddType.task) {
+                typeSpecificForm = TaskForm(
+                  titleController: _taskTitleController,
+                  noteController: _taskNoteController,
+                  dueDateTime: _taskDueDateTime,
+                  selectedTerm: selectedTerm,
+                  courseCodes: courseCodes,
+                  selectedCourseCode: _taskCourseCode,
+                  onTitleChanged: (value) => setState(() {}),
+                  onCourseChanged: (value) =>
+                      setState(() => _taskCourseCode = value),
+                  onPickDate: () => _pickTaskDate(selectedTerm),
+                  onPickTime: _pickTaskTime,
+                  onAddCourseRequested: () =>
+                      _showAddCourseDialogForTask(selectedSession.id, selectedTerm.id),
+                );
+              } else if (_selectedType == AddType.classSlot) {
+                typeSpecificForm = ClassForm(
+                  courseCodes: courseCodes,
+                  selectedCourseCode: _classCourseCode,
+                  slots: _classSlots,
+                  onCourseChanged: (value) =>
+                      setState(() => _classCourseCode = value),
+                  onAddSlot: _addClassSlot,
+                  onEditSlot: _editClassSlot,
+                  onRemoveSlot: (slot) =>
+                      setState(() => _classSlots.remove(slot)),
+                  onAddCourseRequested: () =>
+                      _showAddCourseDialogForClass(selectedSession.id, selectedTerm.id),
+                );
+              } else {
+                typeSpecificForm = EventForm(
+                  eventNameController: _eventNameController,
+                  allDay: _eventAllDay,
+                  startDate: _eventStartDate,
+                  endDate: _eventEndDate,
+                  startTime: _eventStartTime,
+                  endTime: _eventEndTime,
+                  hideClassesInEvent: _hideClassesInEvent,
+                  selectedTerm: selectedTerm,
+                  datesValid: eventDatesValid,
+                  timesValid: eventTimesValid,
+                  onAllDayChanged: (value) {
+                    setState(() {
+                      _eventAllDay = value;
+                      if (_eventAllDay) {
+                        _eventStartTime = null;
+                        _eventEndTime = null;
+                      } else {
+                        _eventStartTime ??= const TimeOfDay(hour: 9, minute: 0);
+                        _eventEndTime ??= const TimeOfDay(hour: 11, minute: 0);
+                      }
+                    });
+                  },
+                  onNameChanged: (value) => setState(() {}),
+                  onPickStartDate: () => _pickEventStartDate(selectedTerm),
+                  onPickEndDate: () => _pickEventEndDate(selectedTerm),
+                  onPickStartTime: _pickEventStartTime,
+                  onPickEndTime: _pickEventEndTime,
+                  onHideClassesChanged: (value) {
+                    setState(() => _hideClassesInEvent = value);
+                  },
+                );
+              }
+
+              return Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  children: [
+                    _TypeTabs(
+                      selected: _selectedType,
+                      onChanged: (value) => setState(() => _selectedType = value),
                     ),
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: _selectedType == AddType.task
-                        ? (canSaveTask
-                            ? () => _saveTask(
-                                  sessionId: selectedSession.id,
-                                  courseCodes: courseCodes,
-                                )
-                            : null)
-                        : _selectedType == AddType.classSlot
-                            ? (canSaveClass ? _saveClass : null)
-                            : (canSaveEvent ? _saveEvent : null),
-                    child: Text(
-                      _selectedType == AddType.task
-                          ? 'Add task'
-                          : _selectedType == AddType.classSlot
-                              ? 'Add class'
-                              : 'Add event',
+                    const SizedBox(height: AppSpacing.md),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            DropdownField<String>(
+                              label: 'Academic Session',
+                              value: selectedSession.id,
+                              items: sessions
+                                  .map(
+                                    (s) => DropdownMenuEntry<String>(
+                                      value: s.id,
+                                      label: s.name,
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) {
+                                if (value == null) return;
+                                final nextSession = sessions.firstWhere(
+                                  (s) => s.id == value,
+                                  orElse: () => session,
+                                );
+                                final nextTerms = buildTermWindows(nextSession);
+                                setState(() {
+                                  _selectedSessionId = value;
+                                  _selectedTermId = defaultTermId(nextTerms);
+                                });
+                              },
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            DropdownField<String>(
+                              label: 'Academic Term',
+                              value: selectedTerm.id,
+                              items: termWindows
+                                  .map(
+                                    (term) => DropdownMenuEntry<String>(
+                                      value: term.id,
+                                      label: term.label,
+                                      style: menuItemStyle,
+                                    ),
+                                  )
+                                  .toList(),
+                              onChanged: (value) {
+                                if (value == null) return;
+                                setState(() => _selectedTermId = value);
+                              },
+                            ),
+                            const SizedBox(height: AppSpacing.md),
+                            typeSpecificForm,
+                          ],
+                        ),
+                      ),
                     ),
-                  ),
+                    const SizedBox(height: AppSpacing.md),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed: _selectedType == AddType.task
+                            ? (canSaveTask
+                                ? () => _saveTask(
+                                      sessionId: selectedSession.id,
+                                      courseCodes: courseCodes,
+                                    )
+                                : null)
+                            : _selectedType == AddType.classSlot
+                                ? (canSaveClass ? _saveClass : null)
+                                : (canSaveEvent ? _saveEvent : null),
+                        child: Text(
+                          _selectedType == AddType.task
+                              ? 'Add task'
+                              : _selectedType == AddType.classSlot
+                                  ? 'Add class'
+                                  : 'Add event',
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              );
+            },
           );
         },
       ),

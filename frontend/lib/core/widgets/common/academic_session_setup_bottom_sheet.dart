@@ -10,13 +10,16 @@ class AcademicSessionSetupBottomSheet extends StatefulWidget {
   const AcademicSessionSetupBottomSheet({
     super.key,
     this.title,
+    this.editSession,
   });
 
   final String? title;
+  final AcademicSession? editSession;
 
   static Future<AcademicSession?> show(
     BuildContext context, {
     String? title,
+    AcademicSession? editSession,
   }) {
     return showModalBottomSheet<AcademicSession>(
       context: context,
@@ -24,7 +27,10 @@ class AcademicSessionSetupBottomSheet extends StatefulWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (_) => AcademicSessionSetupBottomSheet(title: title),
+      builder: (_) => AcademicSessionSetupBottomSheet(
+        title: title,
+        editSession: editSession,
+      ),
     );
   }
 
@@ -35,9 +41,21 @@ class AcademicSessionSetupBottomSheet extends StatefulWidget {
 
 class _AcademicSessionSetupBottomSheetState
     extends State<AcademicSessionSetupBottomSheet> {
-  DateTime? _startDate;
-  DateTime? _endDate;
+  late DateTime? _startDate;
+  late DateTime? _endDate;
   String? _dateError;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.editSession != null) {
+      _startDate = widget.editSession!.startDate;
+      _endDate = widget.editSession!.endDate;
+    } else {
+      _startDate = null;
+      _endDate = null;
+    }
+  }
 
   Future<void> _pickStartDate() async {
     final baseTheme = Theme.of(context);
@@ -100,8 +118,21 @@ class _AcademicSessionSetupBottomSheetState
       startDate: _startDate!,
       endDate: _endDate!,
     );
-    setCurrentAcademicSession(session);
-    Navigator.pop(context, session);
+    
+    if (widget.editSession != null) {
+      // Update existing session - need to preserve the ID
+      final updatedSession = AcademicSession(
+        id: widget.editSession!.id,
+        name: session.name,
+        startDate: session.startDate,
+        endDate: session.endDate,
+      );
+      updateAcademicSession(updatedSession);
+      Navigator.pop(context, updatedSession);
+    } else {
+      addAcademicSession(session);
+      Navigator.pop(context, session);
+    }
   }
 
   @override
@@ -127,7 +158,7 @@ class _AcademicSessionSetupBottomSheetState
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Session name is auto-generated from the selected years.',
+            'Session name is auto-generated from the selected dates.',
             style: Theme.of(context).textTheme.bodyMedium,
           ),
           if (generatedName != null) ...[

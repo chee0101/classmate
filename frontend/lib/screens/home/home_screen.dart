@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/mock/mock_academic_session.dart';
 import '../../core/mock/mock_tasks.dart';
+import '../../core/models/academic_session.dart';
 import '../../core/utils/task_utils.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
@@ -10,6 +11,7 @@ import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/home/session_header.dart';
 import '../../core/widgets/home/today_classes_card.dart';
 import '../../core/widgets/home/upcoming_deadlines_card.dart';
+import 'session_term_ref.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,17 +21,8 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  String? _selectedSessionId;
   String? _selectedTermId;
-
-  @override
-  void initState() {
-    super.initState();
-    final active = currentAcademicSessionNotifier.value;
-    if (active != null) {
-      final windows = buildTermWindows(active);
-      _selectedTermId = defaultTermId(windows);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,10 +31,19 @@ class _HomeScreenState extends State<HomeScreen> {
         title: const Text('Home'),
         automaticallyImplyLeading: false,
       ),
-      body: ValueListenableBuilder(
-        valueListenable: currentAcademicSessionNotifier,
-        builder: (context, session, _) {
-          if (session == null) {
+      body: ValueListenableBuilder<List<AcademicSession>>(
+        valueListenable: mockAcademicSessionsNotifier,
+        builder: (context, sessionsList, _) {
+          final activeSession = currentAcademicSessionNotifier.value;
+
+          // Build full session list, ensuring active session is included.
+          final sessions = <AcademicSession>[...sessionsList];
+          if (activeSession != null &&
+              !sessions.any((s) => s.id == activeSession.id)) {
+            sessions.add(activeSession);
+          }
+
+          if (sessions.isEmpty) {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.lg),
@@ -54,21 +56,80 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           }
 
-          final termWindows = buildTermWindows(session);
-          final selectedTerm = termWindows.firstWhere(
-            (t) =>
-                t.id ==
-                (_selectedTermId != null &&
-                        termWindows.any((w) => w.id == _selectedTermId)
-                    ? _selectedTermId
-                    : defaultTermId(termWindows)),
-            orElse: () => termWindows.first,
-          );
+          // Build all (session, term) combinations.
+          final now = DateTime.now();
+          final allTermRefs = <SessionTermRef>[];
+          for (final session in sessions) {
+            final windows = buildTermWindows(session);
+            for (final term in windows) {
+              allTermRefs.add(SessionTermRef(session: session, term: term));
+            }
+          }
+
+          // Pick default (session, term):
+          SessionTermRef? defaultRef;
+
+          // 1) Prefer a term where today is within the window
+          for (final ref in allTermRefs) {
+            if (!now.isBefore(ref.term.start) && !now.isAfter(ref.term.end)) {
+              defaultRef = ref;
+              break;
+            }
+          }
+
+          // 2) If none, choose the nearest future term
+          if (defaultRef == null) {
+            Duration? minFuture;
+            for (final ref in allTermRefs) {
+              if (ref.term.start.isAfter(now)) {
+                final diff = ref.term.start.difference(now);
+                if (minFuture == null || diff < minFuture) {
+                  minFuture = diff;
+                  defaultRef = ref;
+                }
+              }
+            }
+          }
+
+          // 3) If still none, choose the nearest past term
+          defaultRef ??= () {
+            Duration? minPast;
+            SessionTermRef? best;
+            for (final ref in allTermRefs) {
+              if (ref.term.end.isBefore(now)) {
+                final diff = now.difference(ref.term.end);
+                if (minPast == null || diff < minPast) {
+                  minPast = diff;
+                  best = ref;
+                }
+              }
+            }
+            return best ?? allTermRefs.first;
+          }();
+
+          // Resolve currently selected (session, term), falling back to defaultRef when needed.
+          String selectedSessionId = _selectedSessionId ?? defaultRef.session.id;
+          String selectedTermId = _selectedTermId ?? defaultRef.term.id;
+
+          SessionTermRef selectedRef = defaultRef;
+          for (final ref in allTermRefs) {
+            if (ref.session.id == selectedSessionId &&
+                ref.term.id == selectedTermId) {
+              selectedRef = ref;
+              break;
+            }
+          }
+
+          selectedSessionId = selectedRef.session.id;
+          selectedTermId = selectedRef.term.id;
+
+          final selectedSession = selectedRef.session;
+          final selectedTerm = selectedRef.term;
 
           return ValueListenableBuilder(
             valueListenable: mockTasksNotifier,
             builder: (context, tasks, _) {
-              // Get upcoming tasks and filter by selected term
+              // Get upcoming tasks and filter by selected term window
               final allUpcomingTasks = TaskUtils.getUpcomingTasks(
                 tasks.where((t) => t.parentTaskId == null).toList(),
               );
@@ -85,11 +146,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       right: AppSpacing.lg,
                     ),
                     child: SessionHeader(
-                      sessionName: session.name,
-                      termWindows: termWindows,
-                      selectedTerm: selectedTerm,
-                      onTermChanged: (id) {
-                        setState(() => _selectedTermId = id);
+                      sessions: sessions,
+                      selectedSessionId: selectedSession.id,
+                      selectedTermId: selectedTerm.id,
+                      onSelectionChanged: (sessionId, termId) {
+                        setState(() {
+                          _selectedSessionId = sessionId;
+                          _selectedTermId = termId;
+                        });
                       },
                     ),
                   ),
