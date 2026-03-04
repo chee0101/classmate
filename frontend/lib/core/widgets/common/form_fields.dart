@@ -32,6 +32,7 @@ class LabeledTextField extends StatelessWidget {
           decoration: InputDecoration(
             hintText: hintText,
           ),
+          style: Theme.of(context).textTheme.bodyMedium,
         ),
         if (errorText != null) ...[
           const SizedBox(height: 4),
@@ -98,7 +99,7 @@ class TapField extends StatelessWidget {
             ),
             child: Text(
               value,
-              style: textTheme.bodyLarge?.copyWith(
+              style: textTheme.bodyMedium?.copyWith(
                 color: textColor,
               ),
             ),
@@ -127,7 +128,7 @@ class DropdownField<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final dropdownTextStyle = Theme.of(context).textTheme.bodyLarge;
+    final dropdownTextStyle = Theme.of(context).textTheme.bodyMedium;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

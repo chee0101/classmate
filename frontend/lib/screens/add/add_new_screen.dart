@@ -551,7 +551,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
                                 });
                               },
                             ),
-                            const SizedBox(height: AppSpacing.sm),
+                            const SizedBox(height: AppSpacing.md),
                             DropdownField<String>(
                               label: 'Academic Term',
                               value: selectedTerm.id,
@@ -560,7 +560,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
                                     (term) => DropdownMenuEntry<String>(
                                       value: term.id,
                                       label: term.label,
-                                      style: menuItemStyle,
+                                      
                                     ),
                                   )
                                   .toList(),
