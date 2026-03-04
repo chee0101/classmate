@@ -4,6 +4,8 @@ import '../../core/constants/app_spacing.dart';
 import '../../core/mock/mock_academic_session.dart';
 import '../../core/mock/mock_courses.dart';
 import '../../core/mock/mock_tasks.dart';
+import '../../core/mock/mock_timetables.dart';
+import '../../core/models/timetable_entry.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/models/task.dart';
 import '../../core/utils/term_windows.dart';
@@ -288,11 +290,32 @@ class _AddNewScreenState extends State<AddNewScreen> {
     );
   }
 
-  void _saveClass() {
+  void _saveClass({
+    required String sessionId,
+    required String termId,
+  }) {
     if (_classCourseCode == null || _classSlots.isEmpty) return;
+
+    upsertTimetableByCourse(
+      sessionId: sessionId,
+      termId: termId,
+      courseCode: _classCourseCode!,
+      slots: _classSlots
+          .map(
+            (slot) => TimetableSlot(
+              day: slot.day,
+              startTime: slot.startTime,
+              endTime: slot.endTime,
+              mode: slot.mode,
+              venue: slot.venue,
+            ),
+          )
+          .toList(growable: false),
+    );
+
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Class added (mock).')),
+      const SnackBar(content: Text('Timetable saved.')),
     );
   }
 
@@ -369,6 +392,22 @@ class _AddNewScreenState extends State<AddNewScreen> {
               final sessionAndTermCourses = courses
                   .where((c) => c.sessionId == selectedSession.id && c.termId == selectedTerm.id)
                   .toList(growable: false);
+              final persistedClassSlotsByCourse = {
+                for (final entry in mockTimetablesNotifier.value.where(
+                  (e) => e.sessionId == selectedSession.id && e.termId == selectedTerm.id,
+                ))
+                  entry.courseCode: entry.slots
+                      .map(
+                        (s) => ClassSlotDraft(
+                          day: s.day,
+                          startTime: s.startTime,
+                          endTime: s.endTime,
+                          mode: s.mode,
+                          venue: s.venue,
+                        ),
+                      )
+                      .toList(growable: false),
+              };
               
               final courseCodes = sessionAndTermCourses.map((c) => c.courseCode).toSet().toList()
                 ..sort();
@@ -422,8 +461,16 @@ class _AddNewScreenState extends State<AddNewScreen> {
                   courseCodes: courseCodes,
                   selectedCourseCode: _classCourseCode,
                   slots: _classSlots,
+                  slotsByCourse: persistedClassSlotsByCourse,
                   onCourseChanged: (value) =>
                       setState(() => _classCourseCode = value),
+                  onSlotsHydratedForCourse: (hydratedSlots) {
+                    setState(() {
+                      _classSlots
+                        ..clear()
+                        ..addAll(hydratedSlots);
+                    });
+                  },
                   onAddSlot: _addClassSlot,
                   onEditSlot: _editClassSlot,
                   onRemoveSlot: (slot) =>
@@ -540,7 +587,12 @@ class _AddNewScreenState extends State<AddNewScreen> {
                                     )
                                 : null)
                             : _selectedType == AddType.classSlot
-                                ? (canSaveClass ? _saveClass : null)
+                                ? (canSaveClass
+                                    ? () => _saveClass(
+                                          sessionId: selectedSession.id,
+                                          termId: selectedTerm.id,
+                                        )
+                                    : null)
                                 : (canSaveEvent ? _saveEvent : null),
                         child: Text(
                           _selectedType == AddType.task

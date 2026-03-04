@@ -11,7 +11,9 @@ class ClassForm extends StatelessWidget {
     required this.courseCodes,
     required this.selectedCourseCode,
     required this.slots,
+    this.slotsByCourse = const {},
     required this.onCourseChanged,
+    this.onSlotsHydratedForCourse,
     required this.onAddSlot,
     required this.onEditSlot,
     required this.onRemoveSlot,
@@ -21,7 +23,9 @@ class ClassForm extends StatelessWidget {
   final List<String> courseCodes;
   final String? selectedCourseCode;
   final List<ClassSlotDraft> slots;
+  final Map<String, List<ClassSlotDraft>> slotsByCourse;
   final ValueChanged<String?> onCourseChanged;
+  final ValueChanged<List<ClassSlotDraft>>? onSlotsHydratedForCourse;
   final VoidCallback onAddSlot;
   final ValueChanged<ClassSlotDraft> onEditSlot;
   final ValueChanged<ClassSlotDraft> onRemoveSlot;
@@ -30,6 +34,8 @@ class ClassForm extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final displaySlots =
+        selectedCourseCode == null ? slots : (slotsByCourse[selectedCourseCode!] ?? slots);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -37,7 +43,14 @@ class ClassForm extends StatelessWidget {
         CourseSelector(
           courseCodes: courseCodes,
           selected: selectedCourseCode,
-          onChanged: onCourseChanged,
+          onChanged: (value) {
+            onCourseChanged(value);
+            if (value != null && onSlotsHydratedForCourse != null) {
+              onSlotsHydratedForCourse!(
+                List<ClassSlotDraft>.from(slotsByCourse[value] ?? const []),
+              );
+            }
+          },
           onAddCourseRequested: onAddCourseRequested,
         ),
         const SizedBox(height: AppSpacing.md),
@@ -46,7 +59,7 @@ class ClassForm extends StatelessWidget {
           style: Theme.of(context).textTheme.titleSmall,
         ),
         const SizedBox(height: 4),
-        ...slots.map(
+        ...displaySlots.map(
           (slot) => InkWell(
             borderRadius: BorderRadius.circular(10),
             onTap: () => onEditSlot(slot),
@@ -100,7 +113,7 @@ class ClassForm extends StatelessWidget {
             style: OutlinedButton.styleFrom(
               foregroundColor: colorScheme.primary,
               side: BorderSide(
-                color: colorScheme.primary.withOpacity(0.3),
+                color: colorScheme.primary.withValues(alpha: 0.3),
               ),
             ),
           ),

@@ -257,24 +257,46 @@ class _AddClassSlotSheetState extends State<AddClassSlotSheet> {
           const SizedBox(height: AppSpacing.lg),
           SizedBox(
             width: double.infinity,
-            child: ElevatedButton(
-              onPressed: canAdd
-                  ? () {
-                      Navigator.pop(
-                        context,
-                        ClassSlotDraft(
-                          day: _selectedDay!,
-                          startTime: timeLabel(_start),
-                          endTime: timeLabel(_end),
-                          mode: _mode,
-                          venue:
-                              requiresVenue ? _venueController.text.trim() : null,
-                        ),
-                      );
-                    }
-                  : null,
-              child: Text(isEdit ? 'Save slot' : 'Add schedule'),
-            ),
+            child: isEdit
+                ? ElevatedButton(
+                    onPressed: canAdd
+                        ? () {
+                            Navigator.pop(
+                              context,
+                              ClassSlotDraft(
+                                day: _selectedDay!,
+                                startTime: timeLabel(_start),
+                                endTime: timeLabel(_end),
+                                mode: _mode,
+                                venue: requiresVenue
+                                    ? _venueController.text.trim()
+                                    : null,
+                              ),
+                            );
+                          }
+                        : null,
+                    child: const Text('Save slot'),
+                  )
+                : ElevatedButton.icon(
+                    onPressed: canAdd
+                        ? () {
+                            Navigator.pop(
+                              context,
+                              ClassSlotDraft(
+                                day: _selectedDay!,
+                                startTime: timeLabel(_start),
+                                endTime: timeLabel(_end),
+                                mode: _mode,
+                                venue: requiresVenue
+                                    ? _venueController.text.trim()
+                                    : null,
+                              ),
+                            );
+                          }
+                        : null,
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add slot'),
+                  ),
           ),
         ],
       ),
