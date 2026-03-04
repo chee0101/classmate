@@ -44,6 +44,43 @@ class AddClassSlotSheet extends StatefulWidget {
 }
 
 class _AddClassSlotSheetState extends State<AddClassSlotSheet> {
+  @override
+  Widget build(BuildContext context) {
+    return ClassSlotEditorForm(
+      initial: widget.initial,
+      showTitle: true,
+      addButtonText: 'Add schedule',
+      saveButtonText: 'Save slot',
+      onSubmitted: (slot) => Navigator.pop(context, slot),
+    );
+  }
+}
+
+class ClassSlotEditorForm extends StatefulWidget {
+  const ClassSlotEditorForm({
+    super.key,
+    this.initial,
+    required this.onSubmitted,
+    this.showTitle = false,
+    this.addTitleText = 'Add Slot',
+    this.editTitleText = 'Edit Slot',
+    this.addButtonText = 'Add slot',
+    this.saveButtonText = 'Save slot',
+  });
+
+  final ClassSlotDraft? initial;
+  final ValueChanged<ClassSlotDraft> onSubmitted;
+  final bool showTitle;
+  final String addTitleText;
+  final String editTitleText;
+  final String addButtonText;
+  final String saveButtonText;
+
+  @override
+  State<ClassSlotEditorForm> createState() => _ClassSlotEditorFormState();
+}
+
+class _ClassSlotEditorFormState extends State<ClassSlotEditorForm> {
   String? _selectedDay;
   TimeOfDay? _start;
   TimeOfDay? _end;
@@ -161,11 +198,13 @@ class _AddClassSlotSheetState extends State<AddClassSlotSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            isEdit ? 'Edit Slot' : 'Add Slot',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: AppSpacing.md),
+          if (widget.showTitle) ...[
+            Text(
+              isEdit ? widget.editTitleText : widget.addTitleText,
+              style: Theme.of(context).textTheme.headlineMedium,
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
           DropdownField<String>(
             label: 'Day',
             value: _selectedDay,
@@ -261,8 +300,7 @@ class _AddClassSlotSheetState extends State<AddClassSlotSheet> {
                 ? ElevatedButton(
                     onPressed: canAdd
                         ? () {
-                            Navigator.pop(
-                              context,
+                            widget.onSubmitted(
                               ClassSlotDraft(
                                 day: _selectedDay!,
                                 startTime: timeLabel(_start),
@@ -275,13 +313,12 @@ class _AddClassSlotSheetState extends State<AddClassSlotSheet> {
                             );
                           }
                         : null,
-                    child: const Text('Save slot'),
+                    child: Text(widget.saveButtonText),
                   )
                 : ElevatedButton.icon(
                     onPressed: canAdd
                         ? () {
-                            Navigator.pop(
-                              context,
+                            widget.onSubmitted(
                               ClassSlotDraft(
                                 day: _selectedDay!,
                                 startTime: timeLabel(_start),
@@ -295,7 +332,7 @@ class _AddClassSlotSheetState extends State<AddClassSlotSheet> {
                           }
                         : null,
                     icon: const Icon(Icons.add),
-                    label: const Text('Add slot'),
+                    label: Text(widget.addButtonText),
                   ),
           ),
         ],

@@ -87,7 +87,7 @@ class ClassForm extends StatelessWidget {
                             text:
                                 '${slot.startTime} - ${slot.endTime} · ${slot.mode}'
                                 '${slot.venue == null ? '' : '\nVenue: ${slot.venue}'}',
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                   color: AppPrimarySwatch.shade900,
                                 ),
                           ),
