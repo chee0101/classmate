@@ -5,6 +5,7 @@ import '../../core/mock/mock_academic_session.dart';
 import '../../core/mock/mock_courses.dart';
 import '../../core/mock/mock_timetables.dart';
 import '../../core/models/academic_session.dart';
+import '../../core/models/class_type.dart';
 import '../../core/models/timetable_entry.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/widgets/add/add_course_dialog.dart';
@@ -309,6 +310,7 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
             startTime: s.startTime,
             endTime: s.endTime,
             mode: s.mode,
+            classType: s.classType,
             venue: s.venue,
           ),
         )
@@ -344,12 +346,58 @@ class _TimetableCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
-  String _slotLabel(TimetableSlot slot) {
-    final day = slot.day.length >= 3 ? slot.day.substring(0, 3) : slot.day;
-    final location = (slot.venue != null && slot.venue!.trim().isNotEmpty)
-        ? slot.venue!.trim()
-        : slot.mode;
-    return '$day: ${slot.startTime} - ${slot.endTime} | $location';
+  static const List<String> _dayOrder = <String>[
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
+  ];
+
+  int _slotStartMinutes(TimetableSlot slot) {
+    final match =
+        RegExp(r'^(\d{1,2}):(\d{2})\s*(AM|PM)$', caseSensitive: false)
+            .firstMatch(slot.startTime.trim());
+    if (match == null) return 0;
+    final hour12 = int.tryParse(match.group(1) ?? '') ?? 0;
+    final minute = int.tryParse(match.group(2) ?? '') ?? 0;
+    final period = (match.group(3) ?? 'AM').toUpperCase();
+    final hour24 = period == 'AM' ? hour12 % 12 : (hour12 % 12) + 12;
+    return (hour24 * 60) + minute;
+  }
+
+  String _locationLabel(TimetableSlot slot) {
+    if (slot.mode == 'Online') return 'Online';
+    final venue = slot.venue?.trim();
+    return (venue == null || venue.isEmpty) ? '-' : venue;
+  }
+
+  Map<String, List<TimetableSlot>> _groupSlotsByDay(List<TimetableSlot> slots) {
+    final grouped = <String, List<TimetableSlot>>{};
+    for (final slot in slots) {
+      grouped.putIfAbsent(slot.day, () => <TimetableSlot>[]).add(slot);
+    }
+    for (final day in grouped.keys) {
+      grouped[day]!.sort(
+        (a, b) => _slotStartMinutes(a).compareTo(_slotStartMinutes(b)),
+      );
+    }
+    return grouped;
+  }
+
+  List<String> _sortedDays(Iterable<String> days) {
+    final sorted = days.toList(growable: false);
+    sorted.sort((a, b) {
+      final ai = _dayOrder.indexOf(a);
+      final bi = _dayOrder.indexOf(b);
+      if (ai == -1 && bi == -1) return a.compareTo(b);
+      if (ai == -1) return 1;
+      if (bi == -1) return -1;
+      return ai.compareTo(bi);
+    });
+    return sorted;
   }
 
   @override
@@ -402,17 +450,64 @@ class _TimetableCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                ...entry.slots.map(
-                  (slot) => Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Text(
-                      _slotLabel(slot),
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            color: Theme.of(context).colorScheme.primary,
+                ...() {
+                  final grouped = _groupSlotsByDay(entry.slots);
+                  final days = _sortedDays(grouped.keys);
+                  return days.map((day) {
+                    final slots = grouped[day] ?? const <TimetableSlot>[];
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            day.length >= 3 ? day.substring(0, 3) : day,
+                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                  color: Colors.grey.shade700,
+                                  fontWeight: FontWeight.w700,
+                                ),
                           ),
-                    ),
-                  ),
-                ),
+                          const SizedBox(height: 2),
+                          ...slots.map(
+                            (slot) => Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  SizedBox(
+                                    width: 160,
+                                    child: Text(
+                                      '${slot.startTime} - ${slot.endTime}',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge
+                                          ?.copyWith(
+                                            color:
+                                                Theme.of(context).colorScheme.primary,
+                                          ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: Text(
+                                      '${slot.classType.label} · ${_locationLabel(slot)}',
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyLarge
+                                          ?.copyWith(
+                                            color:
+                                                Theme.of(context).colorScheme.primary,
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(growable: false);
+                }(),
               ],
             ),
           ),
@@ -470,6 +565,7 @@ class _TimetableEditorSheetState extends State<_TimetableEditorSheet> {
                 startTime: s.startTime,
                 endTime: s.endTime,
                 mode: s.mode,
+                classType: s.classType,
                 venue: s.venue,
               ),
             )
@@ -486,6 +582,7 @@ class _TimetableEditorSheetState extends State<_TimetableEditorSheet> {
               startTime: s.startTime,
               endTime: s.endTime,
               mode: s.mode,
+              classType: s.classType,
               venue: s.venue,
             ),
           )
@@ -502,6 +599,7 @@ class _TimetableEditorSheetState extends State<_TimetableEditorSheet> {
             startTime: s.startTime,
             endTime: s.endTime,
             mode: s.mode,
+            classType: s.classType,
             venue: s.venue,
           ),
         )

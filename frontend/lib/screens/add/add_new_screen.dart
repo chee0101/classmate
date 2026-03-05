@@ -307,6 +307,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
               startTime: slot.startTime,
               endTime: slot.endTime,
               mode: slot.mode,
+              classType: slot.classType,
               venue: slot.venue,
             ),
           )
@@ -363,11 +364,6 @@ class _AddNewScreenState extends State<AddNewScreen> {
           return ValueListenableBuilder<List<AcademicSession>>(
             valueListenable: mockAcademicSessionsNotifier,
             builder: (context, sessionsList, _) {
-              final menuItemStyle = ButtonStyle(
-                textStyle: WidgetStateProperty.all<TextStyle?>(
-                  Theme.of(context).textTheme.bodyLarge,
-                ),
-              );
               final sessions = [...sessionsList];
               if (!sessions.any((s) => s.id == session.id)) {
                 sessions.add(session);
@@ -403,6 +399,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
                           startTime: s.startTime,
                           endTime: s.endTime,
                           mode: s.mode,
+                          classType: s.classType,
                           venue: s.venue,
                         ),
                       )

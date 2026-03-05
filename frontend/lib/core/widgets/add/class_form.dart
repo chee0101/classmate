@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../constants/app_colors.dart';
 import '../../constants/app_spacing.dart';
+import '../../models/class_type.dart';
 import '../schedule/class_slot_sheet.dart';
 import '../common/course_selector.dart';
 
@@ -34,8 +35,7 @@ class ClassForm extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final displaySlots =
-        selectedCourseCode == null ? slots : (slotsByCourse[selectedCourseCode!] ?? slots);
+    final displaySlots = slots;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -85,8 +85,8 @@ class ClassForm extends StatelessWidget {
                           ),
                           TextSpan(
                             text:
-                                '${slot.startTime} - ${slot.endTime} · ${slot.mode}'
-                                '${slot.venue == null ? '' : '\nVenue: ${slot.venue}'}',
+                                '${slot.startTime} - ${slot.endTime} · ${slot.classType.label}\n'
+                                '${slot.mode == 'Online' ? 'Online' : 'Venue: ${slot.venue ?? '-'}'}',
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                   color: AppPrimarySwatch.shade900,
                                 ),

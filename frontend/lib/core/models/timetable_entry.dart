@@ -1,9 +1,12 @@
+import 'class_type.dart';
+
 class TimetableSlot {
   const TimetableSlot({
     required this.day,
     required this.startTime,
     required this.endTime,
     required this.mode,
+    required this.classType,
     this.venue,
   });
 
@@ -11,6 +14,7 @@ class TimetableSlot {
   final String startTime;
   final String endTime;
   final String mode;
+  final ClassType classType;
   final String? venue;
 
   TimetableSlot copyWith({
@@ -18,6 +22,7 @@ class TimetableSlot {
     String? startTime,
     String? endTime,
     String? mode,
+    ClassType? classType,
     String? venue,
   }) {
     return TimetableSlot(
@@ -25,6 +30,7 @@ class TimetableSlot {
       startTime: startTime ?? this.startTime,
       endTime: endTime ?? this.endTime,
       mode: mode ?? this.mode,
+      classType: classType ?? this.classType,
       venue: venue ?? this.venue,
     );
   }

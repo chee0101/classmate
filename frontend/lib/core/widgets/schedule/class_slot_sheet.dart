@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../constants/app_spacing.dart';
+import '../../models/class_type.dart';
 import '../../utils/date_time_format.dart';
 import '../common/form_fields.dart';
 
@@ -10,6 +11,7 @@ class ClassSlotDraft {
     required this.startTime,
     required this.endTime,
     required this.mode,
+    required this.classType,
     this.venue,
   });
 
@@ -17,6 +19,7 @@ class ClassSlotDraft {
   final String startTime;
   final String endTime;
   final String mode;
+  final ClassType classType;
   final String? venue;
 }
 
@@ -85,6 +88,7 @@ class _ClassSlotEditorFormState extends State<ClassSlotEditorForm> {
   TimeOfDay? _start;
   TimeOfDay? _end;
   String _mode = 'Online';
+  ClassType _classType = ClassType.lecture;
   final TextEditingController _venueController = TextEditingController();
 
   @override
@@ -96,6 +100,7 @@ class _ClassSlotEditorFormState extends State<ClassSlotEditorForm> {
       _start = _parseTimeOfDay(initial.startTime);
       _end = _parseTimeOfDay(initial.endTime);
       _mode = initial.mode;
+      _classType = initial.classType;
       _venueController.text = initial.venue ?? '';
     }
   }
@@ -252,6 +257,23 @@ class _ClassSlotEditorFormState extends State<ClassSlotEditorForm> {
             ),
           ],
           const SizedBox(height: AppSpacing.md),
+          DropdownField<ClassType>(
+            label: 'Class Type',
+            value: _classType,
+            items: ClassType.values
+                .map(
+                  (type) => DropdownMenuEntry<ClassType>(
+                    value: type,
+                    label: type.label,
+                  ),
+                )
+                .toList(growable: false),
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() => _classType = value);
+            },
+          ),
+          const SizedBox(height: AppSpacing.md),
           Text('Mode', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 4),
           Column(
@@ -306,6 +328,7 @@ class _ClassSlotEditorFormState extends State<ClassSlotEditorForm> {
                                 startTime: timeLabel(_start),
                                 endTime: timeLabel(_end),
                                 mode: _mode,
+                                classType: _classType,
                                 venue: requiresVenue
                                     ? _venueController.text.trim()
                                     : null,
@@ -324,6 +347,7 @@ class _ClassSlotEditorFormState extends State<ClassSlotEditorForm> {
                                 startTime: timeLabel(_start),
                                 endTime: timeLabel(_end),
                                 mode: _mode,
+                                classType: _classType,
                                 venue: requiresVenue
                                     ? _venueController.text.trim()
                                     : null,
