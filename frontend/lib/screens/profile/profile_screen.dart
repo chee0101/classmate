@@ -1,8 +1,10 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/routes.dart';
+import '../../core/services/user_profile_store.dart';
 import '../../core/widgets/common/white_card.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -13,14 +15,21 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  String _userName = 'Alex';
-  final String _userEmail = 'alex123@student.usm.my';
+  String _userName = 'Student';
+  String _userEmail = '';
   bool _isEditingName = false;
   final TextEditingController _nameController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+    final user = FirebaseAuth.instance.currentUser;
+    final email = user?.email ?? '';
+    final displayName = user?.displayName?.trim();
+    _userEmail = email;
+    _userName = (displayName != null && displayName.isNotEmpty)
+        ? displayName
+        : (email.isEmpty ? 'Student' : email.split('@').first);
     _nameController.text = _userName;
   }
 
@@ -33,22 +42,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void _handleLogout() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         backgroundColor: Colors.white,
         title: const Text('Log out'),
         content: const Text('Are you sure you want to log out?'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              // Navigate to login screen
+            onPressed: () async {
+              Navigator.pop(dialogContext);
+              await FirebaseAuth.instance.signOut();
+              if (!mounted) return;
               Navigator.pushNamedAndRemoveUntil(
                 context,
-                AppRoutes.login,
+                AppRoutes.authChecker,
                 (route) => false,
               );
             },
@@ -62,17 +72,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _handleEditName() {
+  Future<void> _handleEditName() async {
     if (_isEditingName) {
-      // Save the name
+      final nextName = _nameController.text.trim().isEmpty
+          ? 'Student'
+          : _nameController.text.trim();
       setState(() {
-        _userName = _nameController.text.trim().isEmpty
-            ? 'Alex'
-            : _nameController.text.trim();
+        _userName = nextName;
         _isEditingName = false;
       });
+      await FirebaseAuth.instance.currentUser?.updateDisplayName(nextName);
+      await UserProfileStore.updateUsernameForCurrentUser(nextName);
     } else {
-      // Start editing
       setState(() {
         _isEditingName = true;
         _nameController.text = _userName;
@@ -262,7 +273,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: colorScheme.primary.withOpacity(0.08),
+                color: colorScheme.primary.withValues(alpha: 0.08),
                 shape: BoxShape.circle,
               ),
               child: Icon(
@@ -278,7 +289,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 style: textTheme.bodyLarge,
               ),
             ),
-            Icon(
+            const Icon(
               Icons.chevron_right,
               color: Colors.black87,
             ),

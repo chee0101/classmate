@@ -1,6 +1,8 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../constants/app_spacing.dart';
 import '../../constants/routes.dart';
+import '../../services/user_profile_store.dart';
 import '../../validators/auth_validators.dart';
 
 class SignUpForm extends StatefulWidget {
@@ -25,6 +27,7 @@ class _SignUpFormState extends State<SignUpForm> {
 
   bool obscurePassword = true;
   bool obscureConfirmPassword = true;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -89,8 +92,14 @@ class _SignUpFormState extends State<SignUpForm> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _submit,
-              child: const Text('Sign Up'),
+              onPressed: _isSubmitting ? null : _submit,
+              child: _isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Sign Up'),
             ),
           ),
         ],
@@ -188,15 +197,36 @@ class _SignUpFormState extends State<SignUpForm> {
     );
   }
 
-  void _submit() {
-    if (_formKey.currentState!.validate()) {
-      // TODO: Replace mock handler with a real Firebase
-      // createUserWithEmailAndPassword call and send email verification
-      // to the @student.usm.my address.
-      debugPrint('Sign up valid (mock)');
-
-      // navigate to the verify-email info screen.
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isSubmitting = true);
+    try {
+      final credential = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text,
+      );
+      await credential.user?.updateDisplayName(usernameController.text.trim());
+      final createdUser = credential.user;
+      if (createdUser != null) {
+        await UserProfileStore.ensureForUser(
+          createdUser,
+          preferredUsername: usernameController.text.trim(),
+        );
+      }
+      await credential.user?.sendEmailVerification();
+      if (!mounted) return;
       Navigator.pushReplacementNamed(context, AppRoutes.verifyEmail);
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      final message = switch (e.code) {
+        'email-already-in-use' => 'This email is already in use.',
+        'invalid-email' => 'Please enter a valid email.',
+        'weak-password' => 'Password is too weak.',
+        _ => e.message ?? 'Sign up failed. Please try again.',
+      };
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 }

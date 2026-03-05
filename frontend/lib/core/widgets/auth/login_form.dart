@@ -1,6 +1,8 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../../constants/app_spacing.dart';
 import '../../constants/routes.dart';
+import '../../services/user_profile_store.dart';
 import '../../validators/auth_validators.dart';
 
 class LoginForm extends StatefulWidget {
@@ -20,6 +22,7 @@ class _LoginFormState extends State<LoginForm> {
   final passwordFocus = FocusNode();
 
   bool obscurePassword = true;
+  bool _isSubmitting = false;
 
   @override
   void dispose() {
@@ -68,8 +71,14 @@ class _LoginFormState extends State<LoginForm> {
           SizedBox(
             width: double.infinity,
             child: ElevatedButton(
-              onPressed: _submit,
-              child: const Text('Login'),
+              onPressed: _isSubmitting ? null : _submit,
+              child: _isSubmitting
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Text('Login'),
             ),
           ),
         ],
@@ -171,14 +180,32 @@ class _LoginFormState extends State<LoginForm> {
     );
   }
 
-  void _submit() {
-    if (_formKey.currentState!.validate()) {
-      // TODO: Replace this mock handler with a real Firebase
-      // signInWithEmailAndPassword call and token handling.
-      debugPrint('Login valid (mock)');
-
-      // navigate to the auth checker
+  Future<void> _submit() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() => _isSubmitting = true);
+    try {
+      final credential = await FirebaseAuth.instance.signInWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text,
+      );
+      final user = credential.user;
+      if (user != null) {
+        await UserProfileStore.ensureForUser(user);
+      }
+      if (!mounted) return;
       Navigator.pushReplacementNamed(context, AppRoutes.authChecker);
+    } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
+      final message = switch (e.code) {
+        'invalid-credential' => 'Invalid email or password.',
+        'user-not-found' => 'No account found for this email.',
+        'wrong-password' => 'Invalid email or password.',
+        'too-many-requests' => 'Too many attempts. Try again later.',
+        _ => e.message ?? 'Login failed. Please try again.',
+      };
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
     }
   }
 }

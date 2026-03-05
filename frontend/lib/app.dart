@@ -1,4 +1,5 @@
 import 'package:classmate/screens/auth/auth_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'core/constants/app_colors.dart';
@@ -246,21 +247,23 @@ class MyApp extends StatelessWidget {
 class AuthChecker extends StatelessWidget {
   const AuthChecker({super.key});
 
-  bool _mockIsLoggedIn() {
-    // Placeholder until auth persistence is wired.
-    return true;
-  }
-
   @override
   Widget build(BuildContext context) {
-    // TODO: Replace with real auth check (SharedPreferences / token).
-    final userIsLoggedIn = _mockIsLoggedIn();
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
 
-    if (userIsLoggedIn) {
-      return const MainScaffold();
-    } else {
-      return const AuthScreen();
-    }
+        final user = snapshot.data;
+        if (user == null) return const AuthScreen();
+        if (!user.emailVerified) return const VerifyEmailScreen();
+        return const MainScaffold();
+      },
+    );
   }
 }
 
