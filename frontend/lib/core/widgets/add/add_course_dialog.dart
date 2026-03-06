@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../constants/app_spacing.dart';
-import '../../mock/mock_courses.dart';
+import '../../services/course_store.dart';
 import '../../models/course.dart';
 import '../common/form_fields.dart';
 

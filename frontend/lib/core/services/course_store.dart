@@ -6,8 +6,9 @@ import 'package:flutter/foundation.dart';
 
 import '../models/course.dart';
 
-final ValueNotifier<List<Course>> mockCoursesNotifier =
-    ValueNotifier<List<Course>>([]);
+final ValueNotifier<List<Course>> coursesNotifier = ValueNotifier<List<Course>>(
+  [],
+);
 
 StreamSubscription<User?>? _authSubscription;
 StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _coursesSubscription;
@@ -45,7 +46,7 @@ void initializeCoursesSync() {
     _coursesSubscription = null;
 
     if (user == null) {
-      mockCoursesNotifier.value = const <Course>[];
+      coursesNotifier.value = const <Course>[];
       return;
     }
 
@@ -53,7 +54,7 @@ void initializeCoursesSync() {
         .orderBy('courseCode')
         .snapshots()
         .listen((snapshot) {
-          mockCoursesNotifier.value = snapshot.docs.map(_courseFromDoc).toList(
+          coursesNotifier.value = snapshot.docs.map(_courseFromDoc).toList(
             growable: false,
           );
         });
@@ -61,13 +62,13 @@ void initializeCoursesSync() {
 }
 
 List<Course> coursesForSession(String sessionId) {
-  return mockCoursesNotifier.value
+  return coursesNotifier.value
       .where((c) => c.sessionId == sessionId)
       .toList(growable: false);
 }
 
 bool hasCoursesForSession(String sessionId) {
-  return mockCoursesNotifier.value.any((c) => c.sessionId == sessionId);
+  return coursesNotifier.value.any((c) => c.sessionId == sessionId);
 }
 
 bool courseCodeExistsInSession({
@@ -75,7 +76,7 @@ bool courseCodeExistsInSession({
   required String courseCode,
 }) {
   final normalized = courseCode.trim().toUpperCase();
-  return mockCoursesNotifier.value.any(
+  return coursesNotifier.value.any(
     (c) => c.sessionId == sessionId && c.courseCode.toUpperCase() == normalized,
   );
 }
@@ -86,7 +87,7 @@ bool courseCodeExistsInSessionAndTerm({
   required String courseCode,
 }) {
   final normalized = courseCode.trim().toUpperCase();
-  return mockCoursesNotifier.value.any(
+  return coursesNotifier.value.any(
     (c) =>
         c.sessionId == sessionId &&
         c.termId == termId &&
@@ -101,7 +102,7 @@ bool courseCodeExistsInSessionAndTermExcludingCourse({
   required String courseCode,
 }) {
   final normalized = courseCode.trim().toUpperCase();
-  return mockCoursesNotifier.value.any(
+  return coursesNotifier.value.any(
     (c) =>
         c.id != courseId &&
         c.sessionId == sessionId &&

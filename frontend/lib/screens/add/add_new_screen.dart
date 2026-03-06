@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
 import '../../core/mock/mock_academic_session.dart';
-import '../../core/mock/mock_courses.dart';
 import '../../core/mock/mock_tasks.dart';
 import '../../core/mock/mock_timetables.dart';
 import '../../core/models/timetable_entry.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/models/task.dart';
+import '../../core/services/course_store.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
 import '../../core/widgets/common/empty_state_card.dart';
@@ -265,7 +265,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
     final title = _taskTitleController.text.trim();
     if (title.isEmpty || _taskCourseCode == null) return;
 
-    final matched = mockCoursesNotifier.value.where((c) {
+    final matched = coursesNotifier.value.where((c) {
       return c.sessionId == sessionId && c.courseCode == _taskCourseCode;
     }).toList();
     final colorHex = matched.isEmpty ? '#6C4DD9' : matched.first.courseColor;
@@ -357,7 +357,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
         title: const Text('Add New'),
       ),
       body: ValueListenableBuilder(
-        valueListenable: mockCoursesNotifier,
+        valueListenable: coursesNotifier,
         builder: (context, courses, _) {
           // activeSession is guaranteed to be non-null here due to early return above
           final session = activeSession;

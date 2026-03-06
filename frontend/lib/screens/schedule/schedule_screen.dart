@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
 import '../../core/mock/mock_academic_session.dart';
-import '../../core/mock/mock_courses.dart';
 import '../../core/mock/mock_timetables.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/models/class_type.dart';
 import '../../core/models/course.dart';
+import '../../core/services/course_store.dart';
 import '../../core/models/timetable_entry.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
@@ -98,7 +98,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             valueListenable: mockTimetablesNotifier,
             builder: (context, entries, _) {
               return ValueListenableBuilder<List<Course>>(
-                valueListenable: mockCoursesNotifier,
+                valueListenable: coursesNotifier,
                 builder: (context, courses, _) {
                   final filteredEntries = entries
                       .where(

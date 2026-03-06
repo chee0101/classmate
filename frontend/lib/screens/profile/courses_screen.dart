@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
 import '../../core/mock/mock_academic_session.dart';
-import '../../core/mock/mock_courses.dart';
+import '../../core/services/course_store.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/widgets/add/add_course_dialog.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
@@ -94,7 +94,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
           final selectedTerm = selectedRef['term'];
 
           return ValueListenableBuilder(
-            valueListenable: mockCoursesNotifier,
+            valueListenable: coursesNotifier,
             builder: (context, courses, _) {
               final filteredCourses = courses
                   .where(

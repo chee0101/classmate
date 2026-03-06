@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
 import '../../core/mock/mock_academic_session.dart';
-import '../../core/mock/mock_courses.dart';
 import '../../core/mock/mock_timetables.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/models/class_type.dart';
 import '../../core/models/timetable_entry.dart';
+import '../../core/services/course_store.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/widgets/add/add_course_dialog.dart';
 import '../../core/widgets/add/class_form.dart';
@@ -271,7 +271,7 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
     required TermWindow selectedTerm,
     TimetableEntry? initial,
   }) async {
-    final courses = mockCoursesNotifier.value
+    final courses = coursesNotifier.value
         .where(
           (c) =>
               c.sessionId == selectedSession.id && c.termId == selectedTerm.id,
