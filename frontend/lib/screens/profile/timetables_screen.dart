@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
 import '../../core/mock/mock_academic_session.dart';
-import '../../core/mock/mock_timetables.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/models/class_type.dart';
 import '../../core/models/timetable_entry.dart';
+import '../../core/services/class_slot_store.dart';
 import '../../core/services/course_store.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/widgets/add/add_course_dialog.dart';
@@ -94,7 +94,7 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
           final selectedTerm = selectedRef.term;
 
           return ValueListenableBuilder<List<TimetableEntry>>(
-            valueListenable: mockTimetablesNotifier,
+            valueListenable: timetablesNotifier,
             builder: (context, entries, _) {
               final filtered = entries
                   .where(
@@ -134,8 +134,8 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
                       ],
                     ),
                     Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Padding(
+          padding: const EdgeInsets.all(AppSpacing.lg),
                         child: EmptyStateCard(
                           title: 'No timetable in ${selectedTerm.label}',
                           subtitle:
@@ -163,14 +163,14 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
                       bottom: AppSpacing.xs,
                     ),
                     child: Row(
-                      children: [
-                        Icon(
+            children: [
+              Icon(
                           Icons.info_outline,
                           size: 14,
                           color: Colors.grey.shade600,
                         ),
                         const SizedBox(width: 6),
-                        Text(
+              Text(
                           'Tap a schedule to edit',
                           style:
                               Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -240,8 +240,9 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
                                     child: const Text('Cancel'),
                                   ),
                                   TextButton(
-                                    onPressed: () {
-                                      deleteTimetableEntry(entry.id);
+                                    onPressed: () async {
+                                      await deleteTimetableEntry(entry.id);
+                                      if (!context.mounted) return;
                                       Navigator.pop(context);
                                     },
                                     child: const Text(
@@ -291,7 +292,7 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
         sessionId: selectedSession.id,
         termId: selectedTerm.id,
         courseCodes: courses,
-        existingEntries: mockTimetablesNotifier.value
+        existingEntries: timetablesNotifier.value
             .where(
               (e) =>
                   e.sessionId == selectedSession.id &&
@@ -317,14 +318,14 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
         .toList(growable: false);
 
     if (initial == null) {
-      upsertTimetableByCourse(
+      await upsertTimetableByCourse(
         sessionId: selectedSession.id,
         termId: selectedTerm.id,
         courseCode: result.courseCode,
         slots: slots,
       );
     } else {
-      updateTimetableEntry(
+      await updateTimetableEntry(
         id: initial.id,
         sessionId: selectedSession.id,
         termId: selectedTerm.id,

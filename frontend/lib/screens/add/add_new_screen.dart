@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/mock/mock_academic_session.dart';
 import '../../core/mock/mock_tasks.dart';
-import '../../core/mock/mock_timetables.dart';
 import '../../core/models/timetable_entry.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/models/task.dart';
+import '../../core/services/class_slot_store.dart';
 import '../../core/services/course_store.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
@@ -292,13 +292,13 @@ class _AddNewScreenState extends State<AddNewScreen> {
     );
   }
 
-  void _saveClass({
+  Future<void> _saveClass({
     required String sessionId,
     required String termId,
-  }) {
+  }) async {
     if (_classCourseCode == null || _classSlots.isEmpty) return;
 
-    upsertTimetableByCourse(
+    await upsertTimetableByCourse(
       sessionId: sessionId,
       termId: termId,
       courseCode: _classCourseCode!,
@@ -316,6 +316,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
           .toList(growable: false),
     );
 
+    if (!mounted) return;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Timetable saved.')),
@@ -391,8 +392,10 @@ class _AddNewScreenState extends State<AddNewScreen> {
                   .where((c) => c.sessionId == selectedSession.id && c.termId == selectedTerm.id)
                   .toList(growable: false);
               final persistedClassSlotsByCourse = {
-                for (final entry in mockTimetablesNotifier.value.where(
-                  (e) => e.sessionId == selectedSession.id && e.termId == selectedTerm.id,
+                for (final entry in timetablesNotifier.value.where(
+                  (e) =>
+                      e.sessionId == selectedSession.id &&
+                      e.termId == selectedTerm.id,
                 ))
                   entry.courseCode: entry.slots
                       .map(

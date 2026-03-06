@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
 import '../../core/mock/mock_academic_session.dart';
-import '../../core/mock/mock_timetables.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/models/class_type.dart';
 import '../../core/models/course.dart';
+import '../../core/services/class_slot_store.dart';
 import '../../core/services/course_store.dart';
 import '../../core/models/timetable_entry.dart';
 import '../../core/utils/term_windows.dart';
@@ -95,7 +95,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           final selectedTerm = selectedRef.term;
 
           return ValueListenableBuilder<List<TimetableEntry>>(
-            valueListenable: mockTimetablesNotifier,
+            valueListenable: timetablesNotifier,
             builder: (context, entries, _) {
               return ValueListenableBuilder<List<Course>>(
                 valueListenable: coursesNotifier,
