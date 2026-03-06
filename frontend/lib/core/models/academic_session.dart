@@ -17,7 +17,8 @@ class AcademicSession {
   }) {
     final name = '${startDate.year}/${endDate.year}';
     return AcademicSession(
-      id: name,
+      // Temporary client-side id; Firestore document id is generated on save.
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
       name: name,
       startDate: startDate,
       endDate: endDate,
