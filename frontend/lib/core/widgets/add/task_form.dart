@@ -32,7 +32,7 @@ class TaskForm extends StatelessWidget {
   final ValueChanged<String?> onCourseChanged;
   final VoidCallback onPickDate;
   final VoidCallback onPickTime;
-  final VoidCallback onAddCourseRequested;
+  final Future<String?> Function() onAddCourseRequested;
 
   @override
   Widget build(BuildContext context) {

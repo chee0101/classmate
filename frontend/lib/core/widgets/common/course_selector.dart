@@ -14,15 +14,23 @@ class CourseSelector extends StatelessWidget {
   final List<String> courseCodes;
   final String? selected;
   final ValueChanged<String?> onChanged;
-  final VoidCallback? onAddCourseRequested;
+  final Future<String?> Function()? onAddCourseRequested;
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     const addCourseValue = '__add_course__';
+    final normalizedSelected = selected?.trim().toUpperCase();
+    final effectiveCourseCodes = <String>[
+      if (normalizedSelected != null &&
+          normalizedSelected.isNotEmpty &&
+          !courseCodes.contains(normalizedSelected))
+        normalizedSelected,
+      ...courseCodes,
+    ];
     final entries = <DropdownMenuEntry<String>>[
-      ...courseCodes.map(
+      ...effectiveCourseCodes.map(
         (code) => DropdownMenuEntry<String>(
           value: code,
           label: code,
@@ -44,17 +52,23 @@ class CourseSelector extends StatelessWidget {
     ];
 
     final currentSelection =
-        (selected != null && courseCodes.contains(selected)) ? selected : null;
+        (normalizedSelected != null &&
+            effectiveCourseCodes.contains(normalizedSelected))
+        ? normalizedSelected
+        : null;
 
     return DropdownField<String>(
       label: 'Course Code',
       value: currentSelection,
       hintText: courseCodes.isEmpty ? 'No course yet' : 'Select course code',
       items: entries,
-      onChanged: (value) {
+      onChanged: (value) async {
         if (value == addCourseValue) {
           if (onAddCourseRequested != null) {
-            onAddCourseRequested!();
+            final newCode = await onAddCourseRequested!();
+            if (newCode != null && newCode.trim().isNotEmpty) {
+              onChanged(newCode.trim().toUpperCase());
+            }
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(

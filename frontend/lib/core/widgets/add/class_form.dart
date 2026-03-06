@@ -30,7 +30,7 @@ class ClassForm extends StatelessWidget {
   final VoidCallback onAddSlot;
   final ValueChanged<ClassSlotDraft> onEditSlot;
   final ValueChanged<ClassSlotDraft> onRemoveSlot;
-  final VoidCallback onAddCourseRequested;
+  final Future<String?> Function() onAddCourseRequested;
 
   @override
   Widget build(BuildContext context) {

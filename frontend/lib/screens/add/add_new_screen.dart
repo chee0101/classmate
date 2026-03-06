@@ -211,36 +211,38 @@ class _AddNewScreenState extends State<AddNewScreen> {
     if (slot == null) return;
     setState(() => _classSlots.add(slot));
   }
-  Future<void> _showAddCourseDialogForTask(String sessionId, String termId) async {
+  Future<String?> _showAddCourseDialogForTask(
+    String sessionId,
+    String termId,
+  ) async {
     final newCode = await AddCourseDialog.show(
       context,
       sessionId: sessionId,
       termId: termId,
     );
-    if (newCode == null) return;
-    setState(() {
-      _taskCourseCode = newCode;
-    });
-    if (!mounted) return;
+    if (newCode == null) return null;
+    if (!mounted) return null;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('$newCode added successfully!')),
     );
+    return newCode;
   }
 
-  Future<void> _showAddCourseDialogForClass(String sessionId, String termId) async {
+  Future<String?> _showAddCourseDialogForClass(
+    String sessionId,
+    String termId,
+  ) async {
     final newCode = await AddCourseDialog.show(
       context,
       sessionId: sessionId,
       termId: termId,
     );
-    if (newCode == null) return;
-    setState(() {
-      _classCourseCode = newCode;
-    });
-    if (!mounted) return;
+    if (newCode == null) return null;
+    if (!mounted) return null;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('$newCode added successfully!')),
     );
+    return newCode;
   }
 
   Future<void> _editClassSlot(ClassSlotDraft slot) async {
@@ -409,13 +411,6 @@ class _AddNewScreenState extends State<AddNewScreen> {
               final courseCodes = sessionAndTermCourses.map((c) => c.courseCode).toSet().toList()
                 ..sort();
 
-              if (_taskCourseCode != null && !courseCodes.contains(_taskCourseCode)) {
-                _taskCourseCode = null;
-              }
-              if (_classCourseCode != null && !courseCodes.contains(_classCourseCode)) {
-                _classCourseCode = null;
-              }
-
               final canSaveTask =
                   _taskTitleController.text.trim().isNotEmpty &&
                   _taskCourseCode != null &&
@@ -545,6 +540,9 @@ class _AddNewScreenState extends State<AddNewScreen> {
                                 setState(() {
                                   _selectedSessionId = value;
                                   _selectedTermId = defaultTermId(nextTerms);
+                                  _taskCourseCode = null;
+                                  _classCourseCode = null;
+                                  _classSlots.clear();
                                 });
                               },
                             ),
@@ -563,7 +561,12 @@ class _AddNewScreenState extends State<AddNewScreen> {
                                   .toList(),
                               onChanged: (value) {
                                 if (value == null) return;
-                                setState(() => _selectedTermId = value);
+                                setState(() {
+                                  _selectedTermId = value;
+                                  _taskCourseCode = null;
+                                  _classCourseCode = null;
+                                  _classSlots.clear();
+                                });
                               },
                             ),
                             const SizedBox(height: AppSpacing.md),

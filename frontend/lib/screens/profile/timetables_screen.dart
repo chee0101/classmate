@@ -629,13 +629,13 @@ class _TimetableEditorSheetState extends State<_TimetableEditorSheet> {
     });
   }
 
-  Future<void> _addCourseRequested() async {
+  Future<String?> _addCourseRequested() async {
     final newCode = await AddCourseDialog.show(
       context,
       sessionId: widget.sessionId,
       termId: widget.termId,
     );
-    if (newCode == null) return;
+    if (newCode == null) return null;
 
     setState(() {
       if (!_courseCodes.contains(newCode)) {
@@ -643,9 +643,8 @@ class _TimetableEditorSheetState extends State<_TimetableEditorSheet> {
         _courseCodes.sort();
       }
       _slotsByCourse.putIfAbsent(newCode, () => []);
-      _selectedCourseCode = newCode;
-      _slots = _cloneSlots(_slotsByCourse[newCode] ?? const []);
     });
+    return newCode;
   }
 
   @override
