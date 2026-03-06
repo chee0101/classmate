@@ -1,9 +1,64 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/course.dart';
 
 final ValueNotifier<List<Course>> mockCoursesNotifier =
     ValueNotifier<List<Course>>([]);
+
+StreamSubscription<User?>? _authSubscription;
+StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _coursesSubscription;
+
+CollectionReference<Map<String, dynamic>> _coursesCollection(String uid) {
+  return FirebaseFirestore.instance.collection('users').doc(uid).collection(
+    'courses',
+  );
+}
+
+String _buildCourseScopedKey({
+  required String sessionId,
+  required String termId,
+  required String courseCode,
+}) {
+  return '${sessionId.trim()}::${termId.trim()}::${courseCode.trim().toUpperCase()}';
+}
+
+Course _courseFromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
+  final data = doc.data() ?? const <String, dynamic>{};
+  return Course(
+    id: doc.id,
+    sessionId: (data['sessionId'] as String?)?.trim() ?? '',
+    termId: (data['termId'] as String?)?.trim() ?? '',
+    courseCode: (data['courseCode'] as String?)?.trim().toUpperCase() ?? '',
+    courseColor: (data['courseColor'] as String?)?.trim() ?? '#3B82F6',
+  );
+}
+
+void initializeCoursesSync() {
+  if (_authSubscription != null) return;
+
+  _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
+    _coursesSubscription?.cancel();
+    _coursesSubscription = null;
+
+    if (user == null) {
+      mockCoursesNotifier.value = const <Course>[];
+      return;
+    }
+
+    _coursesSubscription = _coursesCollection(user.uid)
+        .orderBy('courseCode')
+        .snapshots()
+        .listen((snapshot) {
+          mockCoursesNotifier.value = snapshot.docs.map(_courseFromDoc).toList(
+            growable: false,
+          );
+        });
+  });
+}
 
 List<Course> coursesForSession(String sessionId) {
   return mockCoursesNotifier.value
@@ -55,65 +110,84 @@ bool courseCodeExistsInSessionAndTermExcludingCourse({
   );
 }
 
-void addCourse({
+Future<void> addCourse({
   required String sessionId,
   required String termId,
   required String courseCode,
   required String courseColor,
-}) {
-  if (courseCodeExistsInSessionAndTerm(
+}) async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
+
+  final normalizedCode = courseCode.trim().toUpperCase();
+  final scopedKey = _buildCourseScopedKey(
     sessionId: sessionId,
     termId: termId,
-    courseCode: courseCode,
-  )) {
+    courseCode: normalizedCode,
+  );
+
+  final existsSnapshot = await _coursesCollection(user.uid)
+      .where('courseScopedKey', isEqualTo: scopedKey)
+      .limit(1)
+      .get();
+  if (existsSnapshot.docs.isNotEmpty) {
     return;
   }
 
-  final next = List<Course>.from(mockCoursesNotifier.value)
-    ..add(
-      Course(
-        id: DateTime.now().microsecondsSinceEpoch.toString(),
-        sessionId: sessionId,
-        termId: termId,
-        courseCode: courseCode.trim().toUpperCase(),
-        courseColor: courseColor,
-      ),
-    );
-  mockCoursesNotifier.value = next;
+  final docRef = _coursesCollection(user.uid).doc();
+  await docRef.set({
+    'sessionId': sessionId,
+    'termId': termId,
+    'courseCode': normalizedCode,
+    'courseCodeNormalized': normalizedCode,
+    'courseScopedKey': scopedKey,
+    'courseColor': courseColor,
+    'createdAt': FieldValue.serverTimestamp(),
+    'updatedAt': FieldValue.serverTimestamp(),
+  });
 }
 
-void updateCourse({
+Future<void> updateCourse({
   required String id,
   required String sessionId,
   required String termId,
   required String courseCode,
   required String courseColor,
-}) {
-  final exists = courseCodeExistsInSessionAndTermExcludingCourse(
+}) async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
+
+  final normalizedCode = courseCode.trim().toUpperCase();
+  final scopedKey = _buildCourseScopedKey(
     sessionId: sessionId,
     termId: termId,
-    courseId: id,
-    courseCode: courseCode,
+    courseCode: normalizedCode,
   );
+
+  final duplicateSnapshot = await _coursesCollection(user.uid)
+      .where('courseScopedKey', isEqualTo: scopedKey)
+      .limit(2)
+      .get();
+  final exists = duplicateSnapshot.docs.any((doc) => doc.id != id);
 
   if (exists) {
     return;
   }
 
-  final next = mockCoursesNotifier.value.map((course) {
-    if (course.id != id) return course;
-    return course.copyWith(
-      courseCode: courseCode.trim().toUpperCase(),
-      courseColor: courseColor,
-    );
-  }).toList(growable: false);
-
-  mockCoursesNotifier.value = next;
+  await _coursesCollection(user.uid).doc(id).set({
+    'sessionId': sessionId,
+    'termId': termId,
+    'courseCode': normalizedCode,
+    'courseCodeNormalized': normalizedCode,
+    'courseScopedKey': scopedKey,
+    'courseColor': courseColor,
+    'updatedAt': FieldValue.serverTimestamp(),
+  }, SetOptions(merge: true));
 }
 
-void deleteCourse(String id) {
-  final next = mockCoursesNotifier.value
-      .where((course) => course.id != id)
-      .toList(growable: false);
-  mockCoursesNotifier.value = next;
+Future<void> deleteCourse(String id) async {
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
+
+  await _coursesCollection(user.uid).doc(id).delete();
 }
