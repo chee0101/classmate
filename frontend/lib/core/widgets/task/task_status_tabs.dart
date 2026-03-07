@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../models/task.dart';
+import '../common/animated_segmented_switch.dart';
 
 class TaskStatusTabs extends StatelessWidget {
   const TaskStatusTabs({
@@ -14,62 +15,23 @@ class TaskStatusTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    Widget buildTab(TaskStatus status, String label) {
-      final bool isActive = selected == status;
-      return Expanded(
-        child: GestureDetector(
-          onTap: () => onChanged(status),
-          child: Container(
-            height: 40,
-            decoration: BoxDecoration(
-              color: isActive ? colorScheme.primary : Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: const [
-                BoxShadow(
-                  blurRadius: 8,
-                  color: Colors.black12,
-                  offset: Offset(0, 4),
-                ),
-              ],
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              label,
-              style: textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w600,
-                color: isActive ? Colors.white : colorScheme.primary,
-              ),
-            ),
-          ),
+    return AnimatedSegmentedSwitch<TaskStatus>(
+      value: selected,
+      onChanged: onChanged,
+      options: const [
+        SegmentedSwitchOption<TaskStatus>(
+          value: TaskStatus.ongoing,
+          label: 'Ongoing',
         ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: const [
-          BoxShadow(
-            blurRadius: 12,
-            color: Colors.black12,
-            offset: Offset(0, 6),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          buildTab(TaskStatus.ongoing, 'Ongoing'),
-          const SizedBox(width: 4),
-          buildTab(TaskStatus.overdue, 'Overdue'),
-          const SizedBox(width: 4),
-          buildTab(TaskStatus.completed, 'Complete'),
-        ],
-      ),
+        SegmentedSwitchOption<TaskStatus>(
+          value: TaskStatus.overdue,
+          label: 'Overdue',
+        ),
+        SegmentedSwitchOption<TaskStatus>(
+          value: TaskStatus.completed,
+          label: 'Complete',
+        ),
+      ],
     );
   }
 }

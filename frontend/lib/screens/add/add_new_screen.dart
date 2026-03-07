@@ -10,6 +10,7 @@ import '../../core/services/class_slot_store.dart';
 import '../../core/services/course_store.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
+import '../../core/widgets/common/animated_segmented_switch.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/common/form_fields.dart';
 import '../../core/widgets/schedule/class_slot_sheet.dart';
@@ -628,45 +629,14 @@ class _TypeTabs extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-
-    Widget tab(String label, AddType value) {
-      final isSelected = selected == value;
-      return Expanded(
-        child: InkWell(
-          onTap: () => onChanged(value),
-          borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
-              color: isSelected ? primary : Colors.transparent,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: isSelected ? Colors.white : primary,
-                  ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: primary.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          tab('Task', AddType.task),
-          tab('Class', AddType.classSlot),
-          tab('Event', AddType.event),
-        ],
-      ),
+    return AnimatedSegmentedSwitch<AddType>(
+      value: selected,
+      onChanged: onChanged,
+      options: const [
+        SegmentedSwitchOption<AddType>(value: AddType.task, label: 'Task'),
+        SegmentedSwitchOption<AddType>(value: AddType.classSlot, label: 'Class'),
+        SegmentedSwitchOption<AddType>(value: AddType.event, label: 'Event'),
+      ],
     );
   }
 }

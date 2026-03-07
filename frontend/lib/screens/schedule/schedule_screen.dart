@@ -10,6 +10,7 @@ import '../../core/services/course_store.dart';
 import '../../core/models/timetable_entry.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
+import '../../core/widgets/common/animated_segmented_switch.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/home/session_header.dart';
 
@@ -244,58 +245,13 @@ class _ScheduleModeToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final primary = Theme.of(context).colorScheme.primary;
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: primary.withValues(alpha: 0.2),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          _toggleTab(
-            context,
-            label: 'Weekly',
-            selected: !showMonthly,
-            onTap: () => onChanged(false),
-          ),
-          _toggleTab(
-            context,
-            label: 'Monthly',
-            selected: showMonthly,
-            onTap: () => onChanged(true),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _toggleTab(
-    BuildContext context, {
-    required String label,
-    required bool selected,
-    required VoidCallback onTap,
-  }) {
-    final primary = Theme.of(context).colorScheme.primary;
-    return Expanded(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: BoxDecoration(
-            color: selected ? primary : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Text(
-            label,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: selected ? Colors.white : primary,
-                ),
-          ),
-        ),
-      ),
+    return AnimatedSegmentedSwitch<bool>(
+      value: showMonthly,
+      onChanged: onChanged,
+      options: const [
+        SegmentedSwitchOption<bool>(value: false, label: 'Weekly'),
+        SegmentedSwitchOption<bool>(value: true, label: 'Monthly'),
+      ],
     );
   }
 }

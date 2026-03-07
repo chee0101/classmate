@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../core/constants/app_spacing.dart';
+import '../../core/widgets/common/animated_segmented_switch.dart';
 import '../../core/widgets/auth/login_form.dart';
 import '../../core/widgets/auth/signup_form.dart';
 
@@ -88,83 +89,16 @@ class _AuthScreenState extends State<AuthScreen> {
   // --------------------------------------------------
   Widget _buildToggle(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Container(
-      height: 50,
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: colorScheme.primary.withAlpha(20),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Stack(
-        children: [
-          AnimatedAlign(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOut,
-            alignment: isLogin ? Alignment.centerLeft : Alignment.centerRight,
-            child: Container(
-              width:
-                  (MediaQuery.of(context).size.width - 2 * AppSpacing.lg - 8) /
-                      2,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-          ),
-          Row(
-            children: [
-              _toggleText(
-                context,
-                text: 'Login',
-                active: isLogin,
-                onTap: () {
-                  FocusScope.of(context).unfocus();
-                  setState(() => isLogin = true);
-                },
-              ),
-              _toggleText(
-                context,
-                text: 'Sign Up',
-                active: !isLogin,
-                onTap: () {
-                  FocusScope.of(context).unfocus();
-                  setState(() => isLogin = false);
-                },
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _toggleText(
-    BuildContext context, {
-    required String text,
-    required bool active,
-    required VoidCallback onTap,
-  }) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-
-    return Expanded(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTap: onTap,
-        child: Center(
-          child: Text(
-            text,
-            style: textTheme.bodyLarge?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: active
-                  ? colorScheme.primary
-                  : colorScheme.onSurface.withOpacity(0.6),
-            ),
-          ),
-        ),
-      ),
+    return AnimatedSegmentedSwitch<bool>(
+      value: isLogin,
+      options: const [
+        SegmentedSwitchOption<bool>(value: true, label: 'Login'),
+        SegmentedSwitchOption<bool>(value: false, label: 'Sign Up'),
+      ],
+      onChanged: (next) {
+        FocusScope.of(context).unfocus();
+        setState(() => isLogin = next);
+      },
     );
   }
 }
