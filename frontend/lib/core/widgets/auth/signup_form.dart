@@ -4,6 +4,7 @@ import '../../constants/app_spacing.dart';
 import '../../constants/routes.dart';
 import '../../services/user_profile_store.dart';
 import '../../validators/auth_validators.dart';
+import '../common/form_fields.dart';
 
 class SignUpForm extends StatefulWidget {
   const SignUpForm({super.key});
@@ -45,30 +46,29 @@ class _SignUpFormState extends State<SignUpForm> {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
     return Form(
       key: _formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _label('Username', textTheme),
           _field(
+            label: 'Username',
             controller: usernameController,
             focusNode: usernameFocus,
             hint: 'Enter your username',
             validator: (v) =>
                 v == null || v.isEmpty ? 'Username is required' : null,
           ),
-          _label('Email', textTheme),
           _field(
+            label: 'Email',
             controller: emailController,
             focusNode: emailFocus,
             hint: 'Enter your school email',
             validator: validateUsmStudentEmail,
+            keyboardType: TextInputType.emailAddress,
           ),
-          _label('Password', textTheme),
           _passwordField(
+            label: 'Password',
             controller: passwordController,
             focusNode: passwordFocus,
             hint: 'Enter your password',
@@ -76,8 +76,8 @@ class _SignUpFormState extends State<SignUpForm> {
             onToggle: () => setState(() => obscurePassword = !obscurePassword),
             validator: validateStrongPassword,
           ),
-          _label('Confirm Password', textTheme),
           _passwordField(
+            label: 'Confirm Password',
             controller: confirmPasswordController,
             focusNode: confirmPasswordFocus,
             hint: 'Confirm your password',
@@ -109,28 +109,26 @@ class _SignUpFormState extends State<SignUpForm> {
 
   // -------------------------
 
-  Widget _label(String text, TextTheme textTheme) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Text(text, style: textTheme.titleLarge),
-    );
-  }
-
   Widget _field({
+    required String label,
     required TextEditingController controller,
     required FocusNode focusNode,
     required String hint,
     required String? Function(String?) validator,
+    TextInputType? keyboardType,
   }) {
     return _validatedField(
+      label: label,
       controller: controller,
       focusNode: focusNode,
       hint: hint,
       validator: validator,
+      keyboardType: keyboardType,
     );
   }
 
   Widget _passwordField({
+    required String label,
     required TextEditingController controller,
     required FocusNode focusNode,
     required String hint,
@@ -139,6 +137,7 @@ class _SignUpFormState extends State<SignUpForm> {
     required String? Function(String?) validator,
   }) {
     return _validatedField(
+      label: label,
       controller: controller,
       focusNode: focusNode,
       hint: hint,
@@ -149,12 +148,14 @@ class _SignUpFormState extends State<SignUpForm> {
   }
 
   Widget _validatedField({
+    required String label,
     required TextEditingController controller,
     required FocusNode focusNode,
     required String hint,
     bool obscure = false,
     VoidCallback? onToggle,
     required String? Function(String?) validator,
+    TextInputType? keyboardType,
   }) {
     return FormField<String>(
       validator: validator,
@@ -162,34 +163,26 @@ class _SignUpFormState extends State<SignUpForm> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
+            LabeledTextField(
+              label: label,
+              hintText: hint,
               controller: controller,
               focusNode: focusNode,
+              keyboardType: keyboardType,
               obscureText: obscure,
-              decoration: InputDecoration(
-                hintText: hint,
-                errorText: null,
-                suffixIcon: onToggle == null
-                    ? null
-                    : IconButton(
-                        icon: Icon(
-                          obscure
-                              ? Icons.visibility_off_outlined
-                              : Icons.visibility_outlined,
-                        ),
-                        onPressed: onToggle,
+              suffixIcon: onToggle == null
+                  ? null
+                  : IconButton(
+                      icon: Icon(
+                        obscure
+                            ? Icons.visibility_off_outlined
+                            : Icons.visibility_outlined,
                       ),
-              ),
+                      onPressed: onToggle,
+                    ),
               onChanged: state.didChange,
+              errorText: state.errorText,
             ),
-            if (state.hasError)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(
-                  state.errorText!,
-                  style: const TextStyle(fontSize: 12, color: Colors.red),
-                ),
-              ),
             const SizedBox(height: AppSpacing.md),
           ],
         );

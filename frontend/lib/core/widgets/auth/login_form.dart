@@ -4,6 +4,7 @@ import '../../constants/app_spacing.dart';
 import '../../constants/routes.dart';
 import '../../services/user_profile_store.dart';
 import '../../validators/auth_validators.dart';
+import '../common/form_fields.dart';
 
 class LoginForm extends StatefulWidget {
   const LoginForm({super.key});
@@ -35,22 +36,21 @@ class _LoginFormState extends State<LoginForm> {
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
     return Form(
       key: _formKey,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _fieldLabel('School Email', textTheme),
           _validatedField(
+            label: 'School Email',
             controller: emailController,
             focusNode: emailFocus,
             hint: 'Enter your school email',
             validator: validateUsmStudentEmail,
+            keyboardType: TextInputType.emailAddress,
           ),
-          _fieldLabel('Password', textTheme),
           _validatedPasswordField(
+            label: 'Password',
             controller: passwordController,
             focusNode: passwordFocus,
             hint: 'Enter your password',
@@ -61,6 +61,11 @@ class _LoginFormState extends State<LoginForm> {
           Align(
             alignment: Alignment.centerRight,
             child: TextButton(
+              style: TextButton.styleFrom(
+                textStyle: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                  decoration: TextDecoration.underline,
+                ),
+              ),
               onPressed: () {
                 Navigator.pushNamed(context, AppRoutes.forgotPassword);
               },
@@ -90,18 +95,13 @@ class _LoginFormState extends State<LoginForm> {
   // Helpers
   // -------------------------
 
-  Widget _fieldLabel(String text, TextTheme textTheme) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-      child: Text(text, style: textTheme.titleLarge),
-    );
-  }
-
   Widget _validatedField({
+    required String label,
     required TextEditingController controller,
     required FocusNode focusNode,
     required String hint,
     required String? Function(String?) validator,
+    TextInputType? keyboardType,
   }) {
     return FormField<String>(
       validator: validator,
@@ -109,23 +109,15 @@ class _LoginFormState extends State<LoginForm> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
+            LabeledTextField(
+              label: label,
+              hintText: hint,
               controller: controller,
               focusNode: focusNode,
-              decoration: InputDecoration(
-                hintText: hint,
-                errorText: null,
-              ),
+              keyboardType: keyboardType,
               onChanged: state.didChange,
+              errorText: state.errorText,
             ),
-            if (state.hasError)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(
-                  state.errorText!,
-                  style: const TextStyle(fontSize: 12, color: Colors.red),
-                ),
-              ),
             const SizedBox(height: AppSpacing.md),
           ],
         );
@@ -134,6 +126,7 @@ class _LoginFormState extends State<LoginForm> {
   }
 
   Widget _validatedPasswordField({
+    required String label,
     required TextEditingController controller,
     required FocusNode focusNode,
     required String hint,
@@ -147,32 +140,23 @@ class _LoginFormState extends State<LoginForm> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            TextField(
+            LabeledTextField(
+              label: label,
+              hintText: hint,
               controller: controller,
               focusNode: focusNode,
               obscureText: obscure,
-              decoration: InputDecoration(
-                hintText: hint,
-                errorText: null,
-                suffixIcon: IconButton(
-                  icon: Icon(
-                    obscure
-                        ? Icons.visibility_off_outlined
-                        : Icons.visibility_outlined,
-                  ),
-                  onPressed: onToggle,
+              suffixIcon: IconButton(
+                icon: Icon(
+                  obscure
+                      ? Icons.visibility_off_outlined
+                      : Icons.visibility_outlined,
                 ),
+                onPressed: onToggle,
               ),
               onChanged: state.didChange,
+              errorText: state.errorText,
             ),
-            if (state.hasError)
-              Padding(
-                padding: const EdgeInsets.only(top: 6),
-                child: Text(
-                  state.errorText!,
-                  style: const TextStyle(fontSize: 12, color: Colors.red),
-                ),
-              ),
             const SizedBox(height: AppSpacing.md),
           ],
         );

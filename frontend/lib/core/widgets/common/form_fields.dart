@@ -9,6 +9,10 @@ class LabeledTextField extends StatelessWidget {
     required this.onChanged,
     this.maxLines = 1,
     this.errorText,
+    this.focusNode,
+    this.keyboardType,
+    this.obscureText = false,
+    this.suffixIcon,
   });
 
   final String label;
@@ -17,6 +21,10 @@ class LabeledTextField extends StatelessWidget {
   final ValueChanged<String> onChanged;
   final int maxLines;
   final String? errorText;
+  final FocusNode? focusNode;
+  final TextInputType? keyboardType;
+  final bool obscureText;
+  final Widget? suffixIcon;
 
   @override
   Widget build(BuildContext context) {
@@ -27,10 +35,14 @@ class LabeledTextField extends StatelessWidget {
         const SizedBox(height: 4),
         TextField(
           controller: controller,
+          focusNode: focusNode,
           maxLines: maxLines,
+          keyboardType: keyboardType,
+          obscureText: obscureText,
           onChanged: onChanged,
           decoration: InputDecoration(
             hintText: hintText,
+            suffixIcon: suffixIcon,
           ),
           style: Theme.of(context).textTheme.bodyMedium,
         ),

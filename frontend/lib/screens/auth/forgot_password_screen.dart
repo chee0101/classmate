@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/routes.dart';
 import '../../core/validators/auth_validators.dart';
+import '../../core/widgets/common/form_fields.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -51,17 +52,16 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                 style: textTheme.bodyLarge,
               ),
               const SizedBox(height: AppSpacing.lg),
-              Text(
-                'School Email',
-                style: textTheme.titleLarge,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              TextFormField(
-                controller: emailController,
-                focusNode: emailFocus,
+              FormField<String>(
                 validator: validateUsmStudentEmail,
-                decoration: const InputDecoration(
+                builder: (state) => LabeledTextField(
+                  label: 'School Email',
                   hintText: 'Enter your school email',
+                  controller: emailController,
+                  focusNode: emailFocus,
+                  keyboardType: TextInputType.emailAddress,
+                  onChanged: state.didChange,
+                  errorText: state.errorText,
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
