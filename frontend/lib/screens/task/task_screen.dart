@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/routes.dart';
 import '../../core/services/academic_session_store.dart';
-import '../../core/mock/mock_tasks.dart';
 import '../../core/models/task.dart';
+import '../../core/services/task_store.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/task/task_card.dart';
@@ -51,16 +51,21 @@ class _TaskScreenState extends State<TaskScreen> {
           }
 
           return ValueListenableBuilder(
-            valueListenable: mockTasksNotifier,
+            valueListenable: tasksNotifier,
             builder: (context, allTasks, _) {
               // Only show top-level tasks in the list (subtasks are shown in detail view).
-              final _tasks = allTasks.where((t) => t.parentTaskId == null).toList();
+              final topLevelTasks = allTasks
+                  .where((t) => t.parentTaskId == null)
+                  .toList();
 
               // Build distinct course codes for the filter.
-              final courseCodes = _tasks.map((t) => t.courseCode).toSet().toList()
+              final courseCodes = topLevelTasks
+                  .map((t) => t.courseCode)
+                  .toSet()
+                  .toList()
                 ..sort();
 
-              final tasks = _tasks.where((t) {
+              final tasks = topLevelTasks.where((t) {
                 final matchesStatus = t.status == _selectedStatus;
                 final matchesCourse =
                     _selectedCourseCode == null || t.courseCode == _selectedCourseCode;
@@ -103,10 +108,13 @@ class _TaskScreenState extends State<TaskScreen> {
                   padding: EdgeInsets.zero,
                   child: tasks.isEmpty
                       ? Center(
-                          child: Text(
-                            'No tasks found. Looks like you\'re all caught up!',
-                            style: textTheme.bodyLarge,
-                            textAlign: TextAlign.center,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg), 
+                            child: Text(
+                              'No tasks found. Looks like you\'re all caught up!',
+                              style: textTheme.bodyLarge,
+                              textAlign: TextAlign.center,
+                            )
                           ),
                         )
                       : ListView.separated(
@@ -121,10 +129,10 @@ class _TaskScreenState extends State<TaskScreen> {
                           itemBuilder: (context, index) {
                             final task = tasks[index];
                             final nextSubtaskTitle =
-                                _getNextSubtaskTitle(task.id);
+                                _getNextSubtaskTitle(task.id, allTasks);
                             return TaskCard(
                               task: task,
-                              onMarkDone: () => _markTaskAsCompleted(task),
+                              onMarkDone: () async => _markTaskAsCompleted(task),
                               onTap: () => _navigateToTaskDetail(task),
                               nextSubtaskTitle: nextSubtaskTitle,
                             );
@@ -141,15 +149,11 @@ class _TaskScreenState extends State<TaskScreen> {
     );
   }
 
-  void _markTaskAsCompleted(Task task) {
+  Future<void> _markTaskAsCompleted(Task task) async {
     if (task.status == TaskStatus.completed) return;
 
-    mockTasksNotifier.value = mockTasksNotifier.value
-        .map(
-          (t) =>
-              t.id == task.id ? t.copyWith(status: TaskStatus.completed) : t,
-        )
-        .toList();
+    await updateTask(task.copyWith(status: TaskStatus.completed));
+    if (!mounted) return;
 
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
@@ -168,8 +172,10 @@ class _TaskScreenState extends State<TaskScreen> {
 
   /// Returns the title of the nearest-due (and not yet completed) subtask,
   /// or null if there is no such subtask.
-  String? _getNextSubtaskTitle(String parentTaskId) {
-    final subtasks = mockSubtasksFor(parentTaskId);
+  String? _getNextSubtaskTitle(String parentTaskId, List<Task> allTasks) {
+    final subtasks = allTasks
+        .where((t) => t.parentTaskId == parentTaskId)
+        .toList(growable: false);
     if (subtasks.isEmpty) return null;
 
     final remaining = subtasks

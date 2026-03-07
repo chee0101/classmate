@@ -2,14 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
 import '../../core/models/task.dart';
-import '../../core/mock/mock_tasks.dart';
+import '../../core/services/task_store.dart';
 import '../../core/widgets/task/task_card.dart';
 import '../../core/widgets/task/subtask_card.dart';
 import '../../core/widgets/task/task_edit_bottom_sheet.dart';
 
 /// Task detail screen showing full task info, subtasks, and actions.
-///
-/// TODO: Replace mock subtasks with real data from backend.
 class TaskDetailScreen extends StatefulWidget {
   const TaskDetailScreen({
     super.key,
@@ -31,21 +29,35 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   void initState() {
     super.initState();
     _task = widget.task;
-    // TODO: Load subtasks from backend based on _task.id
-    _subtasks = mockSubtasksFor(_task.id);
+    _subtasks = const <Task>[];
+    _syncFromStore(notify: false);
+    tasksNotifier.addListener(_onTasksChanged);
+  }
 
-    // If the main task is already completed (e.g. user marked it as done
-    // from the task list screen), reflect that by marking all subtasks
-    // as completed as well.
-    if (_task.status == TaskStatus.completed) {
-      _subtasks = _subtasks
-          .map(
-            (t) => t.copyWith(status: TaskStatus.completed),
-          )
-          .toList();
+  @override
+  void dispose() {
+    tasksNotifier.removeListener(_onTasksChanged);
+    super.dispose();
+  }
+
+  void _onTasksChanged() {
+    _syncFromStore();
+  }
+
+  void _syncFromStore({bool notify = true}) {
+    final allTasks = tasksNotifier.value;
+    final matchedTask = allTasks.where((task) => task.id == _task.id);
+    if (matchedTask.isNotEmpty) {
+      _task = matchedTask.first;
     }
 
+    _subtasks = allTasks
+        .where((task) => task.parentTaskId == _task.id)
+        .toList(growable: false);
     _sortSubtasks();
+    if (notify && mounted) {
+      setState(() {});
+    }
   }
 
   @override
@@ -80,11 +92,11 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               itemBuilder: (context) => const [
                 PopupMenuItem(
                   value: 'edit',
-                  child: Text('Edit task'),
+                  child: Text('Edit'),
                 ),
                 PopupMenuItem(
                   value: 'delete',
-                  child: Text('Delete task'),
+                  child: Text('Delete', style: TextStyle(color: Colors.red)),
                 ),
               ],
             ),
@@ -110,7 +122,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
                 onPressed: _task.status == TaskStatus.completed ||
                         !allSubtasksCompleted
                     ? null
-                    : _handleMarkAsCompleted,
+                    : () async => _handleMarkAsCompleted(),
                 child: const Text('Mark as completed'),
               ),
             ),
@@ -130,7 +142,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               height: 44,
               child: Center(
                 child: TextButton(
-                  onPressed: _handleEdit,
+                  onPressed: () async => _handleEdit(),
                   style: TextButton.styleFrom(
                     padding: EdgeInsets.zero,
                     minimumSize: const Size(0, 0),
@@ -157,7 +169,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             ),
             if (_subtasks.isNotEmpty)
               TextButton(
-                onPressed: _handleMarkAllSubtasksCompleted,
+                onPressed: () async => _handleMarkAllSubtasksCompleted(),
                 child: const Text('Mark all as completed'),
               ),
           ],
@@ -182,8 +194,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               padding: const EdgeInsets.only(bottom: AppSpacing.md),
               child: SubtaskCard(
                 subtask: subtask,
-                onMarkDone: () => _handleSubtaskMarkDone(subtask),
-                onEdit: () => _handleEditSubtask(subtask),
+                onMarkDone: () async => _handleSubtaskMarkDone(subtask),
+                onEdit: () async => _handleEditSubtask(subtask),
                 onDelete: () => _handleDeleteSubtask(subtask),
                 isEditing: _isEditing,
               ),
@@ -198,7 +210,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             label: const Text('Add sub task'),
             style: OutlinedButton.styleFrom(
               foregroundColor: colorScheme.primary,
-              side: BorderSide(color: colorScheme.primary.withOpacity(0.3)),
+              side: BorderSide(
+                color: colorScheme.primary.withValues(alpha: 0.3),
+              ),
             ),
           ),
         ),
@@ -211,11 +225,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       context,
       task: _task,
       sheetTitle: 'Edit Task',
-    ).then((updatedTask) {
+    ).then((updatedTask) async {
       if (updatedTask == null) return;
-      setState(() {
-        _task = updatedTask;
-      });
+      await updateTask(updatedTask);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Task updated')),
       );
@@ -235,11 +248,12 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              // TODO: Delete from backend
-              Navigator.pop(context); // Go back to task list
-              ScaffoldMessenger.of(context).showSnackBar(
+              await deleteTask(_task.id, deleteSubtasks: true);
+              if (!mounted) return;
+              Navigator.of(this.context).pop(); // Go back to task list
+              ScaffoldMessenger.of(this.context).showSnackBar(
                 const SnackBar(content: Text('Task deleted')),
               );
             },
@@ -253,11 +267,9 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     );
   }
 
-  void _handleMarkAsCompleted() {
-    setState(() {
-      _task = _task.copyWith(status: TaskStatus.completed);
-    });
-    // TODO: Update in backend
+  Future<void> _handleMarkAsCompleted() async {
+    await updateTask(_task.copyWith(status: TaskStatus.completed));
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Task marked as completed')),
     );
@@ -268,6 +280,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     final draftSubtask = Task(
       id: 'sub-${DateTime.now().millisecondsSinceEpoch}',
       parentTaskId: _task.id,
+      courseId: _task.courseId,
       courseCode: _task.courseCode,
       courseColor: _task.courseColor,
       title: '',
@@ -282,31 +295,19 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       sheetTitle: 'Add Subtask',
       isSubtask: true,
       parentDueDateTime: _task.dueDateTime,
-    ).then((createdSubtask) {
+    ).then((createdSubtask) async {
       if (createdSubtask == null) return;
-      setState(() {
-        _subtasks = [..._subtasks, createdSubtask];
-        _sortSubtasks();
-      });
-      // Keep mock data in sync so "Next subtask" labels use the new one.
-      mockTasksNotifier.value = [...mockTasksNotifier.value, createdSubtask];
+      await addTask(createdSubtask);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Subtask added')),
       );
     });
   }
 
-  void _handleSubtaskMarkDone(Task subtask) {
-    setState(() {
-      _subtasks = _subtasks
-          .map(
-            (t) =>
-                t.id == subtask.id ? t.copyWith(status: TaskStatus.completed) : t,
-          )
-          .toList();
-      _sortSubtasks();
-    });
-    // TODO: Update in backend
+  Future<void> _handleSubtaskMarkDone(Task subtask) async {
+    await updateTask(subtask.copyWith(status: TaskStatus.completed));
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Subtask marked as completed')),
     );
@@ -324,13 +325,11 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
             child: const Text('Cancel'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              setState(() {
-                _subtasks.removeWhere((t) => t.id == subtask.id);
-              });
-              // TODO: Update in backend
-              ScaffoldMessenger.of(context).showSnackBar(
+              await deleteTask(subtask.id);
+              if (!mounted) return;
+              ScaffoldMessenger.of(this.context).showSnackBar(
                 const SnackBar(content: Text('Subtask deleted')),
               );
             },
@@ -344,37 +343,31 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     );
   }
 
-  void _handleEditSubtask(Task subtask) {
+  Future<void> _handleEditSubtask(Task subtask) async {
     TaskEditBottomSheet.show(
       context,
       task: subtask,
       sheetTitle: 'Edit Subtask',
       isSubtask: true,
       parentDueDateTime: _task.dueDateTime,
-    ).then((updatedSubtask) {
+    ).then((updatedSubtask) async {
       if (updatedSubtask == null) return;
-      setState(() {
-        _subtasks = _subtasks
-            .map(
-              (t) => t.id == updatedSubtask.id ? updatedSubtask : t,
-            )
-            .toList();
-        _sortSubtasks();
-      });
+      await updateTask(updatedSubtask);
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Subtask updated')),
       );
     });
   }
 
-  void _handleMarkAllSubtasksCompleted() {
-    setState(() {
-      _subtasks = _subtasks
-          .map((t) => t.copyWith(status: TaskStatus.completed))
-          .toList();
-      _sortSubtasks();
-    });
-    // TODO: Update in backend
+  Future<void> _handleMarkAllSubtasksCompleted() async {
+    final pending = _subtasks
+        .where((task) => task.status != TaskStatus.completed)
+        .toList(growable: false);
+    await Future.wait(
+      pending.map((task) => updateTask(task.copyWith(status: TaskStatus.completed))),
+    );
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('All subtasks marked as completed')),
     );

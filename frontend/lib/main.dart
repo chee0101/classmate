@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'core/services/academic_session_store.dart';
 import 'core/services/class_slot_store.dart';
 import 'core/services/course_store.dart';
+import 'core/services/task_store.dart';
 import 'firebase_options.dart';
 
 Future<void> main() async {
@@ -14,5 +15,6 @@ Future<void> main() async {
   initializeAcademicSessionsSync();
   initializeCoursesSync();
   initializeClassSlotsSync();
+  initializeTasksSync();
   runApp(const MyApp());
 }

@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
 import '../../core/services/academic_session_store.dart';
-import '../../core/mock/mock_tasks.dart';
 import '../../core/models/academic_session.dart';
+import '../../core/services/task_store.dart';
 import '../../core/utils/task_utils.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
@@ -127,7 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
           final selectedTerm = selectedRef.term;
 
           return ValueListenableBuilder(
-            valueListenable: mockTasksNotifier,
+            valueListenable: tasksNotifier,
             builder: (context, tasks, _) {
               // Get upcoming tasks and filter by selected term window
               final allUpcomingTasks = TaskUtils.getUpcomingTasks(

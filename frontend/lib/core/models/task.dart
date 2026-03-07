@@ -14,6 +14,7 @@ enum TaskStatus {
 /// (or converting from DTOs).
 class Task {
   final String id;
+  final String? courseId;
   final String courseCode;
   final Color courseColor;
   final String title;
@@ -24,6 +25,7 @@ class Task {
 
   const Task({
     required this.id,
+    this.courseId,
     required this.courseCode,
     required this.courseColor,
     required this.title,
@@ -35,6 +37,7 @@ class Task {
 
   Task copyWith({
     String? id,
+    String? courseId,
     String? courseCode,
     Color? courseColor,
     String? title,
@@ -45,6 +48,7 @@ class Task {
   }) {
     return Task(
       id: id ?? this.id,
+      courseId: courseId ?? this.courseId,
       courseCode: courseCode ?? this.courseCode,
       courseColor: courseColor ?? this.courseColor,
       title: title ?? this.title,

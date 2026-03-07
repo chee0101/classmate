@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
 import '../../core/services/academic_session_store.dart';
-import '../../core/mock/mock_tasks.dart';
 import '../../core/models/timetable_entry.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/models/task.dart';
 import '../../core/services/class_slot_store.dart';
 import '../../core/services/course_store.dart';
+import '../../core/services/task_store.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
 import '../../core/widgets/common/animated_segmented_switch.dart';
@@ -261,21 +261,31 @@ class _AddNewScreenState extends State<AddNewScreen> {
     });
   }
 
-  void _saveTask({
+  Future<void> _saveTask({
     required String sessionId,
-    required List<String> courseCodes,
-  }) {
+    required String termId,
+  }) async {
     final title = _taskTitleController.text.trim();
     if (title.isEmpty || _taskCourseCode == null) return;
 
     final matched = coursesNotifier.value.where((c) {
-      return c.sessionId == sessionId && c.courseCode == _taskCourseCode;
+      return c.sessionId == sessionId &&
+          c.termId == termId &&
+          c.courseCode == _taskCourseCode;
     }).toList();
+    if (matched.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please select a valid course.')),
+      );
+      return;
+    }
     final colorHex = matched.isEmpty ? '#6C4DD9' : matched.first.courseColor;
     final colorValue = int.tryParse(colorHex.replaceFirst('#', '0xFF'));
 
     final newTask = Task(
       id: DateTime.now().microsecondsSinceEpoch.toString(),
+      courseId: matched.first.id,
       courseCode: _taskCourseCode!,
       courseColor: Color(colorValue ?? 0xFF6C4DD9),
       title: title,
@@ -285,7 +295,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
       dueDateTime: _taskDueDateTime,
       status: TaskStatus.ongoing,
     );
-    mockTasksNotifier.value = [...mockTasksNotifier.value, newTask];
+    await addTask(newTask);
     if (!mounted) return;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
@@ -587,7 +597,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
                             ? (canSaveTask
                                 ? () => _saveTask(
                                       sessionId: selectedSession.id,
-                                      courseCodes: courseCodes,
+                                      termId: selectedTerm.id,
                                     )
                                 : null)
                             : _selectedType == AddType.classSlot

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../constants/app_spacing.dart';
-import '../../mock/mock_tasks.dart';
 import '../../models/task.dart';
+import '../../services/course_store.dart';
 import '../../utils/date_time_format.dart';
 
 /// Bottom sheet for editing a main Task.
@@ -51,6 +51,7 @@ class TaskEditBottomSheet extends StatefulWidget {
 class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
   late TextEditingController _titleController;
   late TextEditingController _descriptionController;
+  late String? _selectedCourseId;
   late String _selectedCourseCode;
   late DateTime _selectedDueDateTime;
   late List<String> _courseOptions;
@@ -64,11 +65,18 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
     _titleController = TextEditingController(text: widget.task.title);
     _descriptionController =
         TextEditingController(text: widget.task.description ?? '');
+    _selectedCourseId = widget.task.courseId;
     _selectedCourseCode = widget.task.courseCode;
     _selectedDueDateTime = widget.task.dueDateTime;
 
-    _courseOptions = mockTasksNotifier.value.map((t) => t.courseCode).toSet().toList()
-      ..sort();
+    _courseOptions =
+        coursesNotifier.value.map((course) => course.courseCode).toSet().toList()
+          ..sort();
+    if (!_courseOptions.contains(_selectedCourseCode)) {
+      _courseOptions.add(_selectedCourseCode);
+      _courseOptions.sort();
+    }
+    _selectedCourseId ??= _resolveCourseIdByCode(_selectedCourseCode);
   }
 
   @override
@@ -185,10 +193,19 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
       description: _descriptionController.text.trim().isEmpty
           ? null
           : _descriptionController.text.trim(),
+      courseId: _selectedCourseId,
       courseCode: _selectedCourseCode,
       dueDateTime: _selectedDueDateTime,
     );
     Navigator.pop(context, updated);
+  }
+
+  String? _resolveCourseIdByCode(String code) {
+    final normalizedCode = code.trim().toUpperCase();
+    final matched = coursesNotifier.value.where((course) {
+      return course.courseCode.toUpperCase() == normalizedCode;
+    });
+    return matched.isEmpty ? null : matched.first.id;
   }
 
   @override
@@ -236,7 +253,7 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
           ],
           const SizedBox(height: AppSpacing.md),
           DropdownButtonFormField<String>(
-            value: _selectedCourseCode,
+            initialValue: _selectedCourseCode,
             decoration: const InputDecoration(
               labelText: 'Course code',
             ),
@@ -254,6 +271,7 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
                     if (value == null) return;
                     setState(() {
                       _selectedCourseCode = value;
+                      _selectedCourseId = _resolveCourseIdByCode(value);
                     });
                   },
           ),
