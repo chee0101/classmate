@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/routes.dart';
+import '../../core/models/academic_session.dart';
 import '../../core/services/academic_session_store.dart';
 import '../../core/models/task.dart';
+import '../../core/services/session_term_selection_store.dart';
 import '../../core/services/task_store.dart';
+import '../../core/utils/term_windows.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/task/task_card.dart';
@@ -32,10 +35,17 @@ class _TaskScreenState extends State<TaskScreen> {
         title: const Text('Tasks'),
         automaticallyImplyLeading: false,
       ),
-      body: ValueListenableBuilder(
-        valueListenable: currentAcademicSessionNotifier,
-        builder: (context, session, _) {
-          if (session == null) {
+      body: ValueListenableBuilder<List<AcademicSession>>(
+        valueListenable: academicSessionsNotifier,
+        builder: (context, sessionsList, _) {
+          final activeSession = currentAcademicSessionNotifier.value;
+          final sessions = <AcademicSession>[...sessionsList];
+          if (activeSession != null &&
+              !sessions.any((session) => session.id == activeSession.id)) {
+            sessions.add(activeSession);
+          }
+
+          if (sessions.isEmpty) {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(AppSpacing.lg),
@@ -50,12 +60,52 @@ class _TaskScreenState extends State<TaskScreen> {
             );
           }
 
-          return ValueListenableBuilder(
-            valueListenable: tasksNotifier,
-            builder: (context, allTasks, _) {
+          final now = DateTime.now();
+          final refs = <({AcademicSession session, TermWindow term})>[];
+          for (final session in sessions) {
+            for (final term in buildTermWindows(session)) {
+              refs.add((session: session, term: term));
+            }
+          }
+          var selectedRef = refs.first;
+          final current = refs.where(
+            (ref) => !now.isBefore(ref.term.start) && !now.isAfter(ref.term.end),
+          );
+          if (current.isNotEmpty) selectedRef = current.first;
+
+          return ValueListenableBuilder<SessionTermSelection?>(
+            valueListenable: selectedSessionTermNotifier,
+            builder: (context, selectedSelection, _) {
+              final selectedSessionId =
+                  selectedSelection?.sessionId ?? selectedRef.session.id;
+              final selectedTermId =
+                  selectedSelection?.termId ?? selectedRef.term.id;
+              final exact = refs.where(
+                (ref) =>
+                    ref.session.id == selectedSessionId &&
+                    ref.term.id == selectedTermId,
+              );
+              if (exact.isNotEmpty) selectedRef = exact.first;
+
+              if (selectedSelection == null ||
+                  selectedSelection.sessionId != selectedRef.session.id ||
+                  selectedSelection.termId != selectedRef.term.id) {
+                setSelectedSessionTerm(
+                  sessionId: selectedRef.session.id,
+                  termId: selectedRef.term.id,
+                );
+              }
+
+              return ValueListenableBuilder(
+                valueListenable: tasksNotifier,
+                builder: (context, allTasks, _) {
               // Only show top-level tasks in the list (subtasks are shown in detail view).
               final topLevelTasks = allTasks
-                  .where((t) => t.parentTaskId == null)
+                  .where(
+                    (task) =>
+                        task.parentTaskId == null &&
+                        isInTerm(task.dueDateTime, selectedRef.term),
+                  )
                   .toList();
 
               // Build distinct course codes for the filter.
@@ -142,6 +192,8 @@ class _TaskScreenState extends State<TaskScreen> {
               ),
             ],
             );
+                },
+              );
             },
           );
         },

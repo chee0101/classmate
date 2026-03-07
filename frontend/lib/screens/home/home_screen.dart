@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
 import '../../core/services/academic_session_store.dart';
+import '../../core/services/session_term_selection_store.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/services/task_store.dart';
 import '../../core/utils/task_utils.dart';
@@ -21,9 +22,6 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  String? _selectedSessionId;
-  String? _selectedTermId;
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -106,29 +104,42 @@ class _HomeScreenState extends State<HomeScreen> {
             }
             return best ?? allTermRefs.first;
           }();
+          final resolvedDefaultRef = defaultRef;
 
-          // Resolve currently selected (session, term), falling back to defaultRef when needed.
-          String selectedSessionId = _selectedSessionId ?? defaultRef.session.id;
-          String selectedTermId = _selectedTermId ?? defaultRef.term.id;
+          return ValueListenableBuilder<SessionTermSelection?>(
+            valueListenable: selectedSessionTermNotifier,
+            builder: (context, selectedSelection, _) {
+              String selectedSessionId =
+                  selectedSelection?.sessionId ?? resolvedDefaultRef.session.id;
+              String selectedTermId =
+                  selectedSelection?.termId ?? resolvedDefaultRef.term.id;
 
-          SessionTermRef selectedRef = defaultRef;
-          for (final ref in allTermRefs) {
-            if (ref.session.id == selectedSessionId &&
-                ref.term.id == selectedTermId) {
-              selectedRef = ref;
-              break;
-            }
-          }
+              SessionTermRef selectedRef = resolvedDefaultRef;
+              for (final ref in allTermRefs) {
+                if (ref.session.id == selectedSessionId &&
+                    ref.term.id == selectedTermId) {
+                  selectedRef = ref;
+                  break;
+                }
+              }
 
-          selectedSessionId = selectedRef.session.id;
-          selectedTermId = selectedRef.term.id;
+              selectedSessionId = selectedRef.session.id;
+              selectedTermId = selectedRef.term.id;
+              final selectedSession = selectedRef.session;
+              final selectedTerm = selectedRef.term;
 
-          final selectedSession = selectedRef.session;
-          final selectedTerm = selectedRef.term;
+              if (selectedSelection == null ||
+                  selectedSelection.sessionId != selectedSessionId ||
+                  selectedSelection.termId != selectedTermId) {
+                setSelectedSessionTerm(
+                  sessionId: selectedSessionId,
+                  termId: selectedTermId,
+                );
+              }
 
-          return ValueListenableBuilder(
-            valueListenable: tasksNotifier,
-            builder: (context, tasks, _) {
+              return ValueListenableBuilder(
+                valueListenable: tasksNotifier,
+                builder: (context, tasks, _) {
               // Get upcoming tasks and filter by selected term window
               final allUpcomingTasks = TaskUtils.getUpcomingTasks(
                 tasks.where((t) => t.parentTaskId == null).toList(),
@@ -150,10 +161,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       selectedSessionId: selectedSession.id,
                       selectedTermId: selectedTerm.id,
                       onSelectionChanged: (sessionId, termId) {
-                        setState(() {
-                          _selectedSessionId = sessionId;
-                          _selectedTermId = termId;
-                        });
+                        setSelectedSessionTerm(
+                          sessionId: sessionId,
+                          termId: termId,
+                        );
                       },
                     ),
                   ),
@@ -177,6 +188,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ],
+              );
+                },
               );
             },
           );

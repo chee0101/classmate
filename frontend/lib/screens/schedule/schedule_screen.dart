@@ -4,6 +4,7 @@ import '../../core/constants/app_spacing.dart';
 import '../../core/constants/months.dart';
 import '../../core/constants/weekdays.dart';
 import '../../core/services/academic_session_store.dart';
+import '../../core/services/session_term_selection_store.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/models/class_type.dart';
 import '../../core/models/course.dart';
@@ -24,8 +25,6 @@ class ScheduleScreen extends StatefulWidget {
 }
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
-  String? _selectedSessionId;
-  String? _selectedTermId;
   bool _showMonthly = false;
   DateTime _monthCursor = DateTime(DateTime.now().year, DateTime.now().month);
   DateTime _weekCursor = _startOfWeek(DateTime.now());
@@ -75,21 +74,34 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           );
           if (current.isNotEmpty) selectedRef = current.first;
 
-          final selectedSessionId = _selectedSessionId ?? selectedRef.session.id;
-          final selectedTermId = _selectedTermId ?? selectedRef.term.id;
-          final exact = refs.where(
-            (ref) =>
-                ref.session.id == selectedSessionId &&
-                ref.term.id == selectedTermId,
-          );
-          if (exact.isNotEmpty) selectedRef = exact.first;
+          return ValueListenableBuilder<SessionTermSelection?>(
+            valueListenable: selectedSessionTermNotifier,
+            builder: (context, selectedSelection, _) {
+              final selectedSessionId =
+                  selectedSelection?.sessionId ?? selectedRef.session.id;
+              final selectedTermId =
+                  selectedSelection?.termId ?? selectedRef.term.id;
+              final exact = refs.where(
+                (ref) =>
+                    ref.session.id == selectedSessionId &&
+                    ref.term.id == selectedTermId,
+              );
+              if (exact.isNotEmpty) selectedRef = exact.first;
 
-          final selectedSession = selectedRef.session;
-          final selectedTerm = selectedRef.term;
+              final selectedSession = selectedRef.session;
+              final selectedTerm = selectedRef.term;
+              if (selectedSelection == null ||
+                  selectedSelection.sessionId != selectedSession.id ||
+                  selectedSelection.termId != selectedTerm.id) {
+                setSelectedSessionTerm(
+                  sessionId: selectedSession.id,
+                  termId: selectedTerm.id,
+                );
+              }
 
-          return ValueListenableBuilder<List<TimetableEntry>>(
-            valueListenable: timetablesNotifier,
-            builder: (context, entries, _) {
+              return ValueListenableBuilder<List<TimetableEntry>>(
+                valueListenable: timetablesNotifier,
+                builder: (context, entries, _) {
               return ValueListenableBuilder<List<Course>>(
                 valueListenable: coursesNotifier,
                 builder: (context, courses, _) {
@@ -127,10 +139,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                           selectedSessionId: selectedSession.id,
                           selectedTermId: selectedTerm.id,
                           onSelectionChanged: (sessionId, termId) {
-                            setState(() {
-                              _selectedSessionId = sessionId;
-                              _selectedTermId = termId;
-                            });
+                            setSelectedSessionTerm(
+                              sessionId: sessionId,
+                              termId: termId,
+                            );
                           },
                         ),
                       ),
@@ -165,6 +177,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                       ),
                     ],
                   );
+                },
+              );
                 },
               );
             },

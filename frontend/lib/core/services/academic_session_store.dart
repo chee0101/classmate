@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/academic_session.dart';
+import 'session_term_selection_store.dart';
 import '../utils/term_windows.dart';
 
 DateTime _startOfDay(DateTime date) =>
@@ -43,6 +44,7 @@ void initializeAcademicSessionsSync() {
     if (user == null) {
       academicSessionsNotifier.value = const <AcademicSession>[];
       currentAcademicSessionNotifier.value = null;
+      clearSelectedSessionTerm();
       return;
     }
 
