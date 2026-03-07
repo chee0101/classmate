@@ -152,7 +152,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(
-                      top: AppSpacing.lg,
+                      top: AppSpacing.md,
                       left: AppSpacing.lg,
                       right: AppSpacing.lg,
                     ),

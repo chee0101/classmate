@@ -10,6 +10,7 @@ import '../../core/services/task_store.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
 import '../../core/widgets/common/empty_state_card.dart';
+import '../../core/widgets/common/session_term_context_label.dart';
 import '../../core/widgets/task/task_card.dart';
 import '../../core/widgets/task/task_course_filter.dart';
 import '../../core/widgets/task/task_status_tabs.dart';
@@ -129,7 +130,20 @@ class _TaskScreenState extends State<TaskScreen> {
               Padding(
                 padding: const EdgeInsets.fromLTRB(
                   AppSpacing.lg,
+                  AppSpacing.md,
                   AppSpacing.lg,
+                  0,
+                ),
+                child: SessionTermContextLabel(
+                  sessionName: selectedRef.session.name,
+                  termLabel: selectedRef.term.label,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  0,
                   AppSpacing.lg,
                   0,
                 ),

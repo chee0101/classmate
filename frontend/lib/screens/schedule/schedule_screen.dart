@@ -15,7 +15,7 @@ import '../../core/utils/term_windows.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
 import '../../core/widgets/common/animated_segmented_switch.dart';
 import '../../core/widgets/common/empty_state_card.dart';
-import '../../core/widgets/home/session_header.dart';
+import '../../core/widgets/common/session_term_context_label.dart';
 
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
@@ -128,22 +128,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   return Column(
                     children: [
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(
-                          AppSpacing.lg,
-                          AppSpacing.lg,
-                          AppSpacing.lg,
-                          AppSpacing.lg,
-                        ),
-                        child: SessionHeader(
-                          sessions: sessions,
-                          selectedSessionId: selectedSession.id,
-                          selectedTermId: selectedTerm.id,
-                          onSelectionChanged: (sessionId, termId) {
-                            setSelectedSessionTerm(
-                              sessionId: sessionId,
-                              termId: termId,
-                            );
-                          },
+                        padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+                        child: SessionTermContextLabel(
+                          sessionName: selectedSession.name,
+                          termLabel: selectedTerm.label,
                         ),
                       ),
                       Padding(
@@ -385,7 +373,12 @@ class _WeeklyScheduleView extends StatelessWidget {
               }
             },
             child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
+              padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  0,
+                  AppSpacing.md,
+                  AppSpacing.lg,
+                ),
               child: SizedBox(
                 height: totalHeight,
                 child: LayoutBuilder(
@@ -552,7 +545,12 @@ class _MonthlyScheduleView extends StatelessWidget {
         const SizedBox(height: 8),
         Expanded(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+            padding: const EdgeInsets.fromLTRB(
+                  AppSpacing.lg,
+                  0,
+                  AppSpacing.lg,
+                  AppSpacing.lg,
+                ),
             child: Column(
               children: List.generate(6, (weekIdx) {
                 final weekStart = gridStart.add(Duration(days: weekIdx * 7));

@@ -42,7 +42,7 @@ class SessionHeader extends StatelessWidget {
       final termWindows = buildTermWindows(session);
       for (final term in termWindows) {
         final key = '${session.id}::${term.id}';
-        final label = '${session.name} - ${term.label}';
+        final label = '${session.name} · ${term.label}';
         entries.add(
           DropdownMenuEntry<String>(
             value: key,
