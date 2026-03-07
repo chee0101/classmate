@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
-import '../../core/mock/mock_academic_session.dart';
+import '../../core/services/academic_session_store.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
@@ -33,7 +33,7 @@ class _AcademicSessionsScreenState extends State<AcademicSessionsScreen> {
         ),
       ),
       body: ValueListenableBuilder<List<AcademicSession>>(
-        valueListenable: mockAcademicSessionsNotifier,
+        valueListenable: academicSessionsNotifier,
         builder: (context, sessionsList, _) {
           final sessions = [...sessionsList];
 
@@ -318,7 +318,7 @@ class _AcademicSessionsScreenState extends State<AcademicSessionsScreen> {
         },
       ),
       floatingActionButton: ValueListenableBuilder<List<AcademicSession>>(
-        valueListenable: mockAcademicSessionsNotifier,
+        valueListenable: academicSessionsNotifier,
         builder: (context, sessionsList, _) {
           // Only show FAB when sessions are not empty
           if (sessionsList.isEmpty) {
@@ -387,3 +387,4 @@ class _DottedLinePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
+

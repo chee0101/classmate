@@ -10,11 +10,11 @@ import '../utils/term_windows.dart';
 final ValueNotifier<AcademicSession?> currentAcademicSessionNotifier =
     ValueNotifier<AcademicSession?>(null);
 
-final ValueNotifier<List<AcademicSession>> mockAcademicSessionsNotifier =
+final ValueNotifier<List<AcademicSession>> academicSessionsNotifier =
     ValueNotifier<List<AcademicSession>>([]);
 
 // For backward compatibility
-List<AcademicSession> get mockAcademicSessions => mockAcademicSessionsNotifier.value;
+List<AcademicSession> get academicSessions => academicSessionsNotifier.value;
 
 bool hasAcademicSession() => currentAcademicSessionNotifier.value != null;
 
@@ -35,7 +35,7 @@ void initializeAcademicSessionsSync() {
     _sessionsSubscription = null;
 
     if (user == null) {
-      mockAcademicSessionsNotifier.value = const <AcademicSession>[];
+      academicSessionsNotifier.value = const <AcademicSession>[];
       currentAcademicSessionNotifier.value = null;
       return;
     }
@@ -45,7 +45,7 @@ void initializeAcademicSessionsSync() {
         .snapshots()
         .listen((snapshot) {
           final sessions = snapshot.docs.map(_sessionFromDoc).toList(growable: false);
-          mockAcademicSessionsNotifier.value = sessions;
+          academicSessionsNotifier.value = sessions;
 
           final currentDoc = snapshot.docs.where((doc) {
             final data = doc.data();
@@ -110,10 +110,10 @@ List<Map<String, dynamic>> _termArrayForSession(AcademicSession session) {
 
 Future<void> setCurrentAcademicSession(AcademicSession session) async {
   currentAcademicSessionNotifier.value = session;
-  final exists = mockAcademicSessionsNotifier.value.any((s) => s.id == session.id);
+  final exists = academicSessionsNotifier.value.any((s) => s.id == session.id);
   if (!exists) {
-    mockAcademicSessionsNotifier.value = [
-      ...mockAcademicSessionsNotifier.value,
+    academicSessionsNotifier.value = [
+      ...academicSessionsNotifier.value,
       session,
     ];
   }
@@ -136,7 +136,7 @@ Future<void> addAcademicSession(AcademicSession session) async {
   final user = FirebaseAuth.instance.currentUser;
   if (user == null) return;
 
-  final exists = mockAcademicSessionsNotifier.value.any(
+  final exists = academicSessionsNotifier.value.any(
     (s) =>
         s.name == session.name &&
         s.startDate == session.startDate &&
@@ -144,7 +144,7 @@ Future<void> addAcademicSession(AcademicSession session) async {
   );
   if (exists) return;
 
-  final isFirstSession = mockAcademicSessionsNotifier.value.isEmpty;
+  final isFirstSession = academicSessionsNotifier.value.isEmpty;
   await _sessionsCollection(user.uid).doc().set({
     'name': session.name,
     'startDate': Timestamp.fromDate(session.startDate),
@@ -193,3 +193,4 @@ Future<void> deleteAcademicSession(String sessionId) async {
     currentAcademicSessionNotifier.value = null;
   }
 }
+

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/routes.dart';
-import '../../core/mock/mock_academic_session.dart';
+import '../../core/services/academic_session_store.dart';
 import '../../core/mock/mock_tasks.dart';
 import '../../core/models/task.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';

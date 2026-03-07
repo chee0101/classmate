@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
-import '../../core/mock/mock_academic_session.dart';
+import '../../core/services/academic_session_store.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/models/class_type.dart';
 import '../../core/models/course.dart';
@@ -45,7 +45,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         automaticallyImplyLeading: false,
       ),
       body: ValueListenableBuilder<List<AcademicSession>>(
-        valueListenable: mockAcademicSessionsNotifier,
+        valueListenable: academicSessionsNotifier,
         builder: (context, sessionsList, _) {
           final activeSession = currentAcademicSessionNotifier.value;
           final sessions = <AcademicSession>[...sessionsList];
@@ -746,3 +746,4 @@ class _RenderedClassSlot {
   final Color color;
   final ClassType classType;
 }
+

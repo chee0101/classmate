@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'app.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'core/mock/mock_academic_session.dart';
+import 'core/services/academic_session_store.dart';
 import 'core/services/class_slot_store.dart';
 import 'core/services/course_store.dart';
 import 'firebase_options.dart';

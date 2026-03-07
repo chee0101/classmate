@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../constants/app_spacing.dart';
 import '../../constants/routes.dart';
-import '../../mock/mock_academic_session.dart';
+import '../../services/academic_session_store.dart';
 import 'academic_session_setup_bottom_sheet.dart';
 
 class AddNewBottomSheet extends StatelessWidget {
@@ -156,4 +156,5 @@ class _OptionCard extends StatelessWidget {
     );
   }
 }
+
 

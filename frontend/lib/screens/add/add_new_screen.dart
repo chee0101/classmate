@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
-import '../../core/mock/mock_academic_session.dart';
+import '../../core/services/academic_session_store.dart';
 import '../../core/mock/mock_tasks.dart';
 import '../../core/models/timetable_entry.dart';
 import '../../core/models/academic_session.dart';
@@ -365,7 +365,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
           // activeSession is guaranteed to be non-null here due to early return above
           final session = activeSession;
           return ValueListenableBuilder<List<AcademicSession>>(
-            valueListenable: mockAcademicSessionsNotifier,
+            valueListenable: academicSessionsNotifier,
             builder: (context, sessionsList, _) {
               final sessions = [...sessionsList];
               if (!sessions.any((s) => s.id == session.id)) {
@@ -670,4 +670,5 @@ class _TypeTabs extends StatelessWidget {
     );
   }
 }
+
 
