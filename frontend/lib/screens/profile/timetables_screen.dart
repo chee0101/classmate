@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
+import '../../core/constants/weekdays.dart';
 import '../../core/services/academic_session_store.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/models/class_type.dart';
@@ -347,16 +348,6 @@ class _TimetableCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
-  static const List<String> _dayOrder = <String>[
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-    'Sunday',
-  ];
-
   int _slotStartMinutes(TimetableSlot slot) {
     final match =
         RegExp(r'^(\d{1,2}):(\d{2})\s*(AM|PM)$', caseSensitive: false)
@@ -391,11 +382,11 @@ class _TimetableCard extends StatelessWidget {
   List<String> _sortedDays(Iterable<String> days) {
     final sorted = days.toList(growable: false);
     sorted.sort((a, b) {
-      final ai = _dayOrder.indexOf(a);
-      final bi = _dayOrder.indexOf(b);
-      if (ai == -1 && bi == -1) return a.compareTo(b);
-      if (ai == -1) return 1;
-      if (bi == -1) return -1;
+      final ai = weekdayOrderFromString(a);
+      final bi = weekdayOrderFromString(b);
+      if (ai == 99 && bi == 99) return a.compareTo(b);
+      if (ai == 99) return 1;
+      if (bi == 99) return -1;
       return ai.compareTo(bi);
     });
     return sorted;

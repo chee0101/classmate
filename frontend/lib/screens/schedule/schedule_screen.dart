@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
+import '../../core/constants/months.dart';
+import '../../core/constants/weekdays.dart';
 import '../../core/services/academic_session_store.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/models/class_type.dart';
@@ -27,16 +29,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   bool _showMonthly = false;
   DateTime _monthCursor = DateTime(DateTime.now().year, DateTime.now().month);
   DateTime _weekCursor = _startOfWeek(DateTime.now());
-
-  static const List<String> _weekdayKeys = [
-    'monday',
-    'tuesday',
-    'wednesday',
-    'thursday',
-    'friday',
-    'saturday',
-    'sunday',
-  ];
 
   @override
   Widget build(BuildContext context) {
@@ -190,7 +182,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     for (final entry in entries) {
       final color = courseColorByCode[entry.courseCode] ?? const Color(0xFF6C4DD9);
       for (final slot in entry.slots) {
-        final dayIndex = _weekdayKeys.indexOf(slot.day.toLowerCase());
+        final dayIndex = weekdayIndexFromString(slot.day);
         if (dayIndex == -1) continue;
         final start = _parseMinutes(slot.startTime);
         final end = _parseMinutes(slot.endTime);
@@ -271,8 +263,6 @@ class _WeeklyScheduleView extends StatelessWidget {
   static const _endHour = 23;
   static const _rowHeight = 64.0;
   static const _timeColumnWidth = 40.0;
-  static const _dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
-
   String _hourLabel(int hour24) {
     final normalized = hour24 % 24;
     if (normalized == 0) return '';
@@ -291,7 +281,7 @@ class _WeeklyScheduleView extends StatelessWidget {
     );
     final today = DateTime.now();
     final focusDate = weekStart.add(const Duration(days: 3));
-    final monthYearLabel = '${_monthLabel(focusDate.month)} ${focusDate.year}';
+    final monthYearLabel = '${monthShortLabel(focusDate.month)} ${focusDate.year}';
 
     return Column(
       children: [
@@ -325,13 +315,13 @@ class _WeeklyScheduleView extends StatelessWidget {
             children: [
               const SizedBox(width: _timeColumnWidth),
               ...List.generate(
-                _dayLabels.length,
+                weekdayShortLabelsMondayFirst.length,
                 (i) => Expanded(
                   child: Center(
                     child: Column(
                       children: [
                         Text(
-                          _dayLabels[i],
+                          weekdayShortLabelsMondayFirst[i],
                           style: Theme.of(context).textTheme.titleSmall?.copyWith(
                                 color: Colors.grey.shade700,
                               ),
@@ -387,11 +377,14 @@ class _WeeklyScheduleView extends StatelessWidget {
                 child: LayoutBuilder(
                   builder: (context, constraints) {
                     final dayWidth =
-                        (constraints.maxWidth - _timeColumnWidth) / _dayLabels.length;
+                        (constraints.maxWidth - _timeColumnWidth) /
+                            weekdayShortLabelsMondayFirst.length;
                     return Stack(
                       children: [
                         for (int hour = _startHour; hour <= _endHour; hour++)
-                          for (int day = 0; day < _dayLabels.length; day++)
+                          for (int day = 0;
+                              day < weekdayShortLabelsMondayFirst.length;
+                              day++)
                             Positioned(
                               top: (hour - _startHour) * _rowHeight,
                               left: _timeColumnWidth + (day * dayWidth),
@@ -468,23 +461,6 @@ class _WeeklyScheduleView extends StatelessWidget {
     );
   }
 
-  String _monthLabel(int month) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return months[month - 1];
-  }
 }
 
 class _MonthlyScheduleView extends StatelessWidget {
@@ -499,8 +475,6 @@ class _MonthlyScheduleView extends StatelessWidget {
   final ValueChanged<DateTime> onMonthChanged;
   final TermWindow term;
   final List<_RenderedClassSlot> classSlots;
-
-  static const _dayLabels = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
   @override
   Widget build(BuildContext context) {
@@ -528,7 +502,7 @@ class _MonthlyScheduleView extends StatelessWidget {
               ),
               Expanded(
                 child: Text(
-                  '${_monthLabel(monthCursor.month)} ${monthCursor.year}',
+                  '${monthShortLabel(monthCursor.month)} ${monthCursor.year}',
                   textAlign: TextAlign.center,
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
@@ -545,7 +519,7 @@ class _MonthlyScheduleView extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
           child: Row(
-            children: _dayLabels
+            children: weekdayShortLabelsMondayFirst
                 .map(
                   (d) => Expanded(
                     child: Center(
@@ -666,23 +640,6 @@ class _MonthlyScheduleView extends StatelessWidget {
     );
   }
 
-  String _monthLabel(int month) {
-    const months = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    return months[month - 1];
-  }
 }
 
 class _RenderedClassSlot {

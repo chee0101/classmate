@@ -1,3 +1,5 @@
+import '../constants/months.dart';
+
 /// Returns a human-friendly relative date like
 /// "Today", "Tomorrow", "2 days ago", or "5 Mar".
 String formatRelativeDueDate(DateTime dt) {
@@ -14,7 +16,7 @@ String formatRelativeDueDate(DateTime dt) {
     final daysAgo = -difference.inDays;
     return daysAgo == 1 ? 'Yesterday' : '$daysAgo days ago';
   } else {
-    return '${dt.day} ${_monthLabel(dt.month)}';
+    return '${dt.day} ${monthShortLabel(dt.month)}';
   }
 }
 
@@ -32,21 +34,4 @@ String formatDateDdMmYyyy(DateTime dt) =>
     '${dt.month.toString().padLeft(2, '0')}/'
     '${dt.year}';
 
-String _monthLabel(int month) {
-  const months = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  return months[month - 1];
-}
 

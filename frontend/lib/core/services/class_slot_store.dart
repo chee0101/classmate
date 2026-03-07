@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
+import '../constants/weekdays.dart';
 import '../models/class_type.dart';
 import '../models/timetable_entry.dart';
 import 'course_store.dart';
@@ -169,27 +170,6 @@ String _formatMinutes12h(int minutes) {
   final hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12;
   final minuteString = minute.toString().padLeft(2, '0');
   return '$hour12:$minuteString $period';
-}
-
-int _weekdayOrder(String day) {
-  switch (day.toLowerCase()) {
-    case 'monday':
-      return 1;
-    case 'tuesday':
-      return 2;
-    case 'wednesday':
-      return 3;
-    case 'thursday':
-      return 4;
-    case 'friday':
-      return 5;
-    case 'saturday':
-      return 6;
-    case 'sunday':
-      return 7;
-    default:
-      return 99;
-  }
 }
 
 Future<void> upsertTimetableByCourse({
@@ -446,7 +426,8 @@ class _EntryBuilder {
 
   void sortSlots() {
     slots.sort((a, b) {
-      final dayCompare = _weekdayOrder(a.day).compareTo(_weekdayOrder(b.day));
+      final dayCompare =
+          weekdayOrderFromString(a.day).compareTo(weekdayOrderFromString(b.day));
       if (dayCompare != 0) return dayCompare;
       final aMinutes = _parseMinutes12h(a.startTime) ?? 0;
       final bMinutes = _parseMinutes12h(b.startTime) ?? 0;
@@ -476,7 +457,7 @@ class _SlotPayload {
       '${day.toLowerCase()}|$startMinutes|$endMinutes|${mode.toLowerCase()}|${classType.name}|${venue.toLowerCase()}';
 
   String get sortKey =>
-      '${_weekdayOrder(day).toString().padLeft(2, '0')}|${startMinutes.toString().padLeft(4, '0')}|${endMinutes.toString().padLeft(4, '0')}|${classType.name}|${mode.toLowerCase()}|${venue.toLowerCase()}';
+      '${weekdayOrderFromString(day).toString().padLeft(2, '0')}|${startMinutes.toString().padLeft(4, '0')}|${endMinutes.toString().padLeft(4, '0')}|${classType.name}|${mode.toLowerCase()}|${venue.toLowerCase()}';
 
   static _SlotPayload? fromTimetableSlot(TimetableSlot slot) {
     final startMinutes = _parseMinutes12h(slot.startTime);

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../constants/app_spacing.dart';
+import '../../constants/weekdays.dart';
 import '../../models/class_type.dart';
 import '../../utils/date_time_format.dart';
 import '../common/form_fields.dart';
@@ -160,15 +161,7 @@ class _ClassSlotEditorFormState extends State<ClassSlotEditorForm> {
 
   @override
   Widget build(BuildContext context) {
-    final days = const [
-      'Monday',
-      'Tuesday',
-      'Wednesday',
-      'Thursday',
-      'Friday',
-      'Saturday',
-      'Sunday',
-    ];
+    const days = weekdayNamesMondayFirst;
     final requiresVenue = _mode == 'Physical';
     final hasVenue = _venueController.text.trim().isNotEmpty;
 
