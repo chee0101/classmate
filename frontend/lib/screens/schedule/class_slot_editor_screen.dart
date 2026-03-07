@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../core/constants/app_spacing.dart';
 import '../../core/widgets/schedule/class_slot_sheet.dart';
 
 class ClassSlotEditorScreen extends StatefulWidget {

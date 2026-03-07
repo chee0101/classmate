@@ -7,12 +7,12 @@ import '../../core/models/academic_session.dart';
 import '../../core/services/task_store.dart';
 import '../../core/utils/task_utils.dart';
 import '../../core/utils/term_windows.dart';
+import '../../core/models/session_term_ref.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/home/session_header.dart';
 import '../../core/widgets/home/today_classes_card.dart';
 import '../../core/widgets/home/upcoming_deadlines_card.dart';
-import 'session_term_ref.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});

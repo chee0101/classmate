@@ -15,7 +15,7 @@ import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/home/session_header.dart';
 import '../../core/widgets/schedule/class_slot_sheet.dart';
-import 'class_slot_editor_screen.dart';
+import '../schedule/class_slot_editor_screen.dart';
 
 class TimetablesScreen extends StatefulWidget {
   const TimetablesScreen({super.key});
