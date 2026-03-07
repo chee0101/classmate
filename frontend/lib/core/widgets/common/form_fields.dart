@@ -130,6 +130,7 @@ class DropdownField<T> extends StatelessWidget {
     required this.items,
     required this.onChanged,
     this.hintText,
+    this.showLabel = true,
   });
 
   final String label;
@@ -137,6 +138,7 @@ class DropdownField<T> extends StatelessWidget {
   final List<DropdownMenuEntry<T>> items;
   final ValueChanged<T?> onChanged;
   final String? hintText;
+  final bool showLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -144,8 +146,10 @@ class DropdownField<T> extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: Theme.of(context).textTheme.titleSmall),
-        const SizedBox(height: 4),
+        if (showLabel) ...[
+          Text(label, style: Theme.of(context).textTheme.titleSmall),
+          const SizedBox(height: 4),
+        ],
         LayoutBuilder(
           builder: (context, constraints) {
             return DropdownMenu<T>(

@@ -144,7 +144,6 @@ class _TaskScreenState extends State<TaskScreen> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
                 child: TaskCourseFilter(
-                  textTheme: textTheme,
                   courseCodes: courseCodes,
                   selectedCourseCode: _selectedCourseCode,
                   onChanged: (code) {
