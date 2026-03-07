@@ -7,6 +7,12 @@ import 'package:flutter/foundation.dart';
 import '../models/academic_session.dart';
 import '../utils/term_windows.dart';
 
+DateTime _startOfDay(DateTime date) =>
+    DateTime(date.year, date.month, date.day, 0, 0);
+
+DateTime _endOfDay(DateTime date) =>
+    DateTime(date.year, date.month, date.day, 23, 59);
+
 final ValueNotifier<AcademicSession?> currentAcademicSessionNotifier =
     ValueNotifier<AcademicSession?>(null);
 
@@ -83,15 +89,15 @@ AcademicSession _sessionFromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     return AcademicSession(
       id: doc.id,
       name: name ?? doc.id,
-      startDate: startTs?.toDate() ?? fallback.startDate,
-      endDate: endTs?.toDate() ?? fallback.endDate,
+      startDate: startTs == null ? fallback.startDate : _startOfDay(startTs.toDate()),
+      endDate: endTs == null ? fallback.endDate : _endOfDay(endTs.toDate()),
     );
   }
   return AcademicSession(
     id: doc.id,
     name: name,
-    startDate: startTs.toDate(),
-    endDate: endTs.toDate(),
+    startDate: _startOfDay(startTs.toDate()),
+    endDate: _endOfDay(endTs.toDate()),
   );
 }
 
@@ -136,20 +142,28 @@ Future<void> addAcademicSession(AcademicSession session) async {
   final user = FirebaseAuth.instance.currentUser;
   if (user == null) return;
 
+  final normalizedStart = _startOfDay(session.startDate);
+  final normalizedEnd = _endOfDay(session.endDate);
+  final normalizedSession = AcademicSession(
+    id: session.id,
+    name: session.name,
+    startDate: normalizedStart,
+    endDate: normalizedEnd,
+  );
   final exists = academicSessionsNotifier.value.any(
     (s) =>
         s.name == session.name &&
-        s.startDate == session.startDate &&
-        s.endDate == session.endDate,
+        s.startDate == normalizedStart &&
+        s.endDate == normalizedEnd,
   );
   if (exists) return;
 
   final isFirstSession = academicSessionsNotifier.value.isEmpty;
   await _sessionsCollection(user.uid).doc().set({
     'name': session.name,
-    'startDate': Timestamp.fromDate(session.startDate),
-    'endDate': Timestamp.fromDate(session.endDate),
-    'terms': _termArrayForSession(session),
+    'startDate': Timestamp.fromDate(normalizedStart),
+    'endDate': Timestamp.fromDate(normalizedEnd),
+    'terms': _termArrayForSession(normalizedSession),
     'isCurrent': currentAcademicSessionNotifier.value == null || isFirstSession,
     'createdAt': FieldValue.serverTimestamp(),
     'updatedAt': FieldValue.serverTimestamp(),
@@ -160,12 +174,20 @@ Future<void> updateAcademicSession(AcademicSession updatedSession) async {
   final user = FirebaseAuth.instance.currentUser;
   if (user == null) return;
 
+  final normalizedStart = _startOfDay(updatedSession.startDate);
+  final normalizedEnd = _endOfDay(updatedSession.endDate);
+  final normalizedSession = AcademicSession(
+    id: updatedSession.id,
+    name: updatedSession.name,
+    startDate: normalizedStart,
+    endDate: normalizedEnd,
+  );
   final isCurrent = currentAcademicSessionNotifier.value?.id == updatedSession.id;
   await _sessionsCollection(user.uid).doc(updatedSession.id).set({
     'name': updatedSession.name,
-    'startDate': Timestamp.fromDate(updatedSession.startDate),
-    'endDate': Timestamp.fromDate(updatedSession.endDate),
-    'terms': _termArrayForSession(updatedSession),
+    'startDate': Timestamp.fromDate(normalizedStart),
+    'endDate': Timestamp.fromDate(normalizedEnd),
+    'terms': _termArrayForSession(normalizedSession),
     'isCurrent': isCurrent,
     'updatedAt': FieldValue.serverTimestamp(),
   }, SetOptions(merge: true));

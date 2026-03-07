@@ -41,6 +41,12 @@ class AcademicSessionSetupBottomSheet extends StatefulWidget {
 
 class _AcademicSessionSetupBottomSheetState
     extends State<AcademicSessionSetupBottomSheet> {
+  DateTime _startOfDay(DateTime date) =>
+      DateTime(date.year, date.month, date.day, 0, 0);
+
+  DateTime _endOfDay(DateTime date) =>
+      DateTime(date.year, date.month, date.day, 23, 59);
+
   late DateTime? _startDate;
   late DateTime? _endDate;
   String? _dateError;
@@ -68,7 +74,7 @@ class _AcademicSessionSetupBottomSheetState
     );
     if (picked == null) return;
     setState(() {
-      _startDate = picked;
+      _startDate = _startOfDay(picked);
       if (_endDate != null && _endDate!.isBefore(_startDate!)) {
         _endDate = null;
       }
@@ -94,7 +100,7 @@ class _AcademicSessionSetupBottomSheetState
     );
     if (picked == null) return;
     setState(() {
-      _endDate = picked;
+      _endDate = _endOfDay(picked);
       _dateError = null;
     });
   }
@@ -124,8 +130,8 @@ class _AcademicSessionSetupBottomSheetState
       final updatedSession = AcademicSession(
         id: widget.editSession!.id,
         name: session.name,
-        startDate: session.startDate,
-        endDate: session.endDate,
+        startDate: _startOfDay(session.startDate),
+        endDate: _endOfDay(session.endDate),
       );
       updateAcademicSession(updatedSession);
       Navigator.pop(context, updatedSession);

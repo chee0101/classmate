@@ -30,7 +30,8 @@ List<TermWindow> buildTermWindows(AcademicSession session) {
 
   // Semester 1 term = Sem 1 teaching + Mid-sem break / Industrial training
   // 19 weeks (Sem 1) + 4 weeks (break) = 23 weeks total.
-  final sem1End = clamp(start.add(const Duration(days: 23 * 7 - 1)));
+  final sem1EndCandidate = _endOfDay(start.add(const Duration(days: 23 * 7 - 1)));
+  final sem1End = clamp(sem1EndCandidate);
   windows.add(
     TermWindow(
       id: 'sem1',
@@ -41,7 +42,7 @@ List<TermWindow> buildTermWindows(AcademicSession session) {
   );
 
   // Semester 2 term = remainder of the session
-  final sem2Start = sem1End.add(const Duration(days: 1));
+  final sem2Start = _startOfDay(sem1End.add(const Duration(days: 1)));
   if (!sem2Start.isAfter(sessionEnd)) {
     windows.add(
       TermWindow(

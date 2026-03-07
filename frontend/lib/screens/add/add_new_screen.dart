@@ -51,13 +51,19 @@ class _AddNewScreenState extends State<AddNewScreen> {
   bool _eventAllDay = true;
   bool _hideClassesInEvent = true;
 
+  DateTime _startOfDay(DateTime date) =>
+      DateTime(date.year, date.month, date.day, 0, 0);
+
+  DateTime _endOfDay(DateTime date) =>
+      DateTime(date.year, date.month, date.day, 23, 59);
+
   @override
   void initState() {
     super.initState();
     _selectedType = widget.initialType ?? AddType.task;
     final now = DateTime.now();
-    _eventStartDate = now;
-    _eventEndDate = now;
+    _eventStartDate = _startOfDay(now);
+    _eventEndDate = _endOfDay(now);
     _eventStartTime = const TimeOfDay(hour: 9, minute: 0);
     _eventEndTime = const TimeOfDay(hour: 11, minute: 0);
     final active = currentAcademicSessionNotifier.value;
@@ -152,7 +158,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
     );
     if (picked == null) return;
     setState(() {
-      _eventStartDate = picked;
+      _eventStartDate = _startOfDay(picked);
       if (_eventEndDate != null && _eventEndDate!.isBefore(_eventStartDate)) {
         _eventEndDate = null;
       }
@@ -178,7 +184,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
       ),
     );
     if (picked == null) return;
-    setState(() => _eventEndDate = picked);
+    setState(() => _eventEndDate = _endOfDay(picked));
   }
 
   Future<void> _pickEventStartTime() async {
