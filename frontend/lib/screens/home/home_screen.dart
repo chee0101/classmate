@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
+import '../../core/services/academic_event_store.dart';
 import '../../core/services/academic_session_store.dart';
+import '../../core/models/academic_event.dart';
 import '../../core/services/session_term_selection_store.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/services/task_store.dart';
@@ -12,6 +14,7 @@ import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/home/session_header.dart';
 import '../../core/widgets/home/today_classes_card.dart';
+import '../../core/widgets/home/upcoming_events_card.dart';
 import '../../core/widgets/home/upcoming_deadlines_card.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -140,6 +143,9 @@ class _HomeScreenState extends State<HomeScreen> {
               return ValueListenableBuilder(
                 valueListenable: tasksNotifier,
                 builder: (context, tasks, _) {
+              return ValueListenableBuilder<List<AcademicEvent>>(
+                valueListenable: academicEventsNotifier,
+                builder: (context, events, _) {
               // Get upcoming tasks and filter by selected term window
               final allUpcomingTasks = TaskUtils.getUpcomingTasks(
                 tasks.where((t) => t.parentTaskId == null).toList(),
@@ -147,6 +153,23 @@ class _HomeScreenState extends State<HomeScreen> {
               final upcomingTasks = allUpcomingTasks.where((task) {
                 return isInTerm(task.dueDateTime, selectedTerm);
               }).toList();
+              final upcomingEvents = events
+                  .where(
+                    (event) =>
+                        event.sessionId == selectedSession.id &&
+                        event.termId == selectedTerm.id &&
+                        !event.endDateTime.isBefore(
+                          DateTime(
+                            now.year,
+                            now.month,
+                            now.day,
+                            0,
+                            0,
+                          ),
+                        ),
+                  )
+                  .toList(growable: false)
+                ..sort((a, b) => a.startDateTime.compareTo(b.startDateTime));
 
               return Column(
                 children: [
@@ -182,12 +205,16 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           const TodayClassesCard(hasClasses: false),
                           const SizedBox(height: AppSpacing.lg),
+                          UpcomingEventsCard(events: upcomingEvents),
+                          const SizedBox(height: AppSpacing.lg),
                           UpcomingDeadlinesCard(tasks: upcomingTasks),
                         ],
                       ),
                     ),
                   ),
                 ],
+              );
+                },
               );
                 },
               );

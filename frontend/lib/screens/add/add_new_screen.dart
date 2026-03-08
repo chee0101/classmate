@@ -3,9 +3,11 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/services/academic_session_store.dart';
 import '../../core/services/session_term_selection_store.dart';
+import '../../core/models/academic_event.dart';
 import '../../core/models/timetable_entry.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/models/task.dart';
+import '../../core/services/academic_event_store.dart';
 import '../../core/services/class_slot_store.dart';
 import '../../core/services/course_store.dart';
 import '../../core/services/task_store.dart';
@@ -347,11 +349,55 @@ class _AddNewScreenState extends State<AddNewScreen> {
     );
   }
 
-  void _saveEvent() {
-    if (_eventNameController.text.trim().isEmpty) return;
+  Future<void> _saveEvent({
+    required String sessionId,
+    required String termId,
+  }) async {
+    final eventTitle = _eventNameController.text.trim();
+    if (eventTitle.isEmpty) return;
+
+    final effectiveEndDate = _eventEndDate ?? _eventStartDate;
+    DateTime startDateTime;
+    DateTime endDateTime;
+
+    if (_eventAllDay) {
+      startDateTime = _startOfDay(_eventStartDate);
+      endDateTime = _endOfDay(effectiveEndDate);
+    } else {
+      if (_eventStartTime == null || _eventEndTime == null) return;
+      startDateTime = DateTime(
+        _eventStartDate.year,
+        _eventStartDate.month,
+        _eventStartDate.day,
+        _eventStartTime!.hour,
+        _eventStartTime!.minute,
+      );
+      endDateTime = DateTime(
+        effectiveEndDate.year,
+        effectiveEndDate.month,
+        effectiveEndDate.day,
+        _eventEndTime!.hour,
+        _eventEndTime!.minute,
+      );
+      if (!endDateTime.isAfter(startDateTime)) return;
+    }
+
+    final event = AcademicEvent(
+      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      sessionId: sessionId,
+      termId: termId,
+      title: eventTitle,
+      startDateTime: startDateTime,
+      endDateTime: endDateTime,
+      allDay: _eventAllDay,
+      hideClassesDuringEvent: _hideClassesInEvent,
+    );
+    await addAcademicEvent(event);
+
+    if (!mounted) return;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Event added (mock).')),
+      const SnackBar(content: Text('Event added.')),
     );
   }
 
@@ -636,7 +682,12 @@ class _AddNewScreenState extends State<AddNewScreen> {
                                           termId: selectedTerm.id,
                                         )
                                     : null)
-                                : (canSaveEvent ? _saveEvent : null),
+                                : (canSaveEvent
+                                    ? () => _saveEvent(
+                                          sessionId: selectedSession.id,
+                                          termId: selectedTerm.id,
+                                        )
+                                    : null),
                         child: Text(
                           _selectedType == AddType.task
                               ? 'Add task'

@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 
 import 'core/constants/routes.dart';
 import 'core/services/academic_session_store.dart';
+import 'core/services/academic_event_store.dart';
 import 'core/services/class_slot_store.dart';
 import 'core/services/course_store.dart';
 import 'core/services/task_store.dart';
@@ -50,6 +51,7 @@ class _SplashScreenState extends State<SplashScreen> with SingleTickerProviderSt
     initializeCoursesSync();
     initializeClassSlotsSync();
     initializeTasksSync();
+    initializeAcademicEventsSync();
     _setLoadingProgress(0.85);
 
     final elapsed = DateTime.now().difference(startedAt);
