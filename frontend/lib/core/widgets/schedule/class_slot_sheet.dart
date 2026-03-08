@@ -169,7 +169,7 @@ class _ClassSlotEditorFormState extends State<ClassSlotEditorForm> {
     if (_start != null && _end != null) {
       final startMinutes = _start!.hour * 60 + _start!.minute;
       final endMinutes = _end!.hour * 60 + _end!.minute;
-      timeOrderValid = endMinutes >= startMinutes;
+      timeOrderValid = endMinutes > startMinutes;
     }
 
     final canAdd = _selectedDay != null &&
@@ -242,7 +242,7 @@ class _ClassSlotEditorFormState extends State<ClassSlotEditorForm> {
           if (_start != null && _end != null && !timeOrderValid) ...[
             const SizedBox(height: 4),
             Text(
-              'End time cannot be earlier than start time.',
+              'End time must be later than start time.',
               style: TextStyle(
                 color: Colors.red.shade600,
                 fontSize: 12,

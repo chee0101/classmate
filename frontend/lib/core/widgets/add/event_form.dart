@@ -150,7 +150,7 @@ class EventForm extends StatelessWidget {
         if (!allDay && !timesValid) ...[
           const SizedBox(height: 4),
           Text(
-            'End time cannot be earlier than start time.',
+            'End time must be later than start time.',
             style: TextStyle(
               color: Colors.red.shade600,
               fontSize: 12,

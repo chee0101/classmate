@@ -94,7 +94,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
 
     final startMinutes = _eventStartTime!.hour * 60 + _eventStartTime!.minute;
     final endMinutes = _eventEndTime!.hour * 60 + _eventEndTime!.minute;
-    return endMinutes >= startMinutes;
+    return endMinutes > startMinutes;
   }
 
   Future<void> _pickTaskDate(TermWindow term) async {
