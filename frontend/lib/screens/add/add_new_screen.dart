@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
 import '../../core/services/academic_session_store.dart';
+import '../../core/services/session_term_selection_store.dart';
 import '../../core/models/timetable_entry.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/models/task.dart';
@@ -66,11 +67,17 @@ class _AddNewScreenState extends State<AddNewScreen> {
     _eventEndDate = _endOfDay(now);
     _eventStartTime = const TimeOfDay(hour: 9, minute: 0);
     _eventEndTime = const TimeOfDay(hour: 11, minute: 0);
+    final selectedFromHome = selectedSessionTermNotifier.value;
+    if (selectedFromHome != null) {
+      _selectedSessionId = selectedFromHome.sessionId;
+      _selectedTermId = selectedFromHome.termId;
+      return;
+    }
+
     final active = currentAcademicSessionNotifier.value;
     if (active != null) {
       _selectedSessionId = active.id;
-      final windows = buildTermWindows(active);
-      _selectedTermId = defaultTermId(windows);
+      _selectedTermId = defaultTermId(buildTermWindows(active));
     }
   }
 
@@ -403,7 +410,11 @@ class _AddNewScreenState extends State<AddNewScreen> {
                         : defaultTermId(termWindows)),
                 orElse: () => termWindows.first,
               );
-
+              final currentSessionId = currentAcademicSessionNotifier.value?.id;
+              final currentTermIdForSelectedSession =
+                  selectedSession.id == currentSessionId
+                  ? defaultTermId(buildTermWindows(selectedSession))
+                  : null;
               // Filter courses by session and term
               final sessionAndTermCourses = courses
                   .where((c) => c.sessionId == selectedSession.id && c.termId == selectedTerm.id)
@@ -539,14 +550,20 @@ class _AddNewScreenState extends State<AddNewScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            _LabeledFieldHeader(
+                              label: 'Academic Session',
+                            ),
                             DropdownField<String>(
                               label: 'Academic Session',
+                              showLabel: false,
                               value: selectedSession.id,
                               items: sessions
                                   .map(
                                     (s) => DropdownMenuEntry<String>(
                                       value: s.id,
-                                      label: s.name,
+                                      label: s.id == currentSessionId
+                                          ? '${s.name} (Current)'
+                                          : s.name,
                                     ),
                                   )
                                   .toList(),
@@ -567,15 +584,21 @@ class _AddNewScreenState extends State<AddNewScreen> {
                               },
                             ),
                             const SizedBox(height: AppSpacing.md),
+                            _LabeledFieldHeader(
+                              label: 'Academic Term',
+                            ),
                             DropdownField<String>(
                               label: 'Academic Term',
+                              showLabel: false,
                               value: selectedTerm.id,
                               items: termWindows
                                   .map(
                                     (term) => DropdownMenuEntry<String>(
                                       value: term.id,
-                                      label: term.label,
-                                      
+                                      label:
+                                          term.id == currentTermIdForSelectedSession
+                                          ? '${term.label} (Current)'
+                                          : term.label,
                                     ),
                                   )
                                   .toList(),
@@ -653,6 +676,23 @@ class _TypeTabs extends StatelessWidget {
         SegmentedSwitchOption<AddType>(value: AddType.classSlot, label: 'Class'),
         SegmentedSwitchOption<AddType>(value: AddType.event, label: 'Event'),
       ],
+    );
+  }
+}
+
+class _LabeledFieldHeader extends StatelessWidget {
+  const _LabeledFieldHeader({
+    required this.label,
+  });
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4),
+      child: Text(label, style: textTheme.titleSmall),
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:google_fonts/google_fonts.dart';
 
 import '../../constants/app_colors.dart';
 import '../../models/academic_session.dart';
+import '../../services/academic_session_store.dart';
 import '../../utils/term_windows.dart';
 
 /// A header widget that displays and allows selection of academic session and term.
@@ -37,12 +38,21 @@ class SessionHeader extends StatelessWidget {
 
     // Build dropdown entries for all (session, term) combinations.
     final entries = <DropdownMenuEntry<String>>[];
+    final currentSession = currentAcademicSessionNotifier.value;
+    final currentSessionId = currentSession?.id;
+    final currentTermId = currentSession == null
+        ? null
+        : defaultTermId(buildTermWindows(currentSession));
 
     for (final session in sessions) {
       final termWindows = buildTermWindows(session);
       for (final term in termWindows) {
         final key = '${session.id}::${term.id}';
-        final label = '${session.name} · ${term.label}';
+        final isCurrent =
+            session.id == currentSessionId && term.id == currentTermId;
+        final label = isCurrent
+            ? '${session.name} · ${term.label} (Current)'
+            : '${session.name} · ${term.label}';
         entries.add(
           DropdownMenuEntry<String>(
             value: key,

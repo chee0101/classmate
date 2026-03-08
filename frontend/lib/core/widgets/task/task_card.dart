@@ -88,13 +88,18 @@ class TaskCard extends StatelessWidget {
         const SizedBox(height: AppSpacing.sm),
         Row(
           children: [
-            Text(
-              'Due: $dueDateStr',
-              style: textTheme.bodyMedium?.copyWith(
-                color: Colors.grey.shade700,
+            Expanded(
+              child: Text(
+                'Due: $dueDateStr',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.bodyMedium?.copyWith(
+                  color: Colors.grey.shade700,
+                ),
               ),
             ),
-            const Spacer(),
+            if (task.status != TaskStatus.completed && showMarkDone)
+              const SizedBox(width: 8),
             if (task.status != TaskStatus.completed && showMarkDone)
               TextButton(
                 onPressed: onMarkDone,
