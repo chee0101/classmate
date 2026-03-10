@@ -34,4 +34,27 @@ String formatDateDdMmYyyy(DateTime dt) =>
     '${dt.month.toString().padLeft(2, '0')}/'
     '${dt.year}';
 
+/// True when [a] and [b] are on the same calendar day.
+bool isSameDate(DateTime a, DateTime b) =>
+    a.year == b.year && a.month == b.month && a.day == b.day;
+
+/// Formats a DateTime as "8 Mar 2026".
+String formatDateShortWithYear(DateTime dt) =>
+    '${dt.day} ${monthShortLabel(dt.month)} ${dt.year}';
+
+/// Formats date range for all-day labels.
+String formatAllDayRange(DateTime start, DateTime end) {
+  if (isSameDate(start, end)) {
+    return '${formatDateShortWithYear(start)} (All day)';
+  }
+  return '${formatDateShortWithYear(start)} - ${formatDateShortWithYear(end)} (All day)';
+}
+
+/// Formats a date-time range, using a compact same-day form.
+String formatDateTimeRange(DateTime start, DateTime end) {
+  if (isSameDate(start, end)) {
+    return '${formatDateShortWithYear(start)} ${formatTime12h(start)} - ${formatTime12h(end)}';
+  }
+  return '${formatDateShortWithYear(start)} ${formatTime12h(start)} - ${formatDateShortWithYear(end)} ${formatTime12h(end)}';
+}
 
