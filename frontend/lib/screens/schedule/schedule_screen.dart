@@ -16,7 +16,8 @@ import '../../core/services/class_slot_store.dart';
 import '../../core/services/course_store.dart';
 import '../../core/services/session_term_selection_store.dart';
 import '../../core/utils/date_time_format.dart';
-import '../../core/utils/term_windows.dart';
+import '../../core/utils/session_term_resolver.dart';
+import '../../core/models/session_term_ref.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/common/session_term_context_label.dart';
@@ -72,34 +73,27 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             );
           }
 
-          final refs = <({AcademicSession session, TermWindow term})>[];
-          for (final session in sessions) {
-            for (final term in buildTermWindows(session)) {
-              refs.add((session: session, term: term));
-            }
-          }
-
-          var selectedRef = refs.first;
           final now = DateTime.now();
-          final current = refs.where(
-            (ref) =>
-                !now.isBefore(ref.term.start) && !now.isAfter(ref.term.end),
-          );
-          if (current.isNotEmpty) selectedRef = current.first;
+          final refs = buildAllSessionTermRefs(sessions);
+          final defaultRef = resolveDefaultSessionTermRef(refs, now);
 
           return ValueListenableBuilder<SessionTermSelection?>(
             valueListenable: selectedSessionTermNotifier,
             builder: (context, selectedSelection, _) {
               final selectedSessionId =
-                  selectedSelection?.sessionId ?? selectedRef.session.id;
+                  selectedSelection?.sessionId ?? defaultRef.session.id;
               final selectedTermId =
-                  selectedSelection?.termId ?? selectedRef.term.id;
-              final exact = refs.where(
-                (ref) =>
-                    ref.session.id == selectedSessionId &&
-                    ref.term.id == selectedTermId,
-              );
-              if (exact.isNotEmpty) selectedRef = exact.first;
+                  selectedSelection?.termId ?? defaultRef.term.id;
+
+              // Resolve exact ref from current selection, falling back to defaultRef.
+              SessionTermRef selectedRef = defaultRef;
+              for (final ref in refs) {
+                if (ref.session.id == selectedSessionId &&
+                    ref.term.id == selectedTermId) {
+                  selectedRef = ref;
+                  break;
+                }
+              }
 
               final selectedSession = selectedRef.session;
               final selectedTerm = selectedRef.term;

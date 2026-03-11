@@ -8,6 +8,7 @@ import '../../core/services/session_term_selection_store.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/services/task_store.dart';
 import '../../core/utils/task_utils.dart';
+import '../../core/utils/session_term_resolver.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/models/session_term_ref.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
@@ -57,57 +58,10 @@ class _HomeScreenState extends State<HomeScreen> {
             );
           }
 
-          // Build all (session, term) combinations.
+          // Build all (session, term) combinations and resolve default.
           final now = DateTime.now();
-          final allTermRefs = <SessionTermRef>[];
-          for (final session in sessions) {
-            final windows = buildTermWindows(session);
-            for (final term in windows) {
-              allTermRefs.add(SessionTermRef(session: session, term: term));
-            }
-          }
-
-          // Pick default (session, term):
-          SessionTermRef? defaultRef;
-
-          // 1) Prefer a term where today is within the window
-          for (final ref in allTermRefs) {
-            if (!now.isBefore(ref.term.start) && !now.isAfter(ref.term.end)) {
-              defaultRef = ref;
-              break;
-            }
-          }
-
-          // 2) If none, choose the nearest future term
-          if (defaultRef == null) {
-            Duration? minFuture;
-            for (final ref in allTermRefs) {
-              if (ref.term.start.isAfter(now)) {
-                final diff = ref.term.start.difference(now);
-                if (minFuture == null || diff < minFuture) {
-                  minFuture = diff;
-                  defaultRef = ref;
-                }
-              }
-            }
-          }
-
-          // 3) If still none, choose the nearest past term
-          defaultRef ??= () {
-            Duration? minPast;
-            SessionTermRef? best;
-            for (final ref in allTermRefs) {
-              if (ref.term.end.isBefore(now)) {
-                final diff = now.difference(ref.term.end);
-                if (minPast == null || diff < minPast) {
-                  minPast = diff;
-                  best = ref;
-                }
-              }
-            }
-            return best ?? allTermRefs.first;
-          }();
-          final resolvedDefaultRef = defaultRef;
+          final allTermRefs = buildAllSessionTermRefs(sessions);
+          final resolvedDefaultRef = resolveDefaultSessionTermRef(allTermRefs, now);
 
           return ValueListenableBuilder<SessionTermSelection?>(
             valueListenable: selectedSessionTermNotifier,
@@ -150,9 +104,9 @@ class _HomeScreenState extends State<HomeScreen> {
               final allUpcomingTasks = TaskUtils.getUpcomingTasks(
                 tasks.where((t) => t.parentTaskId == null).toList(),
               );
-              final upcomingTasks = allUpcomingTasks.where((task) {
-                return isInTerm(task.dueDateTime, selectedTerm);
-              }).toList();
+              final upcomingTasks = allUpcomingTasks
+                  .where((task) => isInTerm(task.dueDateTime, selectedTerm))
+                  .toList();
               final upcomingEvents = events
                   .where(
                     (event) =>
