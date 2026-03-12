@@ -137,49 +137,31 @@ class ScheduleAppointmentBuilder {
       final dayEnd = DateTime(date.year, date.month, date.day, 23, 59);
       final firstEvent = dayEvents.first;
       appointments.add(
-        Appointment(
+        _buildEventAppointment(
+          event: firstEvent,
           startTime: dayStart,
           endTime: dayEnd,
-          subject: firstEvent.title,
-          color: AppPrimarySwatch.shade700,
           isAllDay: true,
-          notes: ScheduleAppointmentMeta.typeEvent,
-          id: ScheduleAppointmentMeta(
-            type: ScheduleAppointmentMeta.typeEvent,
-            events: [firstEvent],
-          ),
         ),
       );
       if (dayEvents.length == 2) {
         final secondEvent = dayEvents[1];
         appointments.add(
-          Appointment(
+          _buildEventAppointment(
+            event: secondEvent,
             startTime: dayStart,
             endTime: dayEnd,
-            subject: secondEvent.title,
-            color: AppPrimarySwatch.shade700,
             isAllDay: true,
-            notes: ScheduleAppointmentMeta.typeEvent,
-            id: ScheduleAppointmentMeta(
-              type: ScheduleAppointmentMeta.typeEvent,
-              events: [secondEvent],
-            ),
           ),
         );
       } else if (dayEvents.length > 2) {
         final hiddenEvents = dayEvents.skip(1).toList(growable: false);
         appointments.add(
-          Appointment(
+          _buildEventOverflowAppointment(
             startTime: dayStart,
             endTime: dayEnd,
-            subject: '+${dayEvents.length - 1}',
-            color: AppPrimarySwatch.shade800,
             isAllDay: true,
-            notes: ScheduleAppointmentMeta.typeEventOverflow,
-            id: ScheduleAppointmentMeta(
-              type: ScheduleAppointmentMeta.typeEventOverflow,
-              events: hiddenEvents,
-            ),
+            hiddenEvents: hiddenEvents,
           ),
         );
       }
@@ -196,17 +178,11 @@ class ScheduleAppointmentBuilder {
       if (group.length <= 2) {
         for (final event in group) {
           appointments.add(
-            Appointment(
+            _buildEventAppointment(
+              event: event,
               startTime: event.startDateTime,
               endTime: event.endDateTime,
-              subject: event.title,
-              color: AppPrimarySwatch.shade700,
               isAllDay: false,
-              notes: ScheduleAppointmentMeta.typeEvent,
-              id: ScheduleAppointmentMeta(
-                type: ScheduleAppointmentMeta.typeEvent,
-                events: [event],
-              ),
             ),
           );
         }
@@ -215,36 +191,195 @@ class ScheduleAppointmentBuilder {
 
       final leadEvent = group.first;
       appointments.add(
-        Appointment(
+        _buildEventAppointment(
+          event: leadEvent,
           startTime: leadEvent.startDateTime,
           endTime: leadEvent.endDateTime,
-          subject: leadEvent.title,
-          color: AppPrimarySwatch.shade700,
           isAllDay: false,
-          notes: ScheduleAppointmentMeta.typeEvent,
-          id: ScheduleAppointmentMeta(
-            type: ScheduleAppointmentMeta.typeEvent,
-            events: [leadEvent],
-          ),
         ),
       );
       appointments.add(
-        Appointment(
+        _buildEventOverflowAppointment(
           startTime: leadEvent.startDateTime,
           endTime: leadEvent.endDateTime,
-          subject: '+${group.length - 1}',
-          color: AppPrimarySwatch.shade800,
           isAllDay: false,
-          notes: ScheduleAppointmentMeta.typeEventOverflow,
-          id: ScheduleAppointmentMeta(
-            type: ScheduleAppointmentMeta.typeEventOverflow,
-            events: group.skip(1).toList(growable: false),
-          ),
+          hiddenEvents: group.skip(1).toList(growable: false),
         ),
       );
     }
 
-    return appointments;
+    return _compressDenseOverlaps(appointments);
+  }
+
+  /// Keep <=2 overlapping timed items as-is. For >2 overlapping items in a day,
+  /// render one longest item plus a "+N" overflow block.
+  static List<Appointment> _compressDenseOverlaps(List<Appointment> input) {
+    final allDay = <Appointment>[];
+    final timedByDay = <String, List<Appointment>>{};
+
+    for (final appt in input) {
+      if (appt.isAllDay) {
+        allDay.add(appt);
+        continue;
+      }
+      final dayKey =
+          '${appt.startTime.year}-${appt.startTime.month}-${appt.startTime.day}';
+      timedByDay.putIfAbsent(dayKey, () => <Appointment>[]).add(appt);
+    }
+
+    final compressedTimed = <Appointment>[];
+    for (final day in timedByDay.values) {
+      day.sort(_compareAppointmentsByStartThenEnd);
+
+      var cluster = <Appointment>[];
+      DateTime? clusterEnd;
+
+      void flushCluster() {
+        if (cluster.isEmpty) return;
+        if (cluster.length <= 2) {
+          compressedTimed.addAll(cluster);
+          cluster = <Appointment>[];
+          clusterEnd = null;
+          return;
+        }
+
+        Appointment lead = cluster.first;
+        var leadDuration = lead.endTime.difference(lead.startTime);
+        for (final candidate in cluster.skip(1)) {
+          final candidateDuration =
+              candidate.endTime.difference(candidate.startTime);
+          final isLonger = candidateDuration > leadDuration;
+          final isSameLengthEarlier =
+              candidateDuration == leadDuration &&
+                  candidate.startTime.isBefore(lead.startTime);
+          if (isLonger || isSameLengthEarlier) {
+            lead = candidate;
+            leadDuration = candidateDuration;
+          }
+        }
+
+        final others =
+            cluster.where((a) => !identical(a, lead)).toList(growable: false);
+        var earliestStart = others.first.startTime;
+        var latestEnd = others.first.endTime;
+        for (final appt in others.skip(1)) {
+          if (appt.startTime.isBefore(earliestStart)) {
+            earliestStart = appt.startTime;
+          }
+          if (appt.endTime.isAfter(latestEnd)) {
+            latestEnd = appt.endTime;
+          }
+        }
+        if (!latestEnd.isAfter(earliestStart)) {
+          latestEnd = earliestStart.add(const Duration(minutes: 1));
+        }
+
+        final overflowAppointment = Appointment(
+          startTime: earliestStart,
+          endTime: latestEnd,
+          subject: '+${others.length}',
+          color: AppPrimarySwatch.shade800,
+          isAllDay: false,
+          notes: ScheduleAppointmentMeta.typeDenseOverflow,
+          id: ScheduleAppointmentMeta(
+            type: ScheduleAppointmentMeta.typeDenseOverflow,
+            overflowAppointments: others,
+          ),
+        );
+
+        // Put overflow first so lead block is laid out as the primary item.
+        compressedTimed.add(overflowAppointment);
+        compressedTimed.add(lead);
+
+        cluster = <Appointment>[];
+        clusterEnd = null;
+      }
+
+      for (final appt in day) {
+        if (cluster.isEmpty) {
+          cluster = [appt];
+          clusterEnd = appt.endTime;
+          continue;
+        }
+
+        final overlapsCluster = appt.startTime.isBefore(clusterEnd!);
+        if (overlapsCluster) {
+          cluster.add(appt);
+          if (appt.endTime.isAfter(clusterEnd!)) {
+            clusterEnd = appt.endTime;
+          }
+        } else {
+          flushCluster();
+          cluster = [appt];
+          clusterEnd = appt.endTime;
+        }
+      }
+      flushCluster();
+    }
+
+    final output = <Appointment>[
+      ...allDay,
+      ...compressedTimed,
+    ];
+    output.sort(_compareAppointmentsForRenderOrder);
+    return output;
+  }
+
+  static int _compareAppointmentsByStartThenEnd(Appointment a, Appointment b) {
+    final byStart = a.startTime.compareTo(b.startTime);
+    if (byStart != 0) return byStart;
+    return a.endTime.compareTo(b.endTime);
+  }
+
+  static int _compareAppointmentsForRenderOrder(Appointment a, Appointment b) {
+    final byStart = a.startTime.compareTo(b.startTime);
+    if (byStart != 0) return byStart;
+    final aIsOverflowSubject = a.subject.trim().startsWith('+');
+    final bIsOverflowSubject = b.subject.trim().startsWith('+');
+    if (aIsOverflowSubject != bIsOverflowSubject) {
+      return aIsOverflowSubject ? 1 : -1;
+    }
+    return a.endTime.compareTo(b.endTime);
+  }
+
+  static Appointment _buildEventAppointment({
+    required AcademicEvent event,
+    required DateTime startTime,
+    required DateTime endTime,
+    required bool isAllDay,
+  }) {
+    return Appointment(
+      startTime: startTime,
+      endTime: endTime,
+      subject: event.title,
+      color: AppPrimarySwatch.shade700,
+      isAllDay: isAllDay,
+      notes: ScheduleAppointmentMeta.typeEvent,
+      id: ScheduleAppointmentMeta(
+        type: ScheduleAppointmentMeta.typeEvent,
+        events: [event],
+      ),
+    );
+  }
+
+  static Appointment _buildEventOverflowAppointment({
+    required DateTime startTime,
+    required DateTime endTime,
+    required bool isAllDay,
+    required List<AcademicEvent> hiddenEvents,
+  }) {
+    return Appointment(
+      startTime: startTime,
+      endTime: endTime,
+      subject: '+${hiddenEvents.length}',
+      color: AppPrimarySwatch.shade800,
+      isAllDay: isAllDay,
+      notes: ScheduleAppointmentMeta.typeEventOverflow,
+      id: ScheduleAppointmentMeta(
+        type: ScheduleAppointmentMeta.typeEventOverflow,
+        events: hiddenEvents,
+      ),
+    );
   }
 
   static List<_RenderedClassSlot> _flattenSlots(
@@ -297,16 +432,19 @@ class ScheduleAppointmentMeta {
     this.events = const [],
     this.mode,
     this.venue,
+    this.overflowAppointments = const [],
   });
 
   static const String typeClass = 'class';
   static const String typeEvent = 'event';
   static const String typeEventOverflow = 'event-overflow';
+  static const String typeDenseOverflow = 'dense-overflow';
 
   final String type;
   final List<AcademicEvent> events;
   final String? mode;
   final String? venue;
+  final List<Appointment> overflowAppointments;
 }
 
 enum ScheduleContentFilter {

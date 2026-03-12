@@ -549,6 +549,36 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         continue;
       }
 
+      if (meta.type == ScheduleAppointmentMeta.typeDenseOverflow &&
+          meta.overflowAppointments.isNotEmpty) {
+        for (final hidden in meta.overflowAppointments) {
+          final hiddenMeta = hidden.id;
+          if (hiddenMeta is ScheduleAppointmentMeta &&
+              hiddenMeta.type == ScheduleAppointmentMeta.typeEventOverflow) {
+            for (final event in hiddenMeta.events) {
+              output.add(
+                Appointment(
+                  startTime: event.startDateTime,
+                  endTime: event.endDateTime,
+                  subject: event.title,
+                  color: AppPrimarySwatch.shade700,
+                  isAllDay:
+                      event.allDay || !isSameDate(event.startDateTime, event.endDateTime),
+                  notes: ScheduleAppointmentMeta.typeEvent,
+                  id: ScheduleAppointmentMeta(
+                    type: ScheduleAppointmentMeta.typeEvent,
+                    events: [event],
+                  ),
+                ),
+              );
+            }
+            continue;
+          }
+          output.add(hidden);
+        }
+        continue;
+      }
+
       if (meta.type == ScheduleAppointmentMeta.typeEvent && meta.events.isNotEmpty) {
         final event = meta.events.first;
         output.add(
