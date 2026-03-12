@@ -84,7 +84,7 @@ class TaskForm extends StatelessWidget {
         ],
         const SizedBox(height: AppSpacing.md),
         LabeledTextField(
-          label: 'Note',
+          label: 'Note (Optional)',
           hintText: 'Enter task details',
           controller: noteController,
           onChanged: (_) {},

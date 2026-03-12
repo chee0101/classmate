@@ -415,6 +415,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         final maxSheetHeight = MediaQuery.sizeOf(context).height * 0.75;
         final isSingleClassDetails =
             appointments.length == 1 && isClassDetails;
+        final isSingleEventDetails =
+            appointments.length == 1 && !isClassDetails;
 
         if (isSingleClassDetails) {
           final appointment = appointments.first;
@@ -565,6 +567,116 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           );
         }
 
+        if (isSingleEventDetails) {
+          final appointment = appointments.first;
+          final eventMeta = appointment.id;
+          AcademicEvent? event;
+          if (eventMeta is ScheduleAppointmentMeta &&
+              eventMeta.type == ScheduleAppointmentMeta.typeEvent &&
+              eventMeta.events.isNotEmpty) {
+            event = eventMeta.events.first;
+          }
+
+          final title = event?.title.trim() ?? appointment.subject.trim();
+          final subtitle = _formatAppointmentRange(appointment);
+          final location = event?.location?.trim();
+          final hasLocation = location != null && location.isNotEmpty;
+
+          return SafeArea(
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxHeight: maxSheetHeight),
+              child: Padding(
+                padding: const EdgeInsets.all(AppSpacing.lg),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            sheetTitle,
+                            style: textTheme.titleLarge,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.edit_outlined),
+                          onPressed: () {
+                            // TODO: Wire up event edit flow when available.
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.center,
+                          children: [
+                            Container(
+                              width: 6,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: appointment.color,
+                                borderRadius: BorderRadius.circular(99),
+                              ),
+                            ),
+                            const SizedBox(width: AppSpacing.md),
+                            Expanded(
+                              child: Text(
+                                title,
+                                style: textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          subtitle,
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                        if (hasLocation)
+                          Padding(
+                            padding: const EdgeInsets.only(top: AppSpacing.sm),
+                            child: Text(
+                              '📍 $location',
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: Colors.grey.shade700,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    const Divider(),
+                    Center(
+                      child: TextButton.icon(
+                        onPressed: () {
+                          // TODO: Wire up event delete flow when available.
+                          Navigator.of(context).pop();
+                        },
+                        icon: const Icon(
+                          Icons.delete_outline,
+                          color: Colors.red,
+                        ),
+                        label: const Text('Delete'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.red,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
         return SafeArea(
           child: ConstrainedBox(
             constraints: BoxConstraints(maxHeight: maxSheetHeight),
@@ -585,6 +697,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                       itemCount: appointments.length,
                       itemBuilder: (context, index) {
                         final appointment = appointments[index];
+                        final meta = appointment.id;
+                        String? eventLocation;
+                        if (meta is ScheduleAppointmentMeta &&
+                            meta.type == ScheduleAppointmentMeta.typeEvent &&
+                            meta.events.isNotEmpty) {
+                          eventLocation = meta.events.first.location?.trim();
+                          if (eventLocation != null && eventLocation.isEmpty) {
+                            eventLocation = null;
+                          }
+                        }
                         return Padding(
                           padding: const EdgeInsets.only(bottom: AppSpacing.md),
                           child: Row(
@@ -616,6 +738,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                         color: Colors.grey.shade700,
                                       ),
                                     ),
+                                    if (eventLocation != null) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '📍 $eventLocation',
+                                        style: textTheme.bodySmall?.copyWith(
+                                          color: Colors.grey.shade700,
+                                        ),
+                                      ),
+                                    ],
                                   ],
                                 ),
                               ),

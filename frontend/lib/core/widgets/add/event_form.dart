@@ -9,6 +9,7 @@ class EventForm extends StatelessWidget {
   const EventForm({
     super.key,
     required this.eventNameController,
+    required this.locationController,
     required this.allDay,
     required this.startDate,
     required this.endDate,
@@ -20,6 +21,7 @@ class EventForm extends StatelessWidget {
     required this.timesValid,
     required this.onAllDayChanged,
     required this.onNameChanged,
+    required this.onLocationChanged,
     required this.onPickStartDate,
     required this.onPickEndDate,
     required this.onPickStartTime,
@@ -28,6 +30,7 @@ class EventForm extends StatelessWidget {
   });
 
   final TextEditingController eventNameController;
+  final TextEditingController locationController;
   final bool allDay;
   final DateTime startDate;
   final DateTime? endDate;
@@ -39,6 +42,7 @@ class EventForm extends StatelessWidget {
   final bool timesValid;
   final ValueChanged<bool> onAllDayChanged;
   final ValueChanged<String> onNameChanged;
+  final ValueChanged<String> onLocationChanged;
   final VoidCallback onPickStartDate;
   final VoidCallback onPickEndDate;
   final VoidCallback onPickStartTime;
@@ -55,6 +59,13 @@ class EventForm extends StatelessWidget {
           hintText: 'Enter event',
           controller: eventNameController,
           onChanged: onNameChanged,
+        ),
+        const SizedBox(height: AppSpacing.md),
+        LabeledTextField(
+          label: 'Location (Optional)',
+          hintText: 'Enter location',
+          controller: locationController,
+          onChanged: onLocationChanged,
         ),
         const SizedBox(height: AppSpacing.sm),
         Row(

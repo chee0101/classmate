@@ -47,6 +47,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
   final List<ClassSlotDraft> _classSlots = [];
 
   final _eventNameController = TextEditingController();
+  final _eventLocationController = TextEditingController();
   DateTime _eventStartDate = DateTime.now();
   DateTime? _eventEndDate;
   TimeOfDay? _eventStartTime;
@@ -88,6 +89,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
     _taskTitleController.dispose();
     _taskNoteController.dispose();
     _eventNameController.dispose();
+    _eventLocationController.dispose();
     super.dispose();
   }
 
@@ -354,6 +356,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
     required String termId,
   }) async {
     final eventTitle = _eventNameController.text.trim();
+    final eventLocation = _eventLocationController.text.trim();
     if (eventTitle.isEmpty) return;
 
     final effectiveEndDate = _eventEndDate ?? _eventStartDate;
@@ -391,6 +394,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
       endDateTime: endDateTime,
       allDay: _eventAllDay,
       hideClassesDuringEvent: _hideClassesInEvent,
+      location: eventLocation.isEmpty ? null : eventLocation,
     );
     await addAcademicEvent(event);
 
@@ -550,6 +554,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
               } else {
                 typeSpecificForm = EventForm(
                   eventNameController: _eventNameController,
+                  locationController: _eventLocationController,
                   allDay: _eventAllDay,
                   startDate: _eventStartDate,
                   endDate: _eventEndDate,
@@ -572,6 +577,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
                     });
                   },
                   onNameChanged: (value) => setState(() {}),
+                  onLocationChanged: (value) => setState(() {}),
                   onPickStartDate: () => _pickEventStartDate(selectedTerm),
                   onPickEndDate: () => _pickEventEndDate(selectedTerm),
                   onPickStartTime: _pickEventStartTime,

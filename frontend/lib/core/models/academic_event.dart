@@ -8,6 +8,7 @@ class AcademicEvent {
     required this.endDateTime,
     required this.allDay,
     required this.hideClassesDuringEvent,
+    this.location,
   });
 
   final String id;
@@ -18,6 +19,7 @@ class AcademicEvent {
   final DateTime endDateTime;
   final bool allDay;
   final bool hideClassesDuringEvent;
+  final String? location;
 
   AcademicEvent copyWith({
     String? id,
@@ -28,6 +30,7 @@ class AcademicEvent {
     DateTime? endDateTime,
     bool? allDay,
     bool? hideClassesDuringEvent,
+    String? location,
   }) {
     return AcademicEvent(
       id: id ?? this.id,
@@ -39,6 +42,7 @@ class AcademicEvent {
       allDay: allDay ?? this.allDay,
       hideClassesDuringEvent:
           hideClassesDuringEvent ?? this.hideClassesDuringEvent,
+      location: location ?? this.location,
     );
   }
 }

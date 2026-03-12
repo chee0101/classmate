@@ -53,7 +53,7 @@ String formatAllDayRange(DateTime start, DateTime end) {
 /// Formats a date-time range, using a compact same-day form.
 String formatDateTimeRange(DateTime start, DateTime end) {
   if (isSameDate(start, end)) {
-    return '${formatDateShortWithYear(start)} ${formatTime12h(start)} - ${formatTime12h(end)}';
+    return '${formatDateShortWithYear(start)} • ${formatTime12h(start)} - ${formatTime12h(end)}';
   }
   return '${formatDateShortWithYear(start)} ${formatTime12h(start)} - ${formatDateShortWithYear(end)} ${formatTime12h(end)}';
 }

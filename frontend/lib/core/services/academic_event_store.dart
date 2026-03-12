@@ -58,6 +58,7 @@ AcademicEvent _eventFromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     endDateTime: endTimestamp?.toDate() ?? now,
     allDay: (data['allDay'] as bool?) ?? false,
     hideClassesDuringEvent: (data['hideClassesDuringEvent'] as bool?) ?? true,
+    location: (data['location'] as String?)?.trim(),
   );
 }
 
@@ -74,6 +75,9 @@ Future<String?> addAcademicEvent(AcademicEvent event) async {
     'endDateTime': Timestamp.fromDate(event.endDateTime),
     'allDay': event.allDay,
     'hideClassesDuringEvent': event.hideClassesDuringEvent,
+    'location': (event.location ?? '').trim().isEmpty
+        ? null
+        : (event.location ?? '').trim(),
     'createdAt': FieldValue.serverTimestamp(),
     'updatedAt': FieldValue.serverTimestamp(),
   });
@@ -92,6 +96,9 @@ Future<void> updateAcademicEvent(AcademicEvent event) async {
     'endDateTime': Timestamp.fromDate(event.endDateTime),
     'allDay': event.allDay,
     'hideClassesDuringEvent': event.hideClassesDuringEvent,
+    'location': (event.location ?? '').trim().isEmpty
+        ? null
+        : (event.location ?? '').trim(),
     'updatedAt': FieldValue.serverTimestamp(),
   }, SetOptions(merge: true));
 }
