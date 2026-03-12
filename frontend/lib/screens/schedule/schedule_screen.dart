@@ -329,7 +329,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                       );
                                     },
                                       onTap: (details) {
-                                        if (_showMonthly) return;
+                                         // In monthly view, don't open details when tapping the grid/date cells.
+                                         // Only taps on items that carry appointments (e.g., agenda blocks)
+                                         // should open the bottom sheet.
+                                         if (_showMonthly &&
+                                             details.targetElement ==
+                                                 CalendarElement.calendarCell) {
+                                           return;
+                                         }
                                         final rawAppointments = details.appointments;
                                         if (rawAppointments == null ||
                                             rawAppointments.isEmpty ||
