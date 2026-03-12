@@ -64,7 +64,11 @@ class ScheduleAppointmentBuilder {
               color: slot.color,
               isAllDay: false,
               notes: ScheduleAppointmentMeta.typeClass,
-              id: const ScheduleAppointmentMeta(type: ScheduleAppointmentMeta.typeClass),
+              id: ScheduleAppointmentMeta(
+                type: ScheduleAppointmentMeta.typeClass,
+                mode: slot.mode,
+                venue: slot.venue,
+              ),
             ),
           );
         }
@@ -264,6 +268,8 @@ class ScheduleAppointmentBuilder {
             endMinutes: end,
             color: color,
             classType: slot.classType,
+            mode: slot.mode,
+            venue: slot.venue,
           ),
         );
       }
@@ -289,6 +295,8 @@ class ScheduleAppointmentMeta {
   const ScheduleAppointmentMeta({
     required this.type,
     this.events = const [],
+    this.mode,
+    this.venue,
   });
 
   static const String typeClass = 'class';
@@ -297,6 +305,8 @@ class ScheduleAppointmentMeta {
 
   final String type;
   final List<AcademicEvent> events;
+  final String? mode;
+  final String? venue;
 }
 
 enum ScheduleContentFilter {
@@ -313,6 +323,8 @@ class _RenderedClassSlot {
     required this.endMinutes,
     required this.color,
     required this.classType,
+    required this.mode,
+    this.venue,
   });
 
   final String courseCode;
@@ -321,4 +333,6 @@ class _RenderedClassSlot {
   final int endMinutes;
   final Color color;
   final ClassType classType;
+  final String mode;
+  final String? venue;
 }
