@@ -23,8 +23,7 @@ import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/common/session_term_context_label.dart';
 import '../../core/widgets/schedule/schedule_class_appointment_text.dart';
 import '../../core/widgets/schedule/schedule_mode_toggle.dart';
-import '../../core/widgets/schedule/class_details_sheet.dart';
-import '../../core/widgets/schedule/event_details_sheet.dart';
+import '../../core/widgets/schedule/schedule_details_sheet.dart';
 
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
@@ -415,25 +414,22 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       builder: (context) {
         final textTheme = Theme.of(context).textTheme;
         final maxSheetHeight = MediaQuery.sizeOf(context).height * 0.75;
-        final isSingleClassDetails =
-            appointments.length == 1 && isClassDetails;
-        final isSingleEventDetails =
-            appointments.length == 1 && !isClassDetails;
-
-        if (isSingleClassDetails) {
+        final isSingle = appointments.length == 1;
+        if (isSingle) {
           final appointment = appointments.first;
-          return ClassDetailsSheet(
-            sheetTitle: sheetTitle,
-            appointment: appointment,
-          );
-        }
-
-        if (isSingleEventDetails) {
-          final appointment = appointments.first;
-          return EventDetailsSheet(
-            sheetTitle: sheetTitle,
-            appointment: appointment,
-          );
+          if (isClassDetails) {
+            return ScheduleDetailsSheet(
+              sheetTitle: sheetTitle,
+              appointment: appointment,
+              type: ScheduleDetailsType.classDetails,
+            );
+          } else {
+            return ScheduleDetailsSheet(
+              sheetTitle: sheetTitle,
+              appointment: appointment,
+              type: ScheduleDetailsType.eventDetails,
+            );
+          }
         }
 
         return SafeArea(
