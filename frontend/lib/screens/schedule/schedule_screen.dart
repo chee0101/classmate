@@ -36,6 +36,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   bool _showMonthly = false;
   final CalendarController _calendarController = CalendarController();
   DateTime _visibleDate = DateTime.now();
+  Offset? _lastPointerGlobalPosition;
 
   @override
   void initState() {
@@ -186,175 +187,201 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(16),
                                     child: SfCalendar(
-                                      controller: _calendarController,
-                                      view: _showMonthly
-                                          ? CalendarView.month
-                                          : CalendarView.week,
-                                      backgroundColor: Colors.white,
-                                      dataSource: _ScheduleDataSource(appointments),
-                                      firstDayOfWeek: 1,
-                                      headerHeight: 40,
-                                      headerStyle: const CalendarHeaderStyle(
-                                        textStyle: TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                          color: Colors.white,
+                                        controller: _calendarController,
+                                        view: _showMonthly
+                                            ? CalendarView.month
+                                            : CalendarView.week,
+                                        backgroundColor: Colors.white,
+                                        dataSource: _ScheduleDataSource(appointments),
+                                        firstDayOfWeek: 1,
+                                        headerHeight: 40,
+                                        headerStyle: const CalendarHeaderStyle(
+                                          textStyle: TextStyle(
+                                            fontWeight: FontWeight.w700,
+                                            color: Colors.white,
+                                          ),
+                                          backgroundColor: Color(0xFF6E52D9),
                                         ),
-                                        backgroundColor: Color(0xFF6E52D9),
-                                      ),
-                                      showNavigationArrow: true,
-                                      viewHeaderHeight: _showMonthly ? 40 : 58,
-                                      viewHeaderStyle: const ViewHeaderStyle(
-                                        backgroundColor: Color(0xFFE2E4FD),
-                                      ),
-                                      showDatePickerButton: true,
-                                      showCurrentTimeIndicator: true,
-                                      selectionDecoration: const BoxDecoration(
-                                        color: Colors.transparent,
-                                      ),
-                                      onViewChanged: (details) {
-                                        if (details.visibleDates.isEmpty) return;
-                                        final middle =
-                                            details.visibleDates[details.visibleDates.length ~/ 2];
-                                        if (!mounted || _visibleDate == middle) return;
-                                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                                          if (!mounted || _visibleDate == middle) return;
-                                          setState(() {
-                                            _visibleDate = middle;
-                                          });
-                                        });
-                                      },
-                                      monthViewSettings: const MonthViewSettings(
-                                        appointmentDisplayMode:
-                                            MonthAppointmentDisplayMode.indicator,
-                                        showAgenda: true,
-                                        agendaItemHeight: 44,
-                                        agendaStyle: AgendaStyle(
+                                        showNavigationArrow: true,
+                                        viewHeaderHeight: _showMonthly ? 40 : 58,
+                                        viewHeaderStyle: const ViewHeaderStyle(
                                           backgroundColor: Color(0xFFE2E4FD),
                                         ),
-                                      ),
-                                      timeSlotViewSettings: const TimeSlotViewSettings(
-                                        startHour: 0,
-                                        endHour: 24,
-                                        timeIntervalHeight: 64,
-                                      ),
-                                      appointmentBuilder:
-                                          (context, calendarAppointmentDetails) {
-                                      final appointment =
-                                          calendarAppointmentDetails
-                                              .appointments
-                                              .first as Appointment;
-                                      if (_showMonthly) {
-                                        return Container(
-                                          margin: const EdgeInsets.symmetric(
-                                            horizontal: 2,
-                                            vertical: 1,
-                                          ),
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 6,
-                                            vertical: 3,
-                                          ),
-                                          alignment: Alignment.centerLeft,
-                                          decoration: BoxDecoration(
-                                            color: appointment.color
-                                                .withValues(alpha: 0.14),
-                                            borderRadius:
-                                                BorderRadius.circular(6),
-                                            border: Border.all(
-                                              color: appointment.color
-                                                  .withValues(alpha: 0.45),
-                                              width: 0.7,
-                                            ),
-                                          ),
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            mainAxisSize: MainAxisSize.min,
-                                            children: [
-                                              Text(
-                                                appointment.subject,
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: const TextStyle(
-                                                  fontSize: 11,
-                                                  height: 1.0,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: Colors.black87,
-                                                ),
-                                              ),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                _formatMonthlyAgendaSubtitle(
-                                                  appointment,
-                                                ),
-                                                maxLines: 1,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  height: 1.0,
-                                                  color: Colors.grey.shade700,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      }
-                                      final maxAppointmentLines =
-                                          appointment.isAllDay ? 1 : 3;
-                                      return Container(
-                                        padding: const EdgeInsets.all(3),
-                                        alignment: Alignment.center,
-                                        decoration: BoxDecoration(
-                                          color: appointment.color
-                                              .withValues(alpha: 0.26),
-                                          borderRadius:
-                                              BorderRadius.circular(6),
+                                        showDatePickerButton: true,
+                                        showCurrentTimeIndicator: true,
+                                        selectionDecoration: const BoxDecoration(
+                                          color: Colors.transparent,
                                         ),
-                                        child: appointment.notes == ScheduleAppointmentMeta.typeClass
-                                            ? ScheduleClassAppointmentText(
-                                                subject: appointment.subject,
-                                                textColor: appointment.color,
-                                                maxLines: maxAppointmentLines,
-                                              )
-                                            : Text(
-                                                appointment.subject,
-                                                maxLines: maxAppointmentLines,
-                                                textAlign: TextAlign.center,
-                                                overflow: TextOverflow.ellipsis,
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .bodySmall
-                                                    ?.copyWith(
-                                                        color: AppPrimarySwatch.shade900,
-                                                    ),
+                                        onViewChanged: (details) {
+                                          if (details.visibleDates.isEmpty) return;
+                                          final middle = details
+                                              .visibleDates[details.visibleDates.length ~/ 2];
+                                          if (!mounted || _visibleDate == middle) return;
+                                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                                            if (!mounted || _visibleDate == middle) return;
+                                            setState(() {
+                                              _visibleDate = middle;
+                                            });
+                                          });
+                                        },
+                                        monthViewSettings: const MonthViewSettings(
+                                          appointmentDisplayMode:
+                                              MonthAppointmentDisplayMode.indicator,
+                                          showAgenda: true,
+                                          agendaItemHeight: 44,
+                                          agendaStyle: AgendaStyle(
+                                            backgroundColor: Color(0xFFE2E4FD),
+                                          ),
+                                        ),
+                                        timeSlotViewSettings: const TimeSlotViewSettings(
+                                          startHour: 0,
+                                          endHour: 24,
+                                          timeIntervalHeight: 64,
+                                        ),
+                                        appointmentBuilder:
+                                            (context, calendarAppointmentDetails) {
+                                          final appointment =
+                                              calendarAppointmentDetails
+                                                  .appointments
+                                                  .first as Appointment;
+                                          if (_showMonthly) {
+                                            return Listener(
+                                              behavior: HitTestBehavior.translucent,
+                                              onPointerDown: (event) {
+                                                _lastPointerGlobalPosition =
+                                                    event.position;
+                                              },
+                                              child: Container(
+                                              margin: const EdgeInsets.symmetric(
+                                                horizontal: 2,
+                                                vertical: 1,
                                               ),
-                                      );
-                                    },
-                                      onTap: (details) {
-                                         // In monthly view, don't open details when tapping the grid/date cells.
-                                         // Only taps on items that carry appointments (e.g., agenda blocks)
-                                         // should open the bottom sheet.
-                                         if (_showMonthly &&
-                                             details.targetElement ==
-                                                 CalendarElement.calendarCell) {
-                                           return;
-                                         }
-                                        final rawAppointments = details.appointments;
-                                        if (rawAppointments == null ||
-                                            rawAppointments.isEmpty ||
-                                            !mounted) {
-                                          return;
-                                        }
+                                              padding: const EdgeInsets.symmetric(
+                                                horizontal: 6,
+                                                vertical: 3,
+                                              ),
+                                              alignment: Alignment.centerLeft,
+                                              decoration: BoxDecoration(
+                                                color: appointment.color
+                                                    .withValues(alpha: 0.14),
+                                                borderRadius:
+                                                    BorderRadius.circular(6),
+                                                border: Border.all(
+                                                  color: appointment.color
+                                                      .withValues(alpha: 0.45),
+                                                  width: 0.7,
+                                                ),
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  Text(
+                                                    appointment.subject,
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      fontSize: 11,
+                                                      height: 1.0,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: Colors.black87,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    _formatMonthlyAgendaSubtitle(
+                                                      appointment,
+                                                    ),
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      height: 1.0,
+                                                      color: Colors.grey.shade700,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            );
+                                          }
+                                          final maxAppointmentLines =
+                                              appointment.isAllDay ? 1 : 3;
+                                          return Listener(
+                                            behavior: HitTestBehavior.translucent,
+                                            onPointerDown: (event) {
+                                              _lastPointerGlobalPosition =
+                                                  event.position;
+                                            },
+                                            child: Container(
+                                            padding: const EdgeInsets.all(3),
+                                            alignment: Alignment.center,
+                                            decoration: BoxDecoration(
+                                              color: appointment.color
+                                                  .withValues(alpha: 0.26),
+                                              borderRadius:
+                                                  BorderRadius.circular(6),
+                                            ),
+                                            child:
+                                                appointment.notes ==
+                                                        ScheduleAppointmentMeta.typeClass
+                                                    ? ScheduleClassAppointmentText(
+                                                        subject: appointment.subject,
+                                                        textColor: appointment.color,
+                                                        maxLines: maxAppointmentLines,
+                                                      )
+                                                    : Text(
+                                                        appointment.subject,
+                                                        maxLines: maxAppointmentLines,
+                                                        textAlign: TextAlign.center,
+                                                        overflow: TextOverflow.ellipsis,
+                                                        style: Theme.of(context)
+                                                            .textTheme
+                                                            .bodySmall
+                                                            ?.copyWith(
+                                                              color: AppPrimarySwatch.shade900,
+                                                            ),
+                                                      ),
+                                          ),
+                                          );
+                                        },
+                                        onTap: (details) async {
+                                          // In monthly view, don't open details when tapping
+                                          // the grid/date cells. Only event blocks are tappable.
+                                          if (_showMonthly &&
+                                              details.targetElement ==
+                                                  CalendarElement.calendarCell) {
+                                            return;
+                                          }
+                                          final rawAppointments = details.appointments;
+                                          if (rawAppointments == null ||
+                                              rawAppointments.isEmpty ||
+                                              !mounted) {
+                                            return;
+                                          }
 
-                                        final appointments = rawAppointments
-                                            .whereType<Appointment>()
-                                            .toList(growable: false);
-                                        if (appointments.isEmpty) return;
-                                        final detailAppointments =
-                                            _expandAppointmentsForDetails(appointments);
-                                        if (detailAppointments.isEmpty) return;
-                                        _showAppointmentsBottomSheet(detailAppointments);
-                                      },
-                                    ),
+                                          final appointments = rawAppointments
+                                              .whereType<Appointment>()
+                                              .toList(growable: false);
+                                          if (appointments.isEmpty) return;
+
+                                          if (appointments.length == 1 &&
+                                              _isOverflowAppointment(
+                                                appointments.first,
+                                              )) {
+                                            await _showOverflowPicker(
+                                              appointments.first,
+                                            );
+                                            return;
+                                          }
+
+                                          final detailAppointments =
+                                              _expandAppointmentsForDetails(appointments);
+                                          if (detailAppointments.isEmpty) return;
+                                          _showAppointmentsBottomSheet(detailAppointments);
+                                        },
+                                      ),
                                   ),
                                 ),
                               ),
@@ -517,6 +544,113 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           ),
         );
       },
+    );
+  }
+
+  bool _isOverflowAppointment(Appointment appointment) {
+    final meta = appointment.id;
+    if (meta is! ScheduleAppointmentMeta) return false;
+    return meta.type == ScheduleAppointmentMeta.typeEventOverflow ||
+        meta.type == ScheduleAppointmentMeta.typeDenseOverflow;
+  }
+
+  Future<void> _showOverflowPicker(Appointment overflowAppointment) async {
+    final hiddenItems = _expandAppointmentsForDetails([overflowAppointment]);
+    if (hiddenItems.isEmpty || !mounted) return;
+
+    final selected = await showMenu<Appointment>(
+      context: context,
+      position: _buildOverflowMenuPosition(context),
+      elevation: 12,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      constraints: const BoxConstraints(maxWidth: 340, maxHeight: 360),
+      items: hiddenItems.map((item) {
+        return PopupMenuItem<Appointment>(
+          value: item,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 4,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: item.color,
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.subject,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _formatAppointmentRange(item),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Colors.grey.shade700,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      }).toList(growable: false),
+    );
+
+    if (selected == null || !mounted) return;
+    _showAppointmentsBottomSheet([selected]);
+  }
+
+  RelativeRect _buildOverflowMenuPosition(BuildContext context) {
+    final overlay = Overlay.of(context).context.findRenderObject();
+    final screenSize = MediaQuery.sizeOf(context);
+    final fallbackPoint = Offset(screenSize.width / 2, screenSize.height * 0.3);
+    final tapPosition = _lastPointerGlobalPosition ?? fallbackPoint;
+    const popupMaxWidth = 340.0;
+    const popupMaxHeight = 360.0;
+    const edgePadding = 12.0;
+    if (overlay is! RenderBox) {
+      final dx = tapPosition.dx.clamp(
+        edgePadding,
+        screenSize.width - popupMaxWidth - edgePadding,
+      );
+      final dy = tapPosition.dy.clamp(
+        edgePadding,
+        screenSize.height - popupMaxHeight - edgePadding,
+      );
+      return RelativeRect.fromLTRB(
+        dx,
+        dy,
+        screenSize.width - dx,
+        screenSize.height - dy,
+      );
+    }
+    final localInOverlay = overlay.globalToLocal(tapPosition);
+    final dx = localInOverlay.dx.clamp(
+      edgePadding,
+      overlay.size.width - popupMaxWidth - edgePadding,
+    );
+    final dy = localInOverlay.dy.clamp(
+      edgePadding,
+      overlay.size.height - popupMaxHeight - edgePadding,
+    );
+    return RelativeRect.fromLTRB(
+      dx,
+      dy,
+      overlay.size.width - dx,
+      overlay.size.height - dy,
     );
   }
 
