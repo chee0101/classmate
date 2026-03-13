@@ -4,8 +4,6 @@ import 'package:syncfusion_flutter_calendar/calendar.dart';
 import '../../core/builders/schedule_appointment_builder.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/months.dart';
-import '../../core/constants/weekdays.dart';
 import '../../core/models/academic_event.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/models/course.dart';
@@ -15,13 +13,14 @@ import '../../core/services/academic_session_store.dart';
 import '../../core/services/class_slot_store.dart';
 import '../../core/services/course_store.dart';
 import '../../core/services/session_term_selection_store.dart';
-import '../../core/utils/date_time_format.dart';
+import '../../core/utils/schedule_appointment_details.dart';
 import '../../core/utils/session_term_resolver.dart';
 import '../../core/models/session_term_ref.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/common/session_term_context_label.dart';
 import '../../core/widgets/schedule/schedule_class_appointment_text.dart';
+import '../../core/widgets/schedule/schedule_overflow_popup_menu.dart';
 import '../../core/widgets/schedule/schedule_mode_toggle.dart';
 import '../../core/widgets/schedule/schedule_details_sheet.dart';
 
@@ -290,7 +289,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                                   ),
                                                   const SizedBox(height: 2),
                                                   Text(
-                                                    _formatMonthlyAgendaSubtitle(
+                                                    formatMonthlyAgendaSubtitle(
                                                       appointment,
                                                     ),
                                                     maxLines: 1,
@@ -367,7 +366,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                           if (appointments.isEmpty) return;
 
                                           if (appointments.length == 1 &&
-                                              _isOverflowAppointment(
+                                              isOverflowAppointment(
                                                 appointments.first,
                                               )) {
                                             await _showOverflowPicker(
@@ -377,7 +376,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                           }
 
                                           final detailAppointments =
-                                              _expandAppointmentsForDetails(appointments);
+                                              expandAppointmentsForDetails(appointments);
                                           if (detailAppointments.isEmpty) return;
                                           _showAppointmentsBottomSheet(detailAppointments);
                                         },
@@ -398,30 +397,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         },
       ),
     );
-  }
-
-  String _formatMonthlyAgendaSubtitle(Appointment appointment) {
-    final meta = appointment.id;
-    if (meta is ScheduleAppointmentMeta &&
-        meta.type == ScheduleAppointmentMeta.typeEvent &&
-        meta.events.isNotEmpty) {
-      final event = meta.events.first;
-      if (event.allDay) {
-        if (isSameDate(event.startDateTime, event.endDateTime)) {
-          return 'All day';
-        }
-        return formatAllDayRange(event.startDateTime, event.endDateTime);
-      }
-      if (isSameDate(event.startDateTime, event.endDateTime)) {
-        return '${formatTime12h(event.startDateTime)} - ${formatTime12h(event.endDateTime)}';
-      }
-      return formatDateTimeRange(event.startDateTime, event.endDateTime);
-    }
-    if (!appointment.isAllDay &&
-        isSameDate(appointment.startTime, appointment.endTime)) {
-      return '${formatTime12h(appointment.startTime)} - ${formatTime12h(appointment.endTime)}';
-    }
-    return _formatAppointmentRange(appointment);
   }
 
   void _showAppointmentsBottomSheet(List<Appointment> appointments) {
@@ -515,7 +490,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
-                                      _formatAppointmentRange(appointment),
+                                      formatAppointmentRange(appointment),
                                       style: textTheme.bodySmall?.copyWith(
                                         color: Colors.grey.shade700,
                                       ),
@@ -547,237 +522,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
-  bool _isOverflowAppointment(Appointment appointment) {
-    final meta = appointment.id;
-    if (meta is! ScheduleAppointmentMeta) return false;
-    return meta.type == ScheduleAppointmentMeta.typeEventOverflow ||
-        meta.type == ScheduleAppointmentMeta.typeDenseOverflow;
-  }
-
   Future<void> _showOverflowPicker(Appointment overflowAppointment) async {
-    final hiddenItems = _expandAppointmentsForDetails([overflowAppointment]);
+    final hiddenItems = expandAppointmentsForDetails([overflowAppointment]);
     if (hiddenItems.isEmpty || !mounted) return;
 
-    final selected = await showMenu<Appointment>(
+    final selected = await showScheduleOverflowPopupMenu(
       context: context,
-      position: _buildOverflowMenuPosition(context),
-      elevation: 12,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      constraints: const BoxConstraints(maxWidth: 340, maxHeight: 360),
-      items: hiddenItems.map((item) {
-        return PopupMenuItem<Appointment>(
-          value: item,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                width: 4,
-                height: 38,
-                decoration: BoxDecoration(
-                  color: item.color,
-                  borderRadius: BorderRadius.circular(99),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      item.subject,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      _formatAppointmentRange(item),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.grey.shade700,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      }).toList(growable: false),
+      tapPosition: _lastPointerGlobalPosition,
+      hiddenItems: hiddenItems,
+      formatAppointmentRange: formatOverflowPopupSubtitle,
     );
 
     if (selected == null || !mounted) return;
     _showAppointmentsBottomSheet([selected]);
-  }
-
-  RelativeRect _buildOverflowMenuPosition(BuildContext context) {
-    final overlay = Overlay.of(context).context.findRenderObject();
-    final screenSize = MediaQuery.sizeOf(context);
-    final fallbackPoint = Offset(screenSize.width / 2, screenSize.height * 0.3);
-    final tapPosition = _lastPointerGlobalPosition ?? fallbackPoint;
-    const popupMaxWidth = 340.0;
-    const popupMaxHeight = 360.0;
-    const edgePadding = 12.0;
-    if (overlay is! RenderBox) {
-      final dx = tapPosition.dx.clamp(
-        edgePadding,
-        screenSize.width - popupMaxWidth - edgePadding,
-      );
-      final dy = tapPosition.dy.clamp(
-        edgePadding,
-        screenSize.height - popupMaxHeight - edgePadding,
-      );
-      return RelativeRect.fromLTRB(
-        dx,
-        dy,
-        screenSize.width - dx,
-        screenSize.height - dy,
-      );
-    }
-    final localInOverlay = overlay.globalToLocal(tapPosition);
-    final dx = localInOverlay.dx.clamp(
-      edgePadding,
-      overlay.size.width - popupMaxWidth - edgePadding,
-    );
-    final dy = localInOverlay.dy.clamp(
-      edgePadding,
-      overlay.size.height - popupMaxHeight - edgePadding,
-    );
-    return RelativeRect.fromLTRB(
-      dx,
-      dy,
-      overlay.size.width - dx,
-      overlay.size.height - dy,
-    );
-  }
-
-  List<Appointment> _expandAppointmentsForDetails(List<Appointment> appointments) {
-    final output = <Appointment>[];
-    for (final appointment in appointments) {
-      final meta = appointment.id;
-      if (meta is! ScheduleAppointmentMeta) {
-        output.add(appointment);
-        continue;
-      }
-
-      if (meta.type == ScheduleAppointmentMeta.typeEventOverflow) {
-        for (final event in meta.events) {
-          output.add(
-            Appointment(
-              startTime: event.startDateTime,
-              endTime: event.endDateTime,
-              subject: event.title,
-              color: AppPrimarySwatch.shade700,
-              isAllDay: event.allDay || !isSameDate(event.startDateTime, event.endDateTime),
-              notes: ScheduleAppointmentMeta.typeEvent,
-              id: ScheduleAppointmentMeta(
-                type: ScheduleAppointmentMeta.typeEvent,
-                events: [event],
-              ),
-            ),
-          );
-        }
-        continue;
-      }
-
-      if (meta.type == ScheduleAppointmentMeta.typeDenseOverflow &&
-          meta.overflowAppointments.isNotEmpty) {
-        for (final hidden in meta.overflowAppointments) {
-          final hiddenMeta = hidden.id;
-          if (hiddenMeta is ScheduleAppointmentMeta &&
-              hiddenMeta.type == ScheduleAppointmentMeta.typeEventOverflow) {
-            for (final event in hiddenMeta.events) {
-              output.add(
-                Appointment(
-                  startTime: event.startDateTime,
-                  endTime: event.endDateTime,
-                  subject: event.title,
-                  color: AppPrimarySwatch.shade700,
-                  isAllDay:
-                      event.allDay || !isSameDate(event.startDateTime, event.endDateTime),
-                  notes: ScheduleAppointmentMeta.typeEvent,
-                  id: ScheduleAppointmentMeta(
-                    type: ScheduleAppointmentMeta.typeEvent,
-                    events: [event],
-                  ),
-                ),
-              );
-            }
-            continue;
-          }
-          output.add(hidden);
-        }
-        continue;
-      }
-
-      if (meta.type == ScheduleAppointmentMeta.typeEvent && meta.events.isNotEmpty) {
-        final event = meta.events.first;
-        output.add(
-          Appointment(
-            startTime: event.startDateTime,
-            endTime: event.endDateTime,
-            subject: event.title,
-            color: appointment.color,
-            isAllDay: event.allDay || !isSameDate(event.startDateTime, event.endDateTime),
-            notes: ScheduleAppointmentMeta.typeEvent,
-            id: ScheduleAppointmentMeta(
-              type: ScheduleAppointmentMeta.typeEvent,
-              events: [event],
-            ),
-          ),
-        );
-        continue;
-      }
-
-      output.add(appointment);
-    }
-    return output;
-  }
-
-  String _formatAppointmentRange(Appointment appointment) {
-    final meta = appointment.id;
-    if (appointment.notes == ScheduleAppointmentMeta.typeClass) {
-      final start = appointment.startTime;
-      final end = appointment.endTime;
-      final dayLabel = weekdayNamesMondayFirst[start.weekday - 1];
-      return '$dayLabel ${formatTime12h(start)} - ${formatTime12h(end)}';
-    }
-    if (meta is ScheduleAppointmentMeta &&
-        meta.type == ScheduleAppointmentMeta.typeEvent &&
-        meta.events.isNotEmpty) {
-      final event = meta.events.first;
-      final start = event.startDateTime;
-      final end = event.endDateTime;
-      if (event.allDay) {
-        return formatAllDayRange(start, end);
-      }
-      return formatDateTimeRange(start, end);
-    }
-
-    if (appointment.isAllDay) {
-      final start = appointment.startTime;
-      final end = appointment.endTime;
-      final sameDay =
-          start.year == end.year &&
-          start.month == end.month &&
-          start.day == end.day;
-      if (sameDay) {
-        return '${start.day} ${monthShortLabel(start.month)} ${start.year} (All day)';
-      }
-      return '${start.day} ${monthShortLabel(start.month)} - ${end.day} ${monthShortLabel(end.month)} (All day)';
-    }
-
-    final start = appointment.startTime;
-    final end = appointment.endTime;
-    final sameDay =
-        start.year == end.year && start.month == end.month && start.day == end.day;
-    if (sameDay) {
-      return '${start.day} ${monthShortLabel(start.month)} ${formatTime12h(start)} - ${formatTime12h(end)}';
-    }
-    return '${start.day} ${monthShortLabel(start.month)} ${formatTime12h(start)} - ${end.day} ${monthShortLabel(end.month)} ${formatTime12h(end)}';
   }
 }
 

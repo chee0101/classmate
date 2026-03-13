@@ -85,7 +85,7 @@ class ClassForm extends StatelessWidget {
                           ),
                           TextSpan(
                             text:
-                                '${slot.startTime} - ${slot.endTime} · ${slot.classType.label}\n'
+                                '${slot.startTime} – ${slot.endTime} · ${slot.classType.label}\n'
                                 '${slot.mode == 'Online' ? 'Online' : 'Venue: ${slot.venue ?? '-'}'}',
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                   color: AppPrimarySwatch.shade900,

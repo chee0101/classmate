@@ -33,12 +33,15 @@ class UpcomingEventsCard extends StatelessWidget {
 
     if (event.allDay) {
       if (sameDay) return '${formatRelativeDueDate(startDay)} (All day)';
-      return '${formatDateDdMmYyyy(startDay)} - ${formatDateDdMmYyyy(endDay)}';
+      return formatDateRangeDdMmYyyy(startDay, endDay);
     }
     if (sameDay) {
-      return '${formatRelativeDueDate(startDay)}, ${formatTime12h(event.startDateTime)} - ${formatTime12h(event.endDateTime)}';
+      return '${formatRelativeDueDate(startDay)}, ${formatTimeRange12h(event.startDateTime, event.endDateTime)}';
     }
-    return '${formatDateDdMmYyyy(startDay)} ${formatTime12h(event.startDateTime)} - ${formatDateDdMmYyyy(endDay)} ${formatTime12h(event.endDateTime)}';
+    return formatDateTimeRangeDdMmYyyy(
+      event.startDateTime,
+      event.endDateTime,
+    );
   }
 
   @override

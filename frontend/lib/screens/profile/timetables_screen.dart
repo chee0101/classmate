@@ -467,9 +467,9 @@ class _TimetableCard extends StatelessWidget {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   SizedBox(
-                                    width: 160,
+                                    width: 175,
                                     child: Text(
-                                      '${slot.startTime} - ${slot.endTime}',
+                                      '${slot.startTime} – ${slot.endTime}',
                                       style: Theme.of(context)
                                           .textTheme
                                           .bodyLarge

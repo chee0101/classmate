@@ -3,9 +3,9 @@ import 'package:syncfusion_flutter_calendar/calendar.dart';
 
 import '../../builders/schedule_appointment_builder.dart';
 import '../../constants/app_spacing.dart';
-import '../../constants/weekdays.dart';
 import '../../models/academic_event.dart';
 import '../../utils/date_time_format.dart';
+import '../../utils/schedule_appointment_details.dart';
 
 enum ScheduleDetailsType { classDetails, eventDetails }
 
@@ -90,9 +90,12 @@ class ScheduleDetailsSheet extends StatelessWidget {
 
     final start = appointment.startTime;
     final end = appointment.endTime;
-    final dayLabel = weekdayNamesMondayFirst[start.weekday - 1];
-    final timeLabel =
-        '$dayLabel • ${formatTime12h(start)} – ${formatTime12h(end)}';
+    final timeLabel = formatWeekdayTimeRange(
+      start,
+      end,
+      dayTimeSeparator: ' • ',
+      timeRangeSeparator: ' – ',
+    );
 
     String? mode;
     String? venue;
@@ -159,7 +162,7 @@ class ScheduleDetailsSheet extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final event = _extractEvent();
     final title = event?.title.trim() ?? appointment.subject.trim();
-    final subtitle = _formatEventRange(event);
+    final subtitle = formatMonthlyAgendaSubtitle(appointment);
     final location = event?.location?.trim();
     final hasLocation = location != null && location.isNotEmpty;
 
@@ -228,27 +231,6 @@ class ScheduleDetailsSheet extends StatelessWidget {
       return meta.events.first;
     }
     return null;
-  }
-
-  String _formatEventRange(AcademicEvent? event) {
-    if (event != null) {
-      if (event.allDay) {
-        if (isSameDate(event.startDateTime, event.endDateTime)) {
-          return 'All day';
-        }
-        return formatAllDayRange(event.startDateTime, event.endDateTime);
-      }
-      if (isSameDate(event.startDateTime, event.endDateTime)) {
-        return '${formatTime12h(event.startDateTime)} - ${formatTime12h(event.endDateTime)}';
-      }
-      return formatDateTimeRange(event.startDateTime, event.endDateTime);
-    }
-
-    if (!appointment.isAllDay &&
-        isSameDate(appointment.startTime, appointment.endTime)) {
-      return '${formatTime12h(appointment.startTime)} - ${formatTime12h(appointment.endTime)}';
-    }
-    return formatDateTimeRange(appointment.startTime, appointment.endTime);
   }
 }
 
