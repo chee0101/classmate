@@ -671,8 +671,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             context: context,
             builder: (dialogContext) {
               return AlertDialog(
-                title: const Text('Delete Event?'),
-                content: const Text('This action cannot be undone.'),
+                backgroundColor: Colors.white,
+                title: const Text('Delete Event'),
+                content: const Text('Are you sure you want to delete this event?'),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -680,7 +681,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   ),
                   TextButton(
                     onPressed: () => Navigator.of(dialogContext).pop(true),
-                    child: const Text('Delete'),
+                    child: const Text(
+                      'Delete',
+                      style: TextStyle(color: Colors.red),
+                    ),
                   ),
                 ],
               );

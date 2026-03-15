@@ -63,11 +63,15 @@ class ScheduleDetailsSheet extends StatelessWidget {
               Center(
                 child: TextButton.icon(
                   onPressed: onCancelPressed,
-                  icon: const Icon(
-                    Icons.cancel_outlined,
+                  icon: Icon(
+                    type == ScheduleDetailsType.classDetails
+                        ? Icons.cancel_outlined
+                        : Icons.delete_outlined,
                     color: Colors.red,
                   ),
-                  label: const Text('Cancel'),
+                  label: Text(
+                    type == ScheduleDetailsType.classDetails ? 'Cancel' : 'Delete',
+                  ),
                   style: TextButton.styleFrom(
                     foregroundColor: Colors.red,
                   ),
