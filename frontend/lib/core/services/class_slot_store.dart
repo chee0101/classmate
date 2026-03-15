@@ -75,7 +75,7 @@ List<TimetableEntry> _mapSlotDocsToTimetableEntries(
             courseCode: courseCode,
           );
 
-    final slot = _slotFromMap(data);
+    final slot = _slotFromMap(data, fallbackClassSlotId: doc.id);
     if (slot == null) continue;
 
     grouped.putIfAbsent(
@@ -112,7 +112,10 @@ List<TimetableEntry> _mapSlotDocsToTimetableEntries(
   return entries;
 }
 
-TimetableSlot? _slotFromMap(Map<String, dynamic> data) {
+TimetableSlot? _slotFromMap(
+  Map<String, dynamic> data, {
+  required String fallbackClassSlotId,
+}) {
   final day = (data['day'] as String?)?.trim();
   final startMinutes = (data['startMinutes'] as num?)?.toInt();
   final endMinutes = (data['endMinutes'] as num?)?.toInt();
@@ -130,6 +133,9 @@ TimetableSlot? _slotFromMap(Map<String, dynamic> data) {
   if (endMinutes <= startMinutes) return null;
 
   return TimetableSlot(
+    classSlotId: ((data['classSlotId'] as String?)?.trim().isNotEmpty ?? false)
+        ? (data['classSlotId'] as String).trim()
+        : fallbackClassSlotId,
     day: day,
     startTime: _formatMinutes12h(startMinutes),
     endTime: _formatMinutes12h(endMinutes),
@@ -273,6 +279,9 @@ Future<void> upsertTimetableByCourse({
         courseId: courseId,
         courseCode: normalizedCourseCode,
         scopedKey: scopedKey,
+        classSlotId: incomingSlot.classSlotId.isEmpty
+            ? (existingSlot.payload?.classSlotId ?? existingSlot.doc.id)
+            : incomingSlot.classSlotId,
         slot: incomingSlot,
         includeCreatedAt: false,
       ),
@@ -292,6 +301,9 @@ Future<void> upsertTimetableByCourse({
         courseId: courseId,
         courseCode: normalizedCourseCode,
         scopedKey: scopedKey,
+        classSlotId: remainingIncoming[i].classSlotId.isEmpty
+            ? ref.id
+            : remainingIncoming[i].classSlotId,
         slot: remainingIncoming[i],
         includeCreatedAt: true,
       ),
@@ -371,6 +383,7 @@ Map<String, dynamic> _slotWriteData({
   required String courseId,
   required String courseCode,
   required String scopedKey,
+  required String classSlotId,
   required _SlotPayload slot,
   required bool includeCreatedAt,
 }) {
@@ -380,6 +393,7 @@ Map<String, dynamic> _slotWriteData({
     'courseId': courseId,
     'courseCode': courseCode,
     'timetableScopedKey': scopedKey,
+    'classSlotId': classSlotId.trim(),
     'day': slot.day,
     'startMinutes': slot.startMinutes,
     'endMinutes': slot.endMinutes,
@@ -410,6 +424,170 @@ Future<void> deleteTimetableEntry(String id) async {
   await batch.commit();
 }
 
+int? parseTimeLabelToMinutes(String value) => _parseMinutes12h(value);
+
+Future<void> updateClassSlotSeries({
+  required String sessionId,
+  required String termId,
+  required String courseCode,
+  required String sourceDay,
+  required int sourceStartMinutes,
+  required int sourceEndMinutes,
+  required TimetableSlot replacement,
+}) async {
+  final normalizedCourseCode = courseCode.trim().toUpperCase();
+  TimetableEntry? entry;
+  for (final item in timetablesNotifier.value) {
+    if (item.sessionId == sessionId &&
+        item.termId == termId &&
+        item.courseCode.toUpperCase() == normalizedCourseCode) {
+      entry = item;
+      break;
+    }
+  }
+  if (entry == null) return;
+
+  var replaced = false;
+  final updatedSlots = entry.slots.map((slot) {
+    final start = _parseMinutes12h(slot.startTime);
+    final end = _parseMinutes12h(slot.endTime);
+    if (start == null || end == null) return slot;
+    if (slot.day.trim().toLowerCase() == sourceDay.trim().toLowerCase() &&
+        start == sourceStartMinutes &&
+        end == sourceEndMinutes) {
+      replaced = true;
+      return replacement;
+    }
+    return slot;
+  }).toList(growable: false);
+
+  if (!replaced) return;
+  await upsertTimetableByCourse(
+    sessionId: sessionId,
+    termId: termId,
+    courseCode: normalizedCourseCode,
+    slots: updatedSlots,
+  );
+}
+
+Future<void> updateClassSlotSeriesById({
+  required String sessionId,
+  required String termId,
+  required String courseCode,
+  required String classSlotId,
+  required TimetableSlot replacement,
+}) async {
+  final normalizedCourseCode = courseCode.trim().toUpperCase();
+  TimetableEntry? entry;
+  for (final item in timetablesNotifier.value) {
+    if (item.sessionId == sessionId &&
+        item.termId == termId &&
+        item.courseCode.toUpperCase() == normalizedCourseCode) {
+      entry = item;
+      break;
+    }
+  }
+  if (entry == null) return;
+
+  var replaced = false;
+  final updatedSlots = entry.slots.map((slot) {
+    if (slot.classSlotId == classSlotId) {
+      replaced = true;
+      return replacement.copyWith(classSlotId: slot.classSlotId);
+    }
+    return slot;
+  }).toList(growable: false);
+
+  if (!replaced) return;
+  await upsertTimetableByCourse(
+    sessionId: sessionId,
+    termId: termId,
+    courseCode: normalizedCourseCode,
+    slots: updatedSlots,
+  );
+}
+
+Future<void> deleteClassSlotSeries({
+  required String sessionId,
+  required String termId,
+  required String courseCode,
+  required String sourceDay,
+  required int sourceStartMinutes,
+  required int sourceEndMinutes,
+}) async {
+  final normalizedCourseCode = courseCode.trim().toUpperCase();
+  TimetableEntry? entry;
+  for (final item in timetablesNotifier.value) {
+    if (item.sessionId == sessionId &&
+        item.termId == termId &&
+        item.courseCode.toUpperCase() == normalizedCourseCode) {
+      entry = item;
+      break;
+    }
+  }
+  if (entry == null) return;
+
+  final updatedSlots = <TimetableSlot>[];
+  var removed = false;
+  for (final slot in entry.slots) {
+    final start = _parseMinutes12h(slot.startTime);
+    final end = _parseMinutes12h(slot.endTime);
+    final isTarget = slot.day.trim().toLowerCase() == sourceDay.trim().toLowerCase() &&
+        start == sourceStartMinutes &&
+        end == sourceEndMinutes;
+    if (isTarget) {
+      removed = true;
+      continue;
+    }
+    updatedSlots.add(slot);
+  }
+
+  if (!removed) return;
+  await upsertTimetableByCourse(
+    sessionId: sessionId,
+    termId: termId,
+    courseCode: normalizedCourseCode,
+    slots: updatedSlots,
+  );
+}
+
+Future<void> deleteClassSlotSeriesById({
+  required String sessionId,
+  required String termId,
+  required String courseCode,
+  required String classSlotId,
+}) async {
+  final normalizedCourseCode = courseCode.trim().toUpperCase();
+  TimetableEntry? entry;
+  for (final item in timetablesNotifier.value) {
+    if (item.sessionId == sessionId &&
+        item.termId == termId &&
+        item.courseCode.toUpperCase() == normalizedCourseCode) {
+      entry = item;
+      break;
+    }
+  }
+  if (entry == null) return;
+
+  final updatedSlots = <TimetableSlot>[];
+  var removed = false;
+  for (final slot in entry.slots) {
+    if (slot.classSlotId == classSlotId) {
+      removed = true;
+      continue;
+    }
+    updatedSlots.add(slot);
+  }
+
+  if (!removed) return;
+  await upsertTimetableByCourse(
+    sessionId: sessionId,
+    termId: termId,
+    courseCode: normalizedCourseCode,
+    slots: updatedSlots,
+  );
+}
+
 class _EntryBuilder {
   _EntryBuilder({
     required this.id,
@@ -438,6 +616,7 @@ class _EntryBuilder {
 
 class _SlotPayload {
   const _SlotPayload({
+    required this.classSlotId,
     required this.day,
     required this.startMinutes,
     required this.endMinutes,
@@ -446,6 +625,7 @@ class _SlotPayload {
     required this.venue,
   });
 
+  final String classSlotId;
   final String day;
   final int startMinutes;
   final int endMinutes;
@@ -466,6 +646,7 @@ class _SlotPayload {
       return null;
     }
     return _SlotPayload(
+      classSlotId: slot.classSlotId.trim(),
       day: slot.day.trim(),
       startMinutes: startMinutes,
       endMinutes: endMinutes,
@@ -475,7 +656,10 @@ class _SlotPayload {
     );
   }
 
-  static _SlotPayload? fromFirestore(Map<String, dynamic> data) {
+  static _SlotPayload? fromFirestore(
+    Map<String, dynamic> data, {
+    required String fallbackClassSlotId,
+  }) {
     final day = (data['day'] as String?)?.trim();
     final startMinutes = (data['startMinutes'] as num?)?.toInt();
     final endMinutes = (data['endMinutes'] as num?)?.toInt();
@@ -491,6 +675,9 @@ class _SlotPayload {
       return null;
     }
     return _SlotPayload(
+      classSlotId: ((data['classSlotId'] as String?)?.trim().isNotEmpty ?? false)
+          ? (data['classSlotId'] as String).trim()
+          : fallbackClassSlotId,
       day: day,
       startMinutes: startMinutes,
       endMinutes: endMinutes,
@@ -513,7 +700,10 @@ class _PersistedSlot {
   static _PersistedSlot fromDoc(QueryDocumentSnapshot<Map<String, dynamic>> doc) {
     return _PersistedSlot(
       doc: doc,
-      payload: _SlotPayload.fromFirestore(doc.data()),
+      payload: _SlotPayload.fromFirestore(
+        doc.data(),
+        fallbackClassSlotId: doc.id,
+      ),
     );
   }
 }

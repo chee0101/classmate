@@ -308,6 +308,7 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
     final slots = result.slots
         .map(
           (s) => TimetableSlot(
+            classSlotId: (s.classSlotId ?? '').trim(),
             day: s.day,
             startTime: s.startTime,
             endTime: s.endTime,
@@ -553,6 +554,7 @@ class _TimetableEditorSheetState extends State<_TimetableEditorSheet> {
         entry.courseCode: entry.slots
             .map(
               (s) => ClassSlotDraft(
+                classSlotId: s.classSlotId,
                 day: s.day,
                 startTime: s.startTime,
                 endTime: s.endTime,
@@ -570,6 +572,7 @@ class _TimetableEditorSheetState extends State<_TimetableEditorSheet> {
       _slotsByCourse[current] ??= widget.initial!.slots
           .map(
             (s) => ClassSlotDraft(
+              classSlotId: s.classSlotId,
               day: s.day,
               startTime: s.startTime,
               endTime: s.endTime,
@@ -587,6 +590,7 @@ class _TimetableEditorSheetState extends State<_TimetableEditorSheet> {
     return slots
         .map(
           (s) => ClassSlotDraft(
+            classSlotId: s.classSlotId,
             day: s.day,
             startTime: s.startTime,
             endTime: s.endTime,

@@ -8,7 +8,9 @@ import '../common/form_fields.dart';
 
 class ClassSlotDraft {
   const ClassSlotDraft({
+    this.classSlotId,
     required this.day,
+    this.occurrenceDate,
     required this.startTime,
     required this.endTime,
     required this.mode,
@@ -16,7 +18,9 @@ class ClassSlotDraft {
     this.venue,
   });
 
+  final String? classSlotId;
   final String day;
+  final DateTime? occurrenceDate;
   final String startTime;
   final String endTime;
   final String mode;
@@ -65,6 +69,7 @@ class ClassSlotEditorForm extends StatefulWidget {
     super.key,
     this.initial,
     required this.onSubmitted,
+    this.dayAsDate = false,
     this.showTitle = false,
     this.addTitleText = 'Add Slot',
     this.editTitleText = 'Edit Slot',
@@ -74,6 +79,7 @@ class ClassSlotEditorForm extends StatefulWidget {
 
   final ClassSlotDraft? initial;
   final ValueChanged<ClassSlotDraft> onSubmitted;
+  final bool dayAsDate;
   final bool showTitle;
   final String addTitleText;
   final String editTitleText;
@@ -86,6 +92,7 @@ class ClassSlotEditorForm extends StatefulWidget {
 
 class _ClassSlotEditorFormState extends State<ClassSlotEditorForm> {
   String? _selectedDay;
+  DateTime? _selectedDate;
   TimeOfDay? _start;
   TimeOfDay? _end;
   String _mode = 'Online';
@@ -98,6 +105,7 @@ class _ClassSlotEditorFormState extends State<ClassSlotEditorForm> {
     final initial = widget.initial;
     if (initial != null) {
       _selectedDay = initial.day;
+      _selectedDate = initial.occurrenceDate;
       _start = _parseTimeOfDay(initial.startTime);
       _end = _parseTimeOfDay(initial.endTime);
       _mode = initial.mode;
@@ -172,7 +180,9 @@ class _ClassSlotEditorFormState extends State<ClassSlotEditorForm> {
       timeOrderValid = endMinutes > startMinutes;
     }
 
-    final canAdd = _selectedDay != null &&
+    final dayOrDateValid =
+        widget.dayAsDate ? _selectedDate != null : _selectedDay != null;
+    final canAdd = dayOrDateValid &&
         _start != null &&
         _end != null &&
         timeOrderValid &&
@@ -203,20 +213,41 @@ class _ClassSlotEditorFormState extends State<ClassSlotEditorForm> {
             ),
             const SizedBox(height: AppSpacing.md),
           ],
-          DropdownField<String>(
-            label: 'Day',
-            value: _selectedDay,
-            hintText: 'Select day',
-            items: days
-                .map(
-                  (day) => DropdownMenuEntry<String>(
-                    value: day,
-                    label: day,
-                  ),
-                )
-                .toList(),
-            onChanged: (value) => setState(() => _selectedDay = value),
-          ),
+          if (widget.dayAsDate) ...[
+            TapField(
+              label: 'Date',
+              value: _selectedDate == null
+                  ? 'Select date'
+                  : formatDateDdMmYyyy(_selectedDate!),
+              hintText: 'Select date',
+              onTap: () async {
+                final now = DateTime.now();
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _selectedDate ?? now,
+                  firstDate: DateTime(now.year - 5),
+                  lastDate: DateTime(now.year + 10),
+                );
+                if (picked == null) return;
+                setState(() => _selectedDate = picked);
+              },
+            ),
+          ] else ...[
+            DropdownField<String>(
+              label: 'Day',
+              value: _selectedDay,
+              hintText: 'Select day',
+              items: days
+                  .map(
+                    (day) => DropdownMenuEntry<String>(
+                      value: day,
+                      label: day,
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) => setState(() => _selectedDay = value),
+            ),
+          ],
           const SizedBox(height: AppSpacing.md),
           Row(
             children: [
@@ -317,7 +348,9 @@ class _ClassSlotEditorFormState extends State<ClassSlotEditorForm> {
                         ? () {
                             widget.onSubmitted(
                               ClassSlotDraft(
-                                day: _selectedDay!,
+                                classSlotId: widget.initial?.classSlotId,
+                                day: _selectedDay ?? widget.initial?.day ?? days.first,
+                                occurrenceDate: widget.dayAsDate ? _selectedDate : null,
                                 startTime: timeLabel(_start),
                                 endTime: timeLabel(_end),
                                 mode: _mode,
@@ -336,7 +369,9 @@ class _ClassSlotEditorFormState extends State<ClassSlotEditorForm> {
                         ? () {
                             widget.onSubmitted(
                               ClassSlotDraft(
-                                day: _selectedDay!,
+                                classSlotId: widget.initial?.classSlotId,
+                                day: _selectedDay ?? widget.initial?.day ?? days.first,
+                                occurrenceDate: widget.dayAsDate ? _selectedDate : null,
                                 startTime: timeLabel(_start),
                                 endTime: timeLabel(_end),
                                 mode: _mode,

@@ -4,6 +4,7 @@ import 'package:syncfusion_flutter_calendar/calendar.dart';
 import '../constants/app_colors.dart';
 import '../constants/weekdays.dart';
 import '../models/academic_event.dart';
+import '../models/class_slot_override.dart';
 import '../models/class_type.dart';
 import '../models/timetable_entry.dart';
 import '../utils/date_time_format.dart';
@@ -23,6 +24,7 @@ class ScheduleAppointmentBuilder {
     required List<TimetableEntry> entries,
     required Map<String, Color> courseColorByCode,
     required List<AcademicEvent> events,
+    List<ClassSlotOverride> classOverrides = const [],
     required TermWindow term,
     required bool forMonthlyAgenda,
     required ScheduleContentFilter contentFilter,
@@ -36,38 +38,89 @@ class ScheduleAppointmentBuilder {
 
     // Expand recurring class slots into concrete dates in the selected term.
     if (includeClasses) {
+      final overrideById = <String, ClassSlotOverride>{
+        for (final item in classOverrides) item.id: item,
+      };
+      final overrideByOccurrence = <String, ClassSlotOverride>{
+        for (final item in classOverrides) item.occurrenceKey: item,
+      };
       for (final slot in classSlots) {
         for (var date = DateTime(term.start.year, term.start.month, term.start.day);
             !date.isAfter(term.end);
             date = date.add(const Duration(days: 1))) {
           if ((date.weekday - 1) != slot.dayIndex) continue;
+          final sourceDay = weekdayNamesMondayFirst[slot.dayIndex];
+          final occurrenceKey = ClassSlotOverride.buildClassSlotOccurrenceKey(
+            classSlotId: slot.classSlotId,
+            occurrenceDate: date,
+          );
+          final overrideId = ClassSlotOverride.buildClassSlotOverrideId(
+            classSlotId: slot.classSlotId,
+            occurrenceDate: date,
+          );
+          final override =
+              overrideById[overrideId] ??
+              overrideByOccurrence[occurrenceKey];
+          if (override?.action == ClassSlotOverrideAction.cancel) {
+            continue;
+          }
+          final overrideDate = override?.overrideDate;
+          final renderDate = overrideDate == null
+              ? date
+              : DateTime(overrideDate.year, overrideDate.month, overrideDate.day);
+          if (renderDate.isBefore(DateTime(term.start.year, term.start.month, term.start.day)) ||
+              renderDate.isAfter(DateTime(term.end.year, term.end.month, term.end.day))) {
+            continue;
+          }
+          final effectiveStartMinutes =
+              override?.overrideStartMinutes ?? slot.startMinutes;
+          final effectiveEndMinutes = override?.overrideEndMinutes ?? slot.endMinutes;
+          final effectiveMode = override?.overrideMode ?? slot.mode;
+          final effectiveVenue = override?.overrideVenue ?? slot.venue;
           final start = DateTime(
-            date.year,
-            date.month,
-            date.day,
-            slot.startMinutes ~/ 60,
-            slot.startMinutes % 60,
+            renderDate.year,
+            renderDate.month,
+            renderDate.day,
+            effectiveStartMinutes ~/ 60,
+            effectiveStartMinutes % 60,
           );
           final end = DateTime(
-            date.year,
-            date.month,
-            date.day,
-            slot.endMinutes ~/ 60,
-            slot.endMinutes % 60,
+            renderDate.year,
+            renderDate.month,
+            renderDate.day,
+            effectiveEndMinutes ~/ 60,
+            effectiveEndMinutes % 60,
           );
           if (!end.isAfter(start)) continue;
+          final modeLower = effectiveMode.toLowerCase();
+          final venueLabel = modeLower == 'online'
+              ? 'Online'
+              : (effectiveVenue != null && effectiveVenue.trim().isNotEmpty
+                  ? effectiveVenue.trim()
+                  : '');
           appointments.add(
             Appointment(
               startTime: start,
               endTime: end,
-              subject: '${slot.courseCode}\n${slot.classType.label}',
+              subject: venueLabel.isNotEmpty
+                  ? '${slot.courseCode}\n$venueLabel'
+                  : slot.courseCode,
               color: slot.color,
               isAllDay: false,
               notes: ScheduleAppointmentMeta.typeClass,
               id: ScheduleAppointmentMeta(
                 type: ScheduleAppointmentMeta.typeClass,
-                mode: slot.mode,
-                venue: slot.venue,
+                mode: effectiveMode,
+                venue: effectiveVenue,
+                classSessionId: slot.sessionId,
+                classTermId: slot.termId,
+                classCourseCode: slot.courseCode,
+                classSlotId: slot.classSlotId,
+                classOccurrenceDate: date,
+                classSourceDay: sourceDay,
+                classSourceStartMinutes: slot.startMinutes,
+                classSourceEndMinutes: slot.endMinutes,
+                classType: slot.classType.label,
               ),
             ),
           );
@@ -397,7 +450,10 @@ class ScheduleAppointmentBuilder {
         if (start == null || end == null || end <= start) continue;
         output.add(
           _RenderedClassSlot(
+            sessionId: entry.sessionId,
+            termId: entry.termId,
             courseCode: entry.courseCode,
+            classSlotId: slot.classSlotId,
             dayIndex: dayIndex,
             startMinutes: start,
             endMinutes: end,
@@ -424,6 +480,7 @@ class ScheduleAppointmentBuilder {
     final hour24 = period == 'AM' ? hour12 % 12 : (hour12 % 12) + 12;
     return hour24 * 60 + minute;
   }
+
 }
 
 class ScheduleAppointmentMeta {
@@ -433,6 +490,15 @@ class ScheduleAppointmentMeta {
     this.mode,
     this.venue,
     this.overflowAppointments = const [],
+    this.classSessionId,
+    this.classTermId,
+    this.classCourseCode,
+    this.classSlotId,
+    this.classOccurrenceDate,
+    this.classSourceDay,
+    this.classSourceStartMinutes,
+    this.classSourceEndMinutes,
+    this.classType,
   });
 
   static const String typeClass = 'class';
@@ -445,6 +511,15 @@ class ScheduleAppointmentMeta {
   final String? mode;
   final String? venue;
   final List<Appointment> overflowAppointments;
+  final String? classSessionId;
+  final String? classTermId;
+  final String? classCourseCode;
+  final String? classSlotId;
+  final DateTime? classOccurrenceDate;
+  final String? classSourceDay;
+  final int? classSourceStartMinutes;
+  final int? classSourceEndMinutes;
+  final String? classType;
 }
 
 enum ScheduleContentFilter {
@@ -455,7 +530,10 @@ enum ScheduleContentFilter {
 
 class _RenderedClassSlot {
   const _RenderedClassSlot({
+    required this.sessionId,
+    required this.termId,
     required this.courseCode,
+    required this.classSlotId,
     required this.dayIndex,
     required this.startMinutes,
     required this.endMinutes,
@@ -465,7 +543,10 @@ class _RenderedClassSlot {
     this.venue,
   });
 
+  final String sessionId;
+  final String termId;
   final String courseCode;
+  final String classSlotId;
   final int dayIndex;
   final int startMinutes;
   final int endMinutes;

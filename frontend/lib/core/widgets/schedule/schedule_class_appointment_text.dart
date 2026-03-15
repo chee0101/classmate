@@ -16,7 +16,7 @@ class ScheduleClassAppointmentText extends StatelessWidget {
   Widget build(BuildContext context) {
     final parts = subject.split('\n');
     final courseCode = parts.isNotEmpty ? parts.first : subject;
-    final classType = parts.length > 1 ? parts.sublist(1).join('\n') : '';
+    final venueLabel = parts.length > 1 ? parts.sublist(1).join('\n') : '';
     final resolvedTextColor = Color.alphaBlend(
       Colors.black.withValues(alpha: 0.28),
       textColor,
@@ -33,16 +33,15 @@ class ScheduleClassAppointmentText extends StatelessWidget {
         children: [
           TextSpan(
             text: courseCode,
-            style: const TextStyle(fontWeight: FontWeight.w700),
+            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700),
           ),
-          if (classType.isNotEmpty) ...[
+          if (venueLabel.isNotEmpty) ...[
             const TextSpan(text: '\n'),
             TextSpan(
-              text: classType,
-              style: TextStyle(
+              text: venueLabel,
+              style: const TextStyle(
                 fontWeight: FontWeight.w400,
                 fontSize: 10,
-                color: resolvedTextColor.withValues(alpha: 0.9),
               ),
             ),
           ],

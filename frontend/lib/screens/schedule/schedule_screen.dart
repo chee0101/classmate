@@ -6,23 +6,31 @@ import '../../core/constants/app_spacing.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/academic_event.dart';
 import '../../core/models/academic_session.dart';
+import '../../core/models/class_slot_override.dart';
+import '../../core/models/class_type.dart';
 import '../../core/models/course.dart';
 import '../../core/models/timetable_entry.dart';
 import '../../core/services/academic_event_store.dart';
 import '../../core/services/academic_session_store.dart';
 import '../../core/services/class_slot_store.dart';
+import '../../core/services/class_slot_override_store.dart';
 import '../../core/services/course_store.dart';
 import '../../core/services/session_term_selection_store.dart';
+import '../../core/utils/date_time_format.dart';
 import '../../core/utils/schedule_appointment_details.dart';
 import '../../core/utils/session_term_resolver.dart';
+import '../../core/utils/term_windows.dart';
 import '../../core/models/session_term_ref.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/common/session_term_context_label.dart';
+import '../../core/widgets/schedule/class_slot_sheet.dart';
 import '../../core/widgets/schedule/schedule_class_appointment_text.dart';
 import '../../core/widgets/schedule/schedule_overflow_popup_menu.dart';
 import '../../core/widgets/schedule/schedule_mode_toggle.dart';
 import '../../core/widgets/schedule/schedule_details_sheet.dart';
+import 'schedule_class_editor_screen.dart';
+import 'schedule_event_editor_screen.dart';
 
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
@@ -113,9 +121,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   return ValueListenableBuilder<List<Course>>(
                     valueListenable: coursesNotifier,
                     builder: (context, courses, _) {
-                      return ValueListenableBuilder<List<AcademicEvent>>(
-                        valueListenable: academicEventsNotifier,
-                        builder: (context, events, _) {
+                      return ValueListenableBuilder<List<ClassSlotOverride>>(
+                        valueListenable: classSlotOverridesNotifier,
+                        builder: (context, classOverrides, _) {
+                          return ValueListenableBuilder<List<AcademicEvent>>(
+                            valueListenable: academicEventsNotifier,
+                            builder: (context, events, _) {
                           final filteredEntries = entries
                               .where(
                                 (e) =>
@@ -140,10 +151,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                     event.termId == selectedTerm.id,
                               )
                               .toList(growable: false);
+                          final selectedClassSlotIds = filteredEntries
+                              .expand((entry) => entry.slots.map((slot) => slot.classSlotId))
+                              .toSet();
+                          final selectedClassOverrides = classOverrides
+                              .where(
+                                (item) => selectedClassSlotIds.contains(item.classSlotId),
+                              )
+                              .toList(growable: false);
                           final appointments = ScheduleAppointmentBuilder.build(
                             entries: filteredEntries,
                             courseColorByCode: courseColorByCode,
                             events: selectedTermEvents,
+                            classOverrides: selectedClassOverrides,
                             term: selectedTerm,
                             forMonthlyAgenda: _showMonthly,
                             contentFilter: ScheduleContentFilter.both,
@@ -177,11 +197,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                               const SizedBox(height: AppSpacing.md),
                               Expanded(
                                 child: Padding(
-                                  padding: EdgeInsets.fromLTRB(
-                                    AppSpacing.md,
+                                  padding: const EdgeInsets.fromLTRB(
+                                    AppSpacing.sm,
                                     0,
-                                    AppSpacing.md,
-                                    AppSpacing.md,
+                                    AppSpacing.sm,
+                                    AppSpacing.sm,
                                   ),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(16),
@@ -371,6 +391,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                               )) {
                                             await _showOverflowPicker(
                                               appointments.first,
+                                              selectedTerm: selectedTerm,
                                             );
                                             return;
                                           }
@@ -378,13 +399,18 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                           final detailAppointments =
                                               expandAppointmentsForDetails(appointments);
                                           if (detailAppointments.isEmpty) return;
-                                          _showAppointmentsBottomSheet(detailAppointments);
+                                          _showAppointmentsBottomSheet(
+                                            detailAppointments,
+                                            selectedTerm: selectedTerm,
+                                          );
                                         },
                                       ),
                                   ),
                                 ),
                               ),
                              ],
+                          );
+                            },
                           );
                         },
                       );
@@ -399,7 +425,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
-  void _showAppointmentsBottomSheet(List<Appointment> appointments) {
+  void _showAppointmentsBottomSheet(
+    List<Appointment> appointments, {
+    required TermWindow selectedTerm,
+  }) {
     final first = appointments.first;
     final isClassDetails = first.notes == ScheduleAppointmentMeta.typeClass;
     final sheetTitle = appointments.length == 1
@@ -424,12 +453,26 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               sheetTitle: sheetTitle,
               appointment: appointment,
               type: ScheduleDetailsType.classDetails,
+              onEditPressed: () => _handleDetailsEdit(
+                appointment,
+                selectedTerm: selectedTerm,
+              ),
+              onCancelPressed: () => _handleDetailsCancel(
+                appointment,
+              ),
             );
           } else {
             return ScheduleDetailsSheet(
               sheetTitle: sheetTitle,
               appointment: appointment,
               type: ScheduleDetailsType.eventDetails,
+              onEditPressed: () => _handleDetailsEdit(
+                appointment,
+                selectedTerm: selectedTerm,
+              ),
+              onCancelPressed: () => _handleDetailsCancel(
+                appointment,
+              ),
             );
           }
         }
@@ -522,7 +565,308 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
   }
 
-  Future<void> _showOverflowPicker(Appointment overflowAppointment) async {
+  Future<void> _handleDetailsEdit(
+    Appointment appointment, {
+    required TermWindow selectedTerm,
+  }) async {
+    Navigator.of(context).pop();
+    final meta = appointment.id;
+    if (meta is! ScheduleAppointmentMeta) return;
+
+    if (meta.type == ScheduleAppointmentMeta.typeEvent && meta.events.isNotEmpty) {
+      final updated = await ScheduleEventEditorScreen.show(
+        context,
+        initialEvent: meta.events.first,
+        selectedTerm: selectedTerm,
+      );
+      if (updated == null || !mounted) return;
+      await updateAcademicEvent(updated);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Event updated.')),
+      );
+      return;
+    }
+
+    if (meta.type != ScheduleAppointmentMeta.typeClass) return;
+    final classMeta = _extractClassMeta(meta);
+    if (classMeta == null) return;
+    final initialDraft = _buildDraftFromAppointment(
+      appointment: appointment,
+      meta: classMeta,
+    );
+    final result = await ScheduleClassEditorScreen.show(
+      context,
+      initialDraft: initialDraft,
+    );
+    if (result == null || !mounted) return;
+
+    if (result.applyScope == ClassEditApplyScope.thisClassOnly) {
+      final overrideStart = parseTimeLabelToMinutes(result.updatedDraft.startTime);
+      final overrideEnd = parseTimeLabelToMinutes(result.updatedDraft.endTime);
+      if (overrideStart == null || overrideEnd == null || overrideEnd <= overrideStart) {
+        return;
+      }
+      final override = ClassSlotOverride(
+        id: ClassSlotOverride.buildClassSlotOverrideId(
+          classSlotId: classMeta.classSlotId,
+          occurrenceDate: classMeta.classOccurrenceDate,
+        ),
+        classSlotId: classMeta.classSlotId,
+        occurrenceDate: classMeta.classOccurrenceDate,
+        action: ClassSlotOverrideAction.edit,
+        overrideDate: result.updatedDraft.occurrenceDate == null
+            ? null
+            : DateTime(
+                result.updatedDraft.occurrenceDate!.year,
+                result.updatedDraft.occurrenceDate!.month,
+                result.updatedDraft.occurrenceDate!.day,
+              ),
+        overrideStartMinutes: overrideStart,
+        overrideEndMinutes: overrideEnd,
+        overrideMode: result.updatedDraft.mode,
+        overrideVenue: result.updatedDraft.venue,
+      );
+      await upsertClassSlotOverride(override);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Class updated for this occurrence.')),
+      );
+      return;
+    }
+
+    final replacement = TimetableSlot(
+      classSlotId: classMeta.classSlotId,
+      day: result.updatedDraft.day,
+      startTime: result.updatedDraft.startTime,
+      endTime: result.updatedDraft.endTime,
+      mode: result.updatedDraft.mode,
+      classType: result.updatedDraft.classType,
+      venue: result.updatedDraft.venue,
+    );
+    await updateClassSlotSeriesById(
+      sessionId: classMeta.classSessionId,
+      termId: classMeta.classTermId,
+      courseCode: classMeta.classCourseCode,
+      classSlotId: classMeta.classSlotId,
+      replacement: replacement,
+    );
+    await deleteClassSlotOverridesForClassSlotId(
+      classSlotId: classMeta.classSlotId,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Class updated for all occurrences.')),
+    );
+  }
+
+  Future<void> _handleDetailsCancel(Appointment appointment) async {
+    Navigator.of(context).pop();
+    final meta = appointment.id;
+    if (meta is! ScheduleAppointmentMeta) return;
+
+    if (meta.type == ScheduleAppointmentMeta.typeEvent && meta.events.isNotEmpty) {
+      final event = meta.events.first;
+      final shouldDelete = await showDialog<bool>(
+            context: context,
+            builder: (dialogContext) {
+              return AlertDialog(
+                title: const Text('Delete Event?'),
+                content: const Text('This action cannot be undone.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.of(dialogContext).pop(true),
+                    child: const Text('Delete'),
+                  ),
+                ],
+              );
+            },
+          ) ??
+          false;
+      if (!shouldDelete) return;
+      await deleteAcademicEvent(event.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Event deleted.')),
+      );
+      return;
+    }
+
+    if (meta.type != ScheduleAppointmentMeta.typeClass) return;
+    final classMeta = _extractClassMeta(meta);
+    if (classMeta == null) return;
+    final scope = await _showClassApplyScopePicker(
+      title: 'Cancel Class',
+      thisOnlyLabel: 'This class only',
+      allLabel: 'All classes at this time',
+    );
+    if (scope == null) return;
+
+    if (scope == ClassEditApplyScope.thisClassOnly) {
+      final override = ClassSlotOverride(
+        id: ClassSlotOverride.buildClassSlotOverrideId(
+          classSlotId: classMeta.classSlotId,
+          occurrenceDate: classMeta.classOccurrenceDate,
+        ),
+        classSlotId: classMeta.classSlotId,
+        occurrenceDate: classMeta.classOccurrenceDate,
+        action: ClassSlotOverrideAction.cancel,
+      );
+      await upsertClassSlotOverride(override);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('This class occurrence cancelled.')),
+      );
+      return;
+    }
+
+    await deleteClassSlotSeriesById(
+      sessionId: classMeta.classSessionId,
+      termId: classMeta.classTermId,
+      courseCode: classMeta.classCourseCode,
+      classSlotId: classMeta.classSlotId,
+    );
+    await deleteClassSlotOverridesForClassSlotId(
+      classSlotId: classMeta.classSlotId,
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Class cancelled for all occurrences.')),
+    );
+  }
+
+  Future<ClassEditApplyScope?> _showClassApplyScopePicker({
+    required String title,
+    required String thisOnlyLabel,
+    required String allLabel,
+  }) {
+    return showDialog<ClassEditApplyScope>(
+      context: context,
+      builder: (dialogContext) {
+        var selectedScope = ClassEditApplyScope.thisClassOnly;
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              title: Text(title),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Are you sure you want to cancel this class?'),
+                  const SizedBox(height: AppSpacing.md),
+                  RadioListTile<ClassEditApplyScope>(
+                    value: ClassEditApplyScope.thisClassOnly,
+                    groupValue: selectedScope,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(thisOnlyLabel),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setDialogState(() => selectedScope = value);
+                    },
+                  ),
+                  RadioListTile<ClassEditApplyScope>(
+                    value: ClassEditApplyScope.allClasses,
+                    groupValue: selectedScope,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(allLabel),
+                    onChanged: (value) {
+                      if (value == null) return;
+                      setDialogState(() => selectedScope = value);
+                    },
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(selectedScope),
+                  child: const Text(
+                    'Confirm',
+                    style: TextStyle(color: Colors.red),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  _ClassSourceMeta? _extractClassMeta(ScheduleAppointmentMeta meta) {
+    final sessionId = meta.classSessionId;
+    final termId = meta.classTermId;
+    final courseCode = meta.classCourseCode;
+    final classSlotId = meta.classSlotId;
+    final classOccurrenceDate = meta.classOccurrenceDate;
+    final sourceDay = meta.classSourceDay;
+    final sourceStartMinutes = meta.classSourceStartMinutes;
+    final sourceEndMinutes = meta.classSourceEndMinutes;
+    if (sessionId == null ||
+        termId == null ||
+        courseCode == null ||
+        classSlotId == null ||
+        classOccurrenceDate == null ||
+        sourceDay == null ||
+        sourceStartMinutes == null ||
+        sourceEndMinutes == null) {
+      return null;
+    }
+    return _ClassSourceMeta(
+      classSessionId: sessionId,
+      classTermId: termId,
+      classCourseCode: courseCode,
+      classSlotId: classSlotId,
+      classOccurrenceDate: classOccurrenceDate,
+      classSourceDay: sourceDay,
+      classSourceStartMinutes: sourceStartMinutes,
+      classSourceEndMinutes: sourceEndMinutes,
+    );
+  }
+
+  ClassSlotDraft _buildDraftFromAppointment({
+    required Appointment appointment,
+    required _ClassSourceMeta meta,
+  }) {
+    final lines = appointment.subject.split('\n');
+    final classTypeLabel = lines.length > 1 ? lines[1].trim().toLowerCase() : '';
+    var classType = ClassType.other;
+    for (final value in ClassType.values) {
+      if (value.label.toLowerCase() == classTypeLabel) {
+        classType = value;
+        break;
+      }
+    }
+    return ClassSlotDraft(
+      classSlotId: meta.classSlotId,
+      day: meta.classSourceDay,
+      occurrenceDate: DateTime(
+        appointment.startTime.year,
+        appointment.startTime.month,
+        appointment.startTime.day,
+      ),
+      startTime: formatTime12h(appointment.startTime),
+      endTime: formatTime12h(appointment.endTime),
+      mode: ((appointment.id as ScheduleAppointmentMeta).mode ?? 'Online').trim(),
+      classType: classType,
+      venue: ((appointment.id as ScheduleAppointmentMeta).venue ?? '').trim().isEmpty
+          ? null
+          : (appointment.id as ScheduleAppointmentMeta).venue?.trim(),
+    );
+  }
+
+  Future<void> _showOverflowPicker(
+    Appointment overflowAppointment, {
+    required TermWindow selectedTerm,
+  }) async {
     final hiddenItems = expandAppointmentsForDetails([overflowAppointment]);
     if (hiddenItems.isEmpty || !mounted) return;
 
@@ -534,8 +878,33 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
 
     if (selected == null || !mounted) return;
-    _showAppointmentsBottomSheet([selected]);
+    _showAppointmentsBottomSheet(
+      [selected],
+      selectedTerm: selectedTerm,
+    );
   }
+}
+
+class _ClassSourceMeta {
+  const _ClassSourceMeta({
+    required this.classSessionId,
+    required this.classTermId,
+    required this.classCourseCode,
+    required this.classSlotId,
+    required this.classOccurrenceDate,
+    required this.classSourceDay,
+    required this.classSourceStartMinutes,
+    required this.classSourceEndMinutes,
+  });
+
+  final String classSessionId;
+  final String classTermId;
+  final String classCourseCode;
+  final String classSlotId;
+  final DateTime classOccurrenceDate;
+  final String classSourceDay;
+  final int classSourceStartMinutes;
+  final int classSourceEndMinutes;
 }
 
 class _ScheduleDataSource extends CalendarDataSource {

@@ -15,11 +15,15 @@ class ScheduleDetailsSheet extends StatelessWidget {
     required this.sheetTitle,
     required this.appointment,
     required this.type,
+    this.onEditPressed,
+    this.onCancelPressed,
   });
 
   final String sheetTitle;
   final Appointment appointment;
   final ScheduleDetailsType type;
+  final VoidCallback? onEditPressed;
+  final VoidCallback? onCancelPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -45,9 +49,7 @@ class ScheduleDetailsSheet extends StatelessWidget {
                   ),
                   IconButton(
                     icon: const Icon(Icons.edit_outlined),
-                    onPressed: () {
-                      // TODO: Wire up edit flow when available.
-                    },
+                    onPressed: onEditPressed,
                   ),
                 ],
               ),
@@ -60,15 +62,12 @@ class ScheduleDetailsSheet extends StatelessWidget {
               const Divider(),
               Center(
                 child: TextButton.icon(
-                  onPressed: () {
-                    // TODO: Wire up delete flow when available.
-                    Navigator.of(context).pop();
-                  },
+                  onPressed: onCancelPressed,
                   icon: const Icon(
-                    Icons.delete_outline,
+                    Icons.cancel_outlined,
                     color: Colors.red,
                   ),
-                  label: const Text('Delete'),
+                  label: const Text('Cancel'),
                   style: TextButton.styleFrom(
                     foregroundColor: Colors.red,
                   ),
@@ -85,8 +84,8 @@ class ScheduleDetailsSheet extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     final subjectLines = appointment.subject.split('\n');
     final classTitle = subjectLines.isNotEmpty ? subjectLines[0] : '';
-    final classType =
-        subjectLines.length > 1 ? subjectLines[1].trim() : null;
+    //final classType =
+        //subjectLines.length > 1 ? subjectLines[1].trim() : null;
 
     final start = appointment.startTime;
     final end = appointment.endTime;
@@ -97,12 +96,14 @@ class ScheduleDetailsSheet extends StatelessWidget {
       timeRangeSeparator: ' – ',
     );
 
+    String? classType;
     String? mode;
     String? venue;
     final meta = appointment.id;
     if (meta is ScheduleAppointmentMeta) {
       mode = meta.mode;
       venue = meta.venue;
+      classType = meta.classType;
     }
 
     return Column(
@@ -127,7 +128,7 @@ class ScheduleDetailsSheet extends StatelessWidget {
               child: Text(
                 classType,
                 style: textTheme.bodySmall?.copyWith(
-                  color: Theme.of(context).colorScheme.onPrimaryContainer,
+                  color: Theme.of(context).colorScheme.primary,
                   fontWeight: FontWeight.w500,
                 ),
               ),

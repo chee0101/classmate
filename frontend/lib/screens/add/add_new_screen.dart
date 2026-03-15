@@ -333,6 +333,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
       slots: _classSlots
           .map(
             (slot) => TimetableSlot(
+              classSlotId: (slot.classSlotId ?? '').trim(),
               day: slot.day,
               startTime: slot.startTime,
               endTime: slot.endTime,

@@ -1,11 +1,11 @@
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../firebase_options.dart';
 import 'academic_event_store.dart';
 import 'academic_session_store.dart';
 import 'class_slot_store.dart';
+import 'class_slot_override_store.dart';
 import 'course_store.dart';
 import 'task_store.dart';
 
@@ -61,8 +61,12 @@ class AppBootstrapper {
       _setProgress(0.78);
       await Future<void>.delayed(Duration.zero);
 
+      initializeClassSlotOverridesSync();
+      _setProgress(0.82);
+      await Future<void>.delayed(Duration.zero);
+
       initializeTasksSync();
-      _setProgress(0.86);
+      _setProgress(0.89);
       await Future<void>.delayed(Duration.zero);
 
       initializeAcademicEventsSync();
