@@ -6,6 +6,7 @@ import 'core/constants/app_colors.dart';
 import 'core/constants/routes.dart';
 import 'core/layout/main_scaffold.dart';
 import 'screens/auth/forgot_password_screen.dart';
+import 'screens/auth/change_password_screen.dart';
 import 'screens/auth/verify_email_screen.dart';
 import 'screens/add/add_new_screen.dart' show AddNewScreen, AddType;
 import 'screens/task/task_detail_screen.dart';
@@ -222,6 +223,7 @@ class MyApp extends StatelessWidget {
         AppRoutes.login: (context) => const AuthScreen(),
         AppRoutes.verifyEmail: (context) => const VerifyEmailScreen(),
         AppRoutes.forgotPassword: (context) => const ForgotPasswordScreen(),
+        AppRoutes.changePassword: (context) => const ChangePasswordScreen(),
         AppRoutes.addNew: (context) {
           final args = ModalRoute.of(context)?.settings.arguments;
           final initialType = args is AddType ? args : null;

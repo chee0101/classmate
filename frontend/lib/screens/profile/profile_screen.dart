@@ -125,10 +125,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 icon: Icons.lock_outline,
                 title: 'Change Password',
                 onTap: () {
-                  // TODO: Navigate to change password screen
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Change password (mock)')),
-                  );
+                  Navigator.pushNamed(context, AppRoutes.changePassword);
                 },
               ),
             ),
