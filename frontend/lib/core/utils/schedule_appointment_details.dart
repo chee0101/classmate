@@ -2,7 +2,6 @@ import 'package:syncfusion_flutter_calendar/calendar.dart';
 
 import '../builders/schedule_appointment_builder.dart';
 import '../constants/app_colors.dart';
-import '../constants/months.dart';
 import 'date_time_format.dart';
 
 bool isOverflowAppointment(Appointment appointment) {
@@ -138,25 +137,12 @@ String formatAppointmentRange(Appointment appointment) {
     return formatDateTimeRange(start, end);
   }
 
-  if (appointment.isAllDay) {
-    final start = appointment.startTime;
-    final end = appointment.endTime;
-    final sameDay =
-        start.year == end.year && start.month == end.month && start.day == end.day;
-    if (sameDay) {
-      return '${start.day} ${monthShortLabel(start.month)} ${start.year} (All day)';
-    }
-    return '${start.day} ${monthShortLabel(start.month)} – ${end.day} ${monthShortLabel(end.month)} (All day)';
-  }
-
   final start = appointment.startTime;
   final end = appointment.endTime;
-  final sameDay =
-      start.year == end.year && start.month == end.month && start.day == end.day;
-  if (sameDay) {
-    return '${start.day} ${monthShortLabel(start.month)} ${formatTimeRange12h(start, end)}';
+  if (appointment.isAllDay) {
+    return formatAllDayRange(start, end);
   }
-  return '${start.day} ${monthShortLabel(start.month)} ${formatTime12h(start)} – ${end.day} ${monthShortLabel(end.month)} ${formatTime12h(end)}';
+  return formatDateTimeRange(start, end);
 }
 
 String formatOverflowPopupSubtitle(Appointment appointment) {

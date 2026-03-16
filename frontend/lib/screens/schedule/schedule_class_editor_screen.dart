@@ -78,7 +78,6 @@ class _ScheduleClassEditorScreenState extends State<ScheduleClassEditorScreen> {
               setState(() => _applyScope = value);
             },
           ),
-          const Divider(height: 1),
           Expanded(
             child: ClassSlotEditorForm(
               initial: widget.initialDraft,

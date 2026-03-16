@@ -6,6 +6,7 @@ import '../../core/services/academic_session_store.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/models/class_type.dart';
 import '../../core/models/timetable_entry.dart';
+import '../../core/utils/date_time_format.dart';
 import '../../core/services/class_slot_store.dart';
 import '../../core/services/course_store.dart';
 import '../../core/utils/term_windows.dart';
@@ -350,15 +351,7 @@ class _TimetableCard extends StatelessWidget {
   final VoidCallback onDelete;
 
   int _slotStartMinutes(TimetableSlot slot) {
-    final match =
-        RegExp(r'^(\d{1,2}):(\d{2})\s*(AM|PM)$', caseSensitive: false)
-            .firstMatch(slot.startTime.trim());
-    if (match == null) return 0;
-    final hour12 = int.tryParse(match.group(1) ?? '') ?? 0;
-    final minute = int.tryParse(match.group(2) ?? '') ?? 0;
-    final period = (match.group(3) ?? 'AM').toUpperCase();
-    final hour24 = period == 'AM' ? hour12 % 12 : (hour12 % 12) + 12;
-    return (hour24 * 60) + minute;
+    return parseTimeLabel12hToMinutes(slot.startTime.trim()) ?? 0;
   }
 
   String _locationLabel(TimetableSlot slot) {

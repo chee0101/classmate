@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_colors.dart';
-import '../../core/constants/months.dart';
+import '../../core/utils/date_time_format.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/services/academic_session_store.dart';
 import '../../core/models/academic_session.dart';
@@ -341,7 +341,7 @@ class _AcademicSessionsScreenState extends State<AcademicSessionsScreen> {
   }
 
   String _formatDate(DateTime date) {
-    return '${date.day} ${monthShortLabel(date.month)} ${date.year}';
+    return formatDateShortWithYear(date);
   }
 }
 

@@ -469,16 +469,7 @@ class ScheduleAppointmentBuilder {
   }
 
   static int? _parseMinutes(String value) {
-    final regex =
-        RegExp(r'^(\d{1,2}):(\d{2})\s*(AM|PM)$', caseSensitive: false);
-    final match = regex.firstMatch(value.trim());
-    if (match == null) return null;
-    final hour12 = int.tryParse(match.group(1) ?? '');
-    final minute = int.tryParse(match.group(2) ?? '');
-    final period = (match.group(3) ?? '').toUpperCase();
-    if (hour12 == null || minute == null) return null;
-    final hour24 = period == 'AM' ? hour12 % 12 : (hour12 % 12) + 12;
-    return hour24 * 60 + minute;
+    return parseTimeLabel12hToMinutes(value);
   }
 
 }

@@ -99,3 +99,31 @@ String formatDateTimeRange(DateTime start, DateTime end) {
   return '${formatDateShortWithYear(start)} ${formatTime12h(start)} – ${formatDateShortWithYear(end)} ${formatTime12h(end)}';
 }
 
+/// Parses a 12-hour time label like "9:30 AM" into minutes since midnight.
+///
+/// Returns `null` if the string is not a valid time.
+int? parseTimeLabel12hToMinutes(String value) {
+  final match = RegExp(
+    r'^(\d{1,2}):(\d{2})\s*(AM|PM)$',
+    caseSensitive: false,
+  ).firstMatch(value.trim());
+  if (match == null) return null;
+  final hour12 = int.tryParse(match.group(1) ?? '');
+  final minute = int.tryParse(match.group(2) ?? '');
+  final period = (match.group(3) ?? '').toUpperCase();
+  if (hour12 == null || minute == null) return null;
+  if (hour12 < 1 || hour12 > 12 || minute < 0 || minute > 59) return null;
+  final hour24 = period == 'AM' ? hour12 % 12 : (hour12 % 12) + 12;
+  return (hour24 * 60) + minute;
+}
+
+/// Formats minutes since midnight as a 12-hour time like "9:30 AM".
+String formatMinutes12h(int minutes) {
+  final normalized = ((minutes % 1440) + 1440) % 1440;
+  final hour24 = normalized ~/ 60;
+  final minute = normalized % 60;
+  final period = hour24 >= 12 ? 'PM' : 'AM';
+  final hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12;
+  final minuteString = minute.toString().padLeft(2, '0');
+  return '$hour12:$minuteString $period';
+}

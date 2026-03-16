@@ -121,23 +121,11 @@ class _ClassSlotEditorFormState extends State<ClassSlotEditorForm> {
   }
 
   TimeOfDay? _parseTimeOfDay(String label) {
-    final regex = RegExp(r'^(\d{1,2}):(\d{2}) (AM|PM)$');
-    final match = regex.firstMatch(label.trim());
-    if (match == null) return null;
-
-    final hour12 = int.tryParse(match.group(1) ?? '');
-    final minute = int.tryParse(match.group(2) ?? '');
-    final period = match.group(3);
-
-    if (hour12 == null || minute == null || period == null) return null;
-
-    int hour24;
-    if (period == 'AM') {
-      hour24 = hour12 % 12; // 12 AM -> 0
-    } else {
-      hour24 = (hour12 % 12) + 12; // 12 PM -> 12
-    }
-
+    final minutes = parseTimeLabel12hToMinutes(label);
+    if (minutes == null) return null;
+    final normalized = ((minutes % 1440) + 1440) % 1440;
+    final hour24 = normalized ~/ 60;
+    final minute = normalized % 60;
     return TimeOfDay(hour: hour24, minute: minute);
   }
 

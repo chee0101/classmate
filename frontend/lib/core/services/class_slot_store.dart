@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../constants/weekdays.dart';
 import '../models/class_type.dart';
 import '../models/timetable_entry.dart';
+import '../utils/date_time_format.dart';
 import 'course_store.dart';
 
 final ValueNotifier<List<TimetableEntry>> timetablesNotifier =
@@ -153,30 +154,9 @@ ClassType _parseClassType(String? raw) {
   return ClassType.other;
 }
 
-int? _parseMinutes12h(String value) {
-  final match = RegExp(
-    r'^(\d{1,2}):(\d{2})\s*(AM|PM)$',
-    caseSensitive: false,
-  ).firstMatch(value.trim());
-  if (match == null) return null;
-  final hour12 = int.tryParse(match.group(1) ?? '');
-  final minute = int.tryParse(match.group(2) ?? '');
-  final period = (match.group(3) ?? '').toUpperCase();
-  if (hour12 == null || minute == null) return null;
-  if (hour12 < 1 || hour12 > 12 || minute < 0 || minute > 59) return null;
-  final hour24 = period == 'AM' ? hour12 % 12 : (hour12 % 12) + 12;
-  return (hour24 * 60) + minute;
-}
+int? _parseMinutes12h(String value) => parseTimeLabel12hToMinutes(value);
 
-String _formatMinutes12h(int minutes) {
-  final normalized = ((minutes % 1440) + 1440) % 1440;
-  final hour24 = normalized ~/ 60;
-  final minute = normalized % 60;
-  final period = hour24 >= 12 ? 'PM' : 'AM';
-  final hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12;
-  final minuteString = minute.toString().padLeft(2, '0');
-  return '$hour12:$minuteString $period';
-}
+String _formatMinutes12h(int minutes) => formatMinutes12h(minutes);
 
 Future<void> upsertTimetableByCourse({
   required String sessionId,
