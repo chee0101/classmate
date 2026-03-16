@@ -7,6 +7,13 @@ import '../../core/models/academic_event.dart';
 import '../../core/services/session_term_selection_store.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/services/task_store.dart';
+import '../../core/services/class_slot_store.dart';
+import '../../core/constants/weekdays.dart';
+import '../../core/models/timetable_entry.dart';
+import '../../core/services/course_store.dart';
+import '../../core/builders/schedule_appointment_builder.dart';
+import '../../core/models/course.dart';
+import '../../core/utils/date_time_format.dart';
 import '../../core/utils/task_utils.dart';
 import '../../core/utils/session_term_resolver.dart';
 import '../../core/utils/term_windows.dart';
@@ -97,9 +104,15 @@ class _HomeScreenState extends State<HomeScreen> {
               return ValueListenableBuilder(
                 valueListenable: tasksNotifier,
                 builder: (context, tasks, _) {
-              return ValueListenableBuilder<List<AcademicEvent>>(
-                valueListenable: academicEventsNotifier,
-                builder: (context, events, _) {
+                  return ValueListenableBuilder<List<AcademicEvent>>(
+                    valueListenable: academicEventsNotifier,
+                    builder: (context, events, _) {
+                      return ValueListenableBuilder<List<Course>>(
+                        valueListenable: coursesNotifier,
+                        builder: (context, courses, _) {
+                          return ValueListenableBuilder<List<TimetableEntry>>(
+                            valueListenable: timetablesNotifier,
+                            builder: (context, timetables, _) {
               // Get upcoming tasks and filter by selected term window
               final allUpcomingTasks = TaskUtils.getUpcomingTasks(
                 tasks.where((t) => t.parentTaskId == null).toList(),
@@ -125,7 +138,44 @@ class _HomeScreenState extends State<HomeScreen> {
                   .toList(growable: false)
                 ..sort((a, b) => a.startDateTime.compareTo(b.startDateTime));
 
-              return Column(
+              final today = DateTime(now.year, now.month, now.day);
+              final weekdayOrder = weekdayNamesMondayFirst;
+              final todayName = weekdayOrder[today.weekday - 1];
+
+              final courseColorByCode = <String, Color>{
+                for (final c in courses.where(
+                  (c) => c.sessionId == selectedSession.id && c.termId == selectedTerm.id,
+                ))
+                  c.courseCode: ScheduleAppointmentBuilder.parseHexColor(c.courseColor),
+              };
+
+              final todayItems = timetables
+                  .where(
+                    (e) =>
+                        e.sessionId == selectedSession.id &&
+                        e.termId == selectedTerm.id,
+                  )
+                  .expand((entry) => entry.slots
+                      .where((slot) => slot.day == todayName)
+                      .map(
+                        (slot) => TodayClassItem(
+                          slot: slot,
+                          courseCode: entry.courseCode,
+                          courseColor:
+                              courseColorByCode[entry.courseCode] ?? const Color(0xFF6C4DD9),
+                        ),
+                      ))
+                  .toList(growable: false)
+                ..sort((a, b) {
+                  final aStart = parseTimeLabel12hToMinutes(a.slot.startTime);
+                  final bStart = parseTimeLabel12hToMinutes(b.slot.startTime);
+                  if (aStart == null && bStart == null) return 0;
+                  if (aStart == null) return 1;
+                  if (bStart == null) return -1;
+                  return aStart.compareTo(bStart);
+                });
+
+                          return Column(
                 children: [
                   Padding(
                     padding: const EdgeInsets.only(
@@ -154,10 +204,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         right: AppSpacing.lg,
                         bottom: AppSpacing.lg,
                       ),
-                      child: Column(
+                          child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const TodayClassesCard(hasClasses: false),
+                          children: [
+                          TodayClassesCard(items: todayItems),
                           const SizedBox(height: AppSpacing.lg),
                           UpcomingEventsCard(events: upcomingEvents),
                           const SizedBox(height: AppSpacing.lg),
@@ -167,9 +217,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ],
-              );
-                },
-              );
+                          );
+                            },
+                          );
+                        },
+                      );
+                    },
+                  );
                 },
               );
             },
