@@ -37,6 +37,8 @@ class _AddNewScreenState extends State<AddNewScreen> {
   late AddType _selectedType;
   String? _selectedSessionId;
   String? _selectedTermId;
+  final ScrollController _scrollController = ScrollController();
+  bool _hasMoreContentBelow = false;
 
   final _taskTitleController = TextEditingController();
   final _taskNoteController = TextEditingController();
@@ -90,6 +92,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
     _taskNoteController.dispose();
     _eventNameController.dispose();
     _eventLocationController.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
@@ -589,21 +592,47 @@ class _AddNewScreenState extends State<AddNewScreen> {
                 );
               }
 
-              return Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
-                child: Column(
-                  children: [
-                    _TypeTabs(
-                      selected: _selectedType,
-                      onChanged: (value) => setState(() => _selectedType = value),
+              return Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    child: Column(
+                      children: [
+                        _TypeTabs(
+                          selected: _selectedType,
+                          onChanged: (value) =>
+                              setState(() => _selectedType = value),
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    Expanded(
+                  ),
+                  Expanded(
+                    child: NotificationListener<ScrollNotification>(
+                      onNotification: (notification) {
+                        if (notification.metrics.maxScrollExtent <= 0) {
+                          if (_hasMoreContentBelow) {
+                            setState(() => _hasMoreContentBelow = false);
+                          }
+                          return false;
+                        }
+                        final atBottom =
+                            notification.metrics.pixels >=
+                            notification.metrics.maxScrollExtent - 1;
+                        final shouldShow = !atBottom;
+                        if (shouldShow != _hasMoreContentBelow) {
+                          setState(() => _hasMoreContentBelow = shouldShow);
+                        }
+                        return false;
+                      },
                       child: SingleChildScrollView(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.lg,
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _LabeledFieldHeader(
+                            const _LabeledFieldHeader(
                               label: 'Academic Session',
                             ),
                             DropdownField<String>(
@@ -637,7 +666,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
                               },
                             ),
                             const SizedBox(height: AppSpacing.md),
-                            _LabeledFieldHeader(
+                            const _LabeledFieldHeader(
                               label: 'Academic Term',
                             ),
                             DropdownField<String>(
@@ -648,8 +677,8 @@ class _AddNewScreenState extends State<AddNewScreen> {
                                   .map(
                                     (term) => DropdownMenuEntry<String>(
                                       value: term.id,
-                                      label:
-                                          term.id == currentTermIdForSelectedSession
+                                      label: term.id ==
+                                              currentTermIdForSelectedSession
                                           ? '${term.label} (Current)'
                                           : term.label,
                                     ),
@@ -667,12 +696,32 @@ class _AddNewScreenState extends State<AddNewScreen> {
                             ),
                             const SizedBox(height: AppSpacing.md),
                             typeSpecificForm,
+                            const SizedBox(height: AppSpacing.lg),
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: AppSpacing.md),
-                    SizedBox(
+                  ),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(
+                      AppSpacing.lg,
+                      AppSpacing.md,
+                      AppSpacing.lg,
+                      AppSpacing.lg,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).scaffoldBackgroundColor,
+                      boxShadow: _hasMoreContentBelow
+                          ? const [
+                              BoxShadow(
+                                color: Colors.black12,
+                                offset: Offset(0, -4),
+                                blurRadius: 8,
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
                         onPressed: _selectedType == AddType.task
@@ -704,8 +753,8 @@ class _AddNewScreenState extends State<AddNewScreen> {
                         ),
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               );
             },
           );
