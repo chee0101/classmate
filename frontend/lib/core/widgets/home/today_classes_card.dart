@@ -152,9 +152,7 @@ class TodayClassesCard extends StatelessWidget {
                               Expanded(
                                 child: Text(
                                   item.courseCode,
-                                  style: textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
+                                  style: textTheme.titleMedium
                                 ),
                               ),
                               if (isNow)
@@ -192,7 +190,7 @@ class TodayClassesCard extends StatelessWidget {
                                 ),
                             ],
                           ),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           Row(
                             children: [
                               Icon(

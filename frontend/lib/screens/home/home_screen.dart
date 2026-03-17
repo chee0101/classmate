@@ -8,7 +8,9 @@ import '../../core/services/session_term_selection_store.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/services/task_store.dart';
 import '../../core/services/class_slot_store.dart';
+import '../../core/services/class_slot_override_store.dart';
 import '../../core/constants/weekdays.dart';
+import '../../core/models/class_slot_override.dart';
 import '../../core/models/timetable_entry.dart';
 import '../../core/services/course_store.dart';
 import '../../core/builders/schedule_appointment_builder.dart';
@@ -111,129 +113,168 @@ class _HomeScreenState extends State<HomeScreen> {
                       return ValueListenableBuilder<List<Course>>(
                         valueListenable: coursesNotifier,
                         builder: (context, courses, _) {
-                          return ValueListenableBuilder<List<TimetableEntry>>(
-                            valueListenable: timetablesNotifier,
-                            builder: (context, timetables, _) {
-                              // Get upcoming tasks and filter by selected term window
-                              final allUpcomingTasks =
-                                  TaskUtils.getUpcomingTasks(
-                                tasks
-                                    .where((t) => t.parentTaskId == null)
-                                    .toList(),
-                              );
-                              final upcomingTasks = allUpcomingTasks
-                                  .where((task) =>
-                                      isInTerm(task.dueDateTime, selectedTerm))
-                                  .toList();
-                              final upcomingEvents = events
-                                  .where(
-                                    (event) =>
-                                        event.sessionId == selectedSession.id &&
-                                        event.termId == selectedTerm.id &&
-                                        !event.endDateTime.isBefore(
-                                          DateTime(
-                                            now.year,
-                                            now.month,
-                                            now.day,
-                                            0,
-                                            0,
+                          return ValueListenableBuilder<List<ClassSlotOverride>>(
+                            valueListenable: classSlotOverridesNotifier,
+                            builder: (context, classOverrides, _) {
+                              return ValueListenableBuilder<List<TimetableEntry>>(
+                                valueListenable: timetablesNotifier,
+                                builder: (context, timetables, _) {
+                                  // Get upcoming tasks and filter by selected term window
+                                  final allUpcomingTasks =
+                                      TaskUtils.getUpcomingTasks(
+                                    tasks
+                                        .where((t) => t.parentTaskId == null)
+                                        .toList(),
+                                  );
+                                  final upcomingTasks = allUpcomingTasks
+                                      .where((task) =>
+                                          isInTerm(task.dueDateTime, selectedTerm))
+                                      .toList();
+                                  final upcomingEvents = events
+                                      .where(
+                                        (event) =>
+                                            event.sessionId == selectedSession.id &&
+                                            event.termId == selectedTerm.id &&
+                                            !event.endDateTime.isBefore(
+                                              DateTime(
+                                                now.year,
+                                                now.month,
+                                                now.day,
+                                                0,
+                                                0,
+                                              ),
+                                            ),
+                                      )
+                                      .toList(growable: false)
+                                    ..sort((a, b) =>
+                                        a.startDateTime.compareTo(b.startDateTime));
+
+                                  final today =
+                                      DateTime(now.year, now.month, now.day);
+                                  final weekdayOrder = weekdayNamesMondayFirst;
+                                  final todayName = weekdayOrder[today.weekday - 1];
+
+                                  final overridesByOccurrenceKey = <String, ClassSlotOverride>{
+                                    for (final o in classOverrides)
+                                      if (o.occurrenceDate.year == today.year &&
+                                          o.occurrenceDate.month == today.month &&
+                                          o.occurrenceDate.day == today.day)
+                                        o.occurrenceKey: o,
+                                  };
+
+                                  final courseColorByCode = <String, Color>{
+                                    for (final c in courses.where(
+                                      (c) =>
+                                          c.sessionId == selectedSession.id &&
+                                          c.termId == selectedTerm.id,
+                                    ))
+                                      c.courseCode:
+                                          ScheduleAppointmentBuilder.parseHexColor(
+                                              c.courseColor),
+                                  };
+
+                                  final todayItems = timetables
+                                      .where(
+                                        (e) =>
+                                            e.sessionId == selectedSession.id &&
+                                            e.termId == selectedTerm.id,
+                                      )
+                                      .expand((entry) => entry.slots
+                                          .where((slot) => slot.day == todayName)
+                                          .map((slot) {
+                                            final overrideKey = ClassSlotOverride
+                                                .buildClassSlotOccurrenceKey(
+                                              classSlotId: slot.classSlotId,
+                                              occurrenceDate: today,
+                                            );
+                                            final override =
+                                                overridesByOccurrenceKey[overrideKey];
+                                            if (override?.action ==
+                                                ClassSlotOverrideAction.cancel) {
+                                              return null;
+                                            }
+                                            final overrideMode =
+                                                (override?.overrideMode ?? '').trim();
+                                            final overrideVenue =
+                                                (override?.overrideVenue ?? '').trim();
+                                            final effectiveSlot = override == null
+                                                ? slot
+                                                : slot.copyWith(
+                                                    mode: overrideMode.isEmpty
+                                                        ? slot.mode
+                                                        : overrideMode,
+                                                    venue: overrideVenue.isEmpty
+                                                        ? slot.venue
+                                                        : overrideVenue,
+                                                  );
+                                            return TodayClassItem(
+                                              slot: effectiveSlot,
+                                              courseCode: entry.courseCode,
+                                              courseColor: courseColorByCode[
+                                                      entry.courseCode] ??
+                                                  const Color(0xFF6C4DD9),
+                                            );
+                                          }))
+                                      .whereType<TodayClassItem>()
+                                      .toList(growable: false)
+                                    ..sort((a, b) {
+                                      final aStart = parseTimeLabel12hToMinutes(
+                                          a.slot.startTime);
+                                      final bStart = parseTimeLabel12hToMinutes(
+                                          b.slot.startTime);
+                                      if (aStart == null && bStart == null)
+                                        return 0;
+                                      if (aStart == null) return 1;
+                                      if (bStart == null) return -1;
+                                      return aStart.compareTo(bStart);
+                                    });
+
+                                  return Column(
+                                    children: [
+                                      Padding(
+                                        padding: const EdgeInsets.only(
+                                          left: AppSpacing.md,
+                                          right: AppSpacing.md,
+                                        ),
+                                        child: SessionHeader(
+                                          sessions: sessions,
+                                          selectedSessionId: selectedSession.id,
+                                          selectedTermId: selectedTerm.id,
+                                          onSelectionChanged: (sessionId, termId) {
+                                            setSelectedSessionTerm(
+                                              sessionId: sessionId,
+                                              termId: termId,
+                                            );
+                                          },
+                                        ),
+                                      ),
+                                      const SizedBox(height: AppSpacing.sm),
+                                      Expanded(
+                                        child: SingleChildScrollView(
+                                          padding: const EdgeInsets.only(
+                                            top: AppSpacing.sm,
+                                            left: AppSpacing.md,
+                                            right: AppSpacing.md,
+                                            bottom: AppSpacing.md,
+                                          ),
+                                          child: Column(
+                                            crossAxisAlignment:
+                                                CrossAxisAlignment.start,
+                                            children: [
+                                              TodayClassesCard(items: todayItems),
+                                              const SizedBox(height: AppSpacing.md),
+                                              UpcomingEventsCard(
+                                                  events: upcomingEvents),
+                                              const SizedBox(height: AppSpacing.md),
+                                              UpcomingDeadlinesCard(
+                                                  tasks: upcomingTasks),
+                                            ],
                                           ),
                                         ),
-                                  )
-                                  .toList(growable: false)
-                                ..sort((a, b) =>
-                                    a.startDateTime.compareTo(b.startDateTime));
-
-                              final today =
-                                  DateTime(now.year, now.month, now.day);
-                              final weekdayOrder = weekdayNamesMondayFirst;
-                              final todayName = weekdayOrder[today.weekday - 1];
-
-                              final courseColorByCode = <String, Color>{
-                                for (final c in courses.where(
-                                  (c) =>
-                                      c.sessionId == selectedSession.id &&
-                                      c.termId == selectedTerm.id,
-                                ))
-                                  c.courseCode:
-                                      ScheduleAppointmentBuilder.parseHexColor(
-                                          c.courseColor),
-                              };
-
-                              final todayItems = timetables
-                                  .where(
-                                    (e) =>
-                                        e.sessionId == selectedSession.id &&
-                                        e.termId == selectedTerm.id,
-                                  )
-                                  .expand((entry) => entry.slots
-                                      .where((slot) => slot.day == todayName)
-                                      .map(
-                                        (slot) => TodayClassItem(
-                                          slot: slot,
-                                          courseCode: entry.courseCode,
-                                          courseColor: courseColorByCode[
-                                                  entry.courseCode] ??
-                                              const Color(0xFF6C4DD9),
-                                        ),
-                                      ))
-                                  .toList(growable: false)
-                                ..sort((a, b) {
-                                  final aStart = parseTimeLabel12hToMinutes(
-                                      a.slot.startTime);
-                                  final bStart = parseTimeLabel12hToMinutes(
-                                      b.slot.startTime);
-                                  if (aStart == null && bStart == null)
-                                    return 0;
-                                  if (aStart == null) return 1;
-                                  if (bStart == null) return -1;
-                                  return aStart.compareTo(bStart);
-                                });
-
-                              return Column(
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.only(
-                                      left: AppSpacing.md,
-                                      right: AppSpacing.md,
-                                    ),
-                                    child: SessionHeader(
-                                      sessions: sessions,
-                                      selectedSessionId: selectedSession.id,
-                                      selectedTermId: selectedTerm.id,
-                                      onSelectionChanged: (sessionId, termId) {
-                                        setSelectedSessionTerm(
-                                          sessionId: sessionId,
-                                          termId: termId,
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                  const SizedBox(height: AppSpacing.sm),
-                                  Expanded(
-                                    child: SingleChildScrollView(
-                                      padding: const EdgeInsets.only(
-                                        top: AppSpacing.sm,
-                                        left: AppSpacing.md,
-                                        right: AppSpacing.md,
-                                        bottom: AppSpacing.md,
                                       ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          TodayClassesCard(items: todayItems),
-                                          const SizedBox(height: AppSpacing.md),
-                                          UpcomingEventsCard(
-                                              events: upcomingEvents),
-                                          const SizedBox(height: AppSpacing.md),
-                                          UpcomingDeadlinesCard(
-                                              tasks: upcomingTasks),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                                    ],
+                                  );
+                                },
                               );
                             },
                           );
