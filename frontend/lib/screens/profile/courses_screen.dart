@@ -43,7 +43,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
           if (sessions.isEmpty) {
             return Center(
               child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
+                padding: const EdgeInsets.all(AppSpacing.md),
                 child: EmptyStateCard(
                   title: 'No academic session',
                   subtitle:
@@ -106,9 +106,8 @@ class _CoursesScreenState extends State<CoursesScreen> {
 
               final header = Padding(
                 padding: const EdgeInsets.only(
-                  top: AppSpacing.lg,
-                  left: AppSpacing.lg,
-                  right: AppSpacing.lg,
+                  left: AppSpacing.md,
+                  right: AppSpacing.md,
                   bottom: AppSpacing.sm,
                 ),
                 child: SessionHeader(
@@ -143,7 +142,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
                           buttonText: 'Add course',
                           icon: Icons.book_outlined,
                           onPressed: () {
-                            AddCourseDialog.show(
+                            CourseDialog.show(
                               context,
                               sessionId: selectedSession.id,
                               termId: selectedTerm.id,
@@ -161,8 +160,8 @@ class _CoursesScreenState extends State<CoursesScreen> {
                   header,
                   Padding(
                     padding: const EdgeInsets.only(
-                      left: AppSpacing.lg,
-                      right: AppSpacing.lg,
+                      left: AppSpacing.md,
+                      right: AppSpacing.md,
                       bottom: AppSpacing.xs,
                     ),
                     child: Row(
@@ -175,9 +174,10 @@ class _CoursesScreenState extends State<CoursesScreen> {
                         const SizedBox(width: 6),
                         Text(
                           'Tap a course to edit',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: Colors.grey.shade600,
-                              ),
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Colors.grey.shade600,
+                                  ),
                         ),
                       ],
                     ),
@@ -185,9 +185,9 @@ class _CoursesScreenState extends State<CoursesScreen> {
                   Expanded(
                     child: ListView.builder(
                       padding: const EdgeInsets.only(
-                        left: AppSpacing.lg,
-                        right: AppSpacing.lg,
-                        bottom: AppSpacing.lg,
+                        left: AppSpacing.md,
+                        right: AppSpacing.md,
+                        bottom: AppSpacing.md,
                       ),
                       itemCount: filteredCourses.length + 1,
                       itemBuilder: (context, index) {
@@ -212,7 +212,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
                                   shape: const StadiumBorder(),
                                 ),
                                 onPressed: () {
-                                  AddCourseDialog.show(
+                                  CourseDialog.show(
                                     context,
                                     sessionId: selectedSession.id,
                                     termId: selectedTerm.id,
@@ -233,8 +233,8 @@ class _CoursesScreenState extends State<CoursesScreen> {
 
                         return Container(
                           width: double.infinity,
-                          margin:
-                              const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+                          margin: const EdgeInsets.symmetric(
+                              vertical: AppSpacing.xs),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(10),
@@ -260,15 +260,17 @@ class _CoursesScreenState extends State<CoursesScreen> {
                                   .primary
                                   .withValues(alpha: 0.04),
                               onTap: () {
-                                EditCourseDialog.show(
+                                CourseDialog.show(
                                   context,
+                                  sessionId: course.sessionId,
+                                  termId: course.termId,
                                   course: course,
                                 );
                               },
                               child: ListTile(
                                 leading: Container(
-                                  width: 12,
-                                  height: 12,
+                                  width: 16,
+                                  height: 16,
                                   decoration: BoxDecoration(
                                     color: courseColor,
                                     shape: BoxShape.circle,
@@ -328,4 +330,3 @@ class _CoursesScreenState extends State<CoursesScreen> {
     );
   }
 }
-

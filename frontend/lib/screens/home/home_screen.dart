@@ -68,7 +68,8 @@ class _HomeScreenState extends State<HomeScreen> {
           // Build all (session, term) combinations and resolve default.
           final now = DateTime.now();
           final allTermRefs = buildAllSessionTermRefs(sessions);
-          final resolvedDefaultRef = resolveDefaultSessionTermRef(allTermRefs, now);
+          final resolvedDefaultRef =
+              resolveDefaultSessionTermRef(allTermRefs, now);
 
           return ValueListenableBuilder<SessionTermSelection?>(
             valueListenable: selectedSessionTermNotifier,
@@ -113,111 +114,127 @@ class _HomeScreenState extends State<HomeScreen> {
                           return ValueListenableBuilder<List<TimetableEntry>>(
                             valueListenable: timetablesNotifier,
                             builder: (context, timetables, _) {
-              // Get upcoming tasks and filter by selected term window
-              final allUpcomingTasks = TaskUtils.getUpcomingTasks(
-                tasks.where((t) => t.parentTaskId == null).toList(),
-              );
-              final upcomingTasks = allUpcomingTasks
-                  .where((task) => isInTerm(task.dueDateTime, selectedTerm))
-                  .toList();
-              final upcomingEvents = events
-                  .where(
-                    (event) =>
-                        event.sessionId == selectedSession.id &&
-                        event.termId == selectedTerm.id &&
-                        !event.endDateTime.isBefore(
-                          DateTime(
-                            now.year,
-                            now.month,
-                            now.day,
-                            0,
-                            0,
-                          ),
-                        ),
-                  )
-                  .toList(growable: false)
-                ..sort((a, b) => a.startDateTime.compareTo(b.startDateTime));
+                              // Get upcoming tasks and filter by selected term window
+                              final allUpcomingTasks =
+                                  TaskUtils.getUpcomingTasks(
+                                tasks
+                                    .where((t) => t.parentTaskId == null)
+                                    .toList(),
+                              );
+                              final upcomingTasks = allUpcomingTasks
+                                  .where((task) =>
+                                      isInTerm(task.dueDateTime, selectedTerm))
+                                  .toList();
+                              final upcomingEvents = events
+                                  .where(
+                                    (event) =>
+                                        event.sessionId == selectedSession.id &&
+                                        event.termId == selectedTerm.id &&
+                                        !event.endDateTime.isBefore(
+                                          DateTime(
+                                            now.year,
+                                            now.month,
+                                            now.day,
+                                            0,
+                                            0,
+                                          ),
+                                        ),
+                                  )
+                                  .toList(growable: false)
+                                ..sort((a, b) =>
+                                    a.startDateTime.compareTo(b.startDateTime));
 
-              final today = DateTime(now.year, now.month, now.day);
-              final weekdayOrder = weekdayNamesMondayFirst;
-              final todayName = weekdayOrder[today.weekday - 1];
+                              final today =
+                                  DateTime(now.year, now.month, now.day);
+                              final weekdayOrder = weekdayNamesMondayFirst;
+                              final todayName = weekdayOrder[today.weekday - 1];
 
-              final courseColorByCode = <String, Color>{
-                for (final c in courses.where(
-                  (c) => c.sessionId == selectedSession.id && c.termId == selectedTerm.id,
-                ))
-                  c.courseCode: ScheduleAppointmentBuilder.parseHexColor(c.courseColor),
-              };
+                              final courseColorByCode = <String, Color>{
+                                for (final c in courses.where(
+                                  (c) =>
+                                      c.sessionId == selectedSession.id &&
+                                      c.termId == selectedTerm.id,
+                                ))
+                                  c.courseCode:
+                                      ScheduleAppointmentBuilder.parseHexColor(
+                                          c.courseColor),
+                              };
 
-              final todayItems = timetables
-                  .where(
-                    (e) =>
-                        e.sessionId == selectedSession.id &&
-                        e.termId == selectedTerm.id,
-                  )
-                  .expand((entry) => entry.slots
-                      .where((slot) => slot.day == todayName)
-                      .map(
-                        (slot) => TodayClassItem(
-                          slot: slot,
-                          courseCode: entry.courseCode,
-                          courseColor:
-                              courseColorByCode[entry.courseCode] ?? const Color(0xFF6C4DD9),
-                        ),
-                      ))
-                  .toList(growable: false)
-                ..sort((a, b) {
-                  final aStart = parseTimeLabel12hToMinutes(a.slot.startTime);
-                  final bStart = parseTimeLabel12hToMinutes(b.slot.startTime);
-                  if (aStart == null && bStart == null) return 0;
-                  if (aStart == null) return 1;
-                  if (bStart == null) return -1;
-                  return aStart.compareTo(bStart);
-                });
+                              final todayItems = timetables
+                                  .where(
+                                    (e) =>
+                                        e.sessionId == selectedSession.id &&
+                                        e.termId == selectedTerm.id,
+                                  )
+                                  .expand((entry) => entry.slots
+                                      .where((slot) => slot.day == todayName)
+                                      .map(
+                                        (slot) => TodayClassItem(
+                                          slot: slot,
+                                          courseCode: entry.courseCode,
+                                          courseColor: courseColorByCode[
+                                                  entry.courseCode] ??
+                                              const Color(0xFF6C4DD9),
+                                        ),
+                                      ))
+                                  .toList(growable: false)
+                                ..sort((a, b) {
+                                  final aStart = parseTimeLabel12hToMinutes(
+                                      a.slot.startTime);
+                                  final bStart = parseTimeLabel12hToMinutes(
+                                      b.slot.startTime);
+                                  if (aStart == null && bStart == null)
+                                    return 0;
+                                  if (aStart == null) return 1;
+                                  if (bStart == null) return -1;
+                                  return aStart.compareTo(bStart);
+                                });
 
-                          return Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(
-                      top: AppSpacing.md,
-                      left: AppSpacing.lg,
-                      right: AppSpacing.lg,
-                    ),
-                    child: SessionHeader(
-                      sessions: sessions,
-                      selectedSessionId: selectedSession.id,
-                      selectedTermId: selectedTerm.id,
-                      onSelectionChanged: (sessionId, termId) {
-                        setSelectedSessionTerm(
-                          sessionId: sessionId,
-                          termId: termId,
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.only(
-                        top: AppSpacing.md,
-                        left: AppSpacing.lg,
-                        right: AppSpacing.lg,
-                        bottom: AppSpacing.lg,
-                      ),
-                          child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                          TodayClassesCard(items: todayItems),
-                          const SizedBox(height: AppSpacing.lg),
-                          UpcomingEventsCard(events: upcomingEvents),
-                          const SizedBox(height: AppSpacing.lg),
-                          UpcomingDeadlinesCard(tasks: upcomingTasks),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-                          );
+                              return Column(
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      left: AppSpacing.md,
+                                      right: AppSpacing.md,
+                                    ),
+                                    child: SessionHeader(
+                                      sessions: sessions,
+                                      selectedSessionId: selectedSession.id,
+                                      selectedTermId: selectedTerm.id,
+                                      onSelectionChanged: (sessionId, termId) {
+                                        setSelectedSessionTerm(
+                                          sessionId: sessionId,
+                                          termId: termId,
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                  const SizedBox(height: AppSpacing.sm),
+                                  Expanded(
+                                    child: SingleChildScrollView(
+                                      padding: const EdgeInsets.only(
+                                        top: AppSpacing.sm,
+                                        left: AppSpacing.md,
+                                        right: AppSpacing.md,
+                                        bottom: AppSpacing.md,
+                                      ),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        children: [
+                                          TodayClassesCard(items: todayItems),
+                                          const SizedBox(height: AppSpacing.md),
+                                          UpcomingEventsCard(
+                                              events: upcomingEvents),
+                                          const SizedBox(height: AppSpacing.md),
+                                          UpcomingDeadlinesCard(
+                                              tasks: upcomingTasks),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
                             },
                           );
                         },

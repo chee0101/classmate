@@ -4,219 +4,83 @@ import '../../constants/app_spacing.dart';
 import '../../services/course_store.dart';
 import '../../models/course.dart';
 import '../common/form_fields.dart';
+import '../common/color_picker.dart';
 
-class AddCourseDialog extends StatefulWidget {
-  const AddCourseDialog({
+class CourseDialog extends StatefulWidget {
+  const CourseDialog({
     super.key,
     required this.sessionId,
     required this.termId,
+    this.course,
   });
 
   final String sessionId;
   final String termId;
+  final Course? course;
+
+  bool get isEdit => course != null;
 
   static Future<String?> show(
     BuildContext context, {
     required String sessionId,
     required String termId,
+    Course? course,
   }) {
     return showDialog<String>(
       context: context,
       barrierDismissible: true,
-      builder: (_) => AddCourseDialog(sessionId: sessionId, termId: termId),
-    );
-  }
-
-  @override
-  State<AddCourseDialog> createState() => _AddCourseDialogState();
-}
-
-class _AddCourseDialogState extends State<AddCourseDialog> {
-  final TextEditingController _codeController = TextEditingController();
-  String? _errorText;
-  int _selectedColorIndex = 0;
-
-  final List<Color> _colors = const [
-    Color(0xFF3B82F6), // blue
-    Color(0xFF22C55E), // green
-    Color(0xFFF97316), // orange
-    Color(0xFFEAB308), // yellow
-    Color(0xFF6366F1), // indigo
-    Color(0xFFEF4444), // red
-    Color(0xFF14B8A6), // teal
-    Color(0xFFEC4899), // pink
-  ];
-
-  @override
-  void dispose() {
-    _codeController.dispose();
-    super.dispose();
-  }
-
-  void _handleSave() {
-    final code = _codeController.text.trim();
-    if (code.isEmpty) {
-      setState(() => _errorText = 'Course code is required.');
-      return;
-    }
-
-    if (courseCodeExistsInSessionAndTerm(
-      sessionId: widget.sessionId,
-      termId: widget.termId,
-      courseCode: code,
-    )) {
-      setState(() => _errorText = 'This course code already exists.');
-      return;
-    }
-
-    final color = _colors[_selectedColorIndex];
-    final hex =
-        '#${color.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
-
-    addCourse(
-      sessionId: widget.sessionId,
-      termId: widget.termId,
-      courseCode: code,
-      courseColor: hex,
-    );
-
-    Navigator.of(context).pop(code.trim().toUpperCase());
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-
-    return Dialog(
-      backgroundColor: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Text(
-                'Add Course',
-                style: textTheme.headlineMedium,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            LabeledTextField(
-              label: 'Course Code',
-              hintText: 'Enter course code',
-              controller: _codeController,
-              errorText: _errorText,
-              onChanged: (_) {
-                if (_errorText != null) {
-                  setState(() => _errorText = null);
-                }
-              },
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              'Color Tag',
-              style: textTheme.titleSmall,
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: List.generate(_colors.length, (index) {
-                final color = _colors[index];
-                final selected = index == _selectedColorIndex;
-                return Padding(
-                  padding: const EdgeInsets.only(right: AppSpacing.sm),
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() => _selectedColorIndex = index);
-                    },
-                    child: Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: color,
-                        border: selected
-                            ? Border.all(
-                                color: Colors.black.withOpacity(0.6),
-                                width: 2,
-                              )
-                            : null,
-                      ),
-                    ),
-                  ),
-                );
-              }),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _handleSave,
-                child: const Text('Add course'),
-              ),
-            ),
-          ],
-        ),
+      builder: (_) => CourseDialog(
+        sessionId: sessionId,
+        termId: termId,
+        course: course,
       ),
     );
   }
-}
-
-class EditCourseDialog extends StatefulWidget {
-  const EditCourseDialog({
-    super.key,
-    required this.course,
-  });
-
-  final Course course;
-
-  static Future<void> show(
-    BuildContext context, {
-    required Course course,
-  }) {
-    return showDialog<void>(
-      context: context,
-      barrierDismissible: true,
-      builder: (_) => EditCourseDialog(course: course),
-    );
-  }
 
   @override
-  State<EditCourseDialog> createState() => _EditCourseDialogState();
+  State<CourseDialog> createState() => _CourseDialogState();
 }
 
-class _EditCourseDialogState extends State<EditCourseDialog> {
+class _CourseDialogState extends State<CourseDialog> {
   late final TextEditingController _codeController;
   String? _errorText;
   int _selectedColorIndex = 0;
 
   final List<Color> _colors = const [
-    Color(0xFF3B82F6), // blue
-    Color(0xFF22C55E), // green
-    Color(0xFFF97316), // orange
-    Color(0xFFEAB308), // yellow
-    Color(0xFF6366F1), // indigo
-    Color(0xFFEF4444), // red
-    Color(0xFF14B8A6), // teal
-    Color(0xFFEC4899), // pink
+    Color(0xFF3B82F6),
+    Color(0xFF22C55E),
+    Color(0xFFF97316),
+    Color(0xFFEAB308),
+    Color(0xFF6366F1),
+    Color(0xFFEF4444),
+    Color(0xFF14B8A6),
+    Color(0xFFEC4899),
   ];
 
   @override
   void initState() {
     super.initState();
-    _codeController = TextEditingController(text: widget.course.courseCode);
 
-    final colorValue = int.tryParse(
-      widget.course.courseColor.replaceFirst('#', '0xFF'),
-    );
-    final currentColor = Color(colorValue ?? _colors.first.value);
-    final index =
-        _colors.indexWhere((color) => color.value == currentColor.value);
-    _selectedColorIndex = index == -1 ? 0 : index;
+    if (widget.isEdit) {
+      final course = widget.course!;
+
+      _codeController =
+          TextEditingController(text: course.courseCode);
+
+      final colorValue = int.tryParse(
+        course.courseColor.replaceFirst('#', '0xFF'),
+      );
+
+      final currentColor = Color(colorValue ?? _colors.first.value);
+
+      final index = _colors.indexWhere(
+        (c) => c.value == currentColor.value,
+      );
+
+      _selectedColorIndex = index == -1 ? 0 : index;
+    } else {
+      _codeController = TextEditingController();
+    }
   }
 
   @override
@@ -227,18 +91,9 @@ class _EditCourseDialogState extends State<EditCourseDialog> {
 
   void _handleSave() {
     final code = _codeController.text.trim();
+
     if (code.isEmpty) {
       setState(() => _errorText = 'Course code is required.');
-      return;
-    }
-
-    if (courseCodeExistsInSessionAndTermExcludingCourse(
-      sessionId: widget.course.sessionId,
-      termId: widget.course.termId,
-      courseId: widget.course.id,
-      courseCode: code,
-    )) {
-      setState(() => _errorText = 'This course code already exists.');
       return;
     }
 
@@ -246,15 +101,45 @@ class _EditCourseDialogState extends State<EditCourseDialog> {
     final hex =
         '#${color.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
 
-    updateCourse(
-      id: widget.course.id,
-      sessionId: widget.course.sessionId,
-      termId: widget.course.termId,
-      courseCode: code,
-      courseColor: hex,
-    );
+    if (widget.isEdit) {
+      final course = widget.course!;
 
-    Navigator.of(context).pop();
+      if (courseCodeExistsInSessionAndTermExcludingCourse(
+        sessionId: course.sessionId,
+        termId: course.termId,
+        courseId: course.id,
+        courseCode: code,
+      )) {
+        setState(() => _errorText = 'This course code already exists.');
+        return;
+      }
+
+      updateCourse(
+        id: course.id,
+        sessionId: course.sessionId,
+        termId: course.termId,
+        courseCode: code,
+        courseColor: hex,
+      );
+    } else {
+      if (courseCodeExistsInSessionAndTerm(
+        sessionId: widget.sessionId,
+        termId: widget.termId,
+        courseCode: code,
+      )) {
+        setState(() => _errorText = 'This course code already exists.');
+        return;
+      }
+
+      addCourse(
+        sessionId: widget.sessionId,
+        termId: widget.termId,
+        courseCode: code,
+        courseColor: hex,
+      );
+    }
+
+    Navigator.of(context).pop(code.toUpperCase()); // ✅ RETURN VALUE
   }
 
   @override
@@ -274,7 +159,7 @@ class _EditCourseDialogState extends State<EditCourseDialog> {
           children: [
             Center(
               child: Text(
-                'Edit Course',
+                widget.isEdit ? 'Edit Course' : 'Add Course',
                 style: textTheme.headlineMedium,
               ),
             ),
@@ -296,41 +181,24 @@ class _EditCourseDialogState extends State<EditCourseDialog> {
               style: textTheme.titleSmall,
             ),
             const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.start,
-              children: List.generate(_colors.length, (index) {
-                final color = _colors[index];
-                final selected = index == _selectedColorIndex;
-                return Padding(
-                  padding: const EdgeInsets.only(right: AppSpacing.sm),
-                  child: GestureDetector(
-                    onTap: () {
-                      setState(() => _selectedColorIndex = index);
-                    },
-                    child: Container(
-                      width: 24,
-                      height: 24,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: color,
-                        border: selected
-                            ? Border.all(
-                                color: Colors.black.withOpacity(0.6),
-                                width: 2,
-                              )
-                            : null,
-                      ),
-                    ),
-                  ),
-                );
-              }),
+
+            /// ✅ Reusable Color Picker
+            ColorPicker(
+              colors: _colors,
+              selectedIndex: _selectedColorIndex,
+              onSelect: (index) {
+                setState(() => _selectedColorIndex = index);
+              },
             ),
+
             const SizedBox(height: AppSpacing.lg),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
                 onPressed: _handleSave,
-                child: const Text('Save changes'),
+                child: Text(
+                  widget.isEdit ? 'Save changes' : 'Add course',
+                ),
               ),
             ),
           ],

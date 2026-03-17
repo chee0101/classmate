@@ -49,7 +49,7 @@ class _TaskScreenState extends State<TaskScreen> {
           if (sessions.isEmpty) {
             return Center(
               child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
+                padding: const EdgeInsets.all(AppSpacing.md),
                 child: EmptyStateCard(
                   onPressed: () {
                     AcademicSessionSetupBottomSheet.show(context);
@@ -129,9 +129,9 @@ class _TaskScreenState extends State<TaskScreen> {
             children: [
               Padding(
                 padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.lg,
                   AppSpacing.md,
-                  AppSpacing.lg,
+                  0,
+                  AppSpacing.md,
                   0,
                 ),
                 child: SessionTermContextLabel(
@@ -139,12 +139,12 @@ class _TaskScreenState extends State<TaskScreen> {
                   termLabel: selectedRef.term.label,
                 ),
               ),
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.sm),
               Padding(
                 padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.lg,
+                  AppSpacing.md,
                   0,
-                  AppSpacing.lg,
+                  AppSpacing.md,
                   0,
                 ),
                 child: TaskStatusTabs(
@@ -154,9 +154,9 @@ class _TaskScreenState extends State<TaskScreen> {
                   },
                 ),
               ),
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.sm),
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                 child: TaskCourseFilter(
                   courseCodes: courseCodes,
                   selectedCourseCode: _selectedCourseCode,
@@ -165,14 +165,14 @@ class _TaskScreenState extends State<TaskScreen> {
                   },
                 ),
               ),
-              const SizedBox(height: AppSpacing.md),
+              const SizedBox(height: AppSpacing.sm),
               Expanded(
                 child: Padding(
                   padding: EdgeInsets.zero,
                   child: tasks.isEmpty
                       ? Center(
                           child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg), 
+                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md), 
                             child: Text(
                               'No tasks found. Looks like you\'re all caught up!',
                               style: textTheme.bodyLarge,
@@ -182,13 +182,13 @@ class _TaskScreenState extends State<TaskScreen> {
                         )
                       : ListView.separated(
                           padding: const EdgeInsets.only(
-                            bottom: AppSpacing.lg,
-                            left: AppSpacing.lg,
-                            right: AppSpacing.lg,
+                            bottom: AppSpacing.md,
+                            left: AppSpacing.md,
+                            right: AppSpacing.md,
                           ),
                           itemCount: tasks.length,
                           separatorBuilder: (_, __) =>
-                              const SizedBox(height: AppSpacing.md),
+                              const SizedBox(height: AppSpacing.sm),
                           itemBuilder: (context, index) {
                             final task = tasks[index];
                             final nextSubtaskTitle =

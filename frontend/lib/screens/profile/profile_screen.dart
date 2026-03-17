@@ -108,17 +108,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // User Information Section
             _buildUserInfoSection(textTheme),
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.md),
 
             // Account Management Section
             _buildSectionHeader(textTheme, 'Account Management'),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.sm),
             WhiteCard(
               child: _buildMenuItem(
                 context,
@@ -129,11 +129,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 },
               ),
             ),
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.md),
 
             // Academic Management Section
             _buildSectionHeader(textTheme, 'Academic Management'),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.sm),
             WhiteCard(
               child: Column(
                 children: [

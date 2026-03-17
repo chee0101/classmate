@@ -72,7 +72,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           if (sessions.isEmpty) {
             return Center(
               child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
+                padding: const EdgeInsets.all(AppSpacing.md),
                 child: EmptyStateCard(
                   onPressed: () {
                     AcademicSessionSetupBottomSheet.show(context);
@@ -172,7 +172,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                           return Column(
                             children: [
                               Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
+                                padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.sm),
                                 child: SessionTermContextLabel(
                                   sessionName: selectedSession.name,
                                   termLabel: selectedTerm.label,
@@ -180,7 +180,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                               ),
                               Padding(
                                 padding:
-                                    const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+                                    const EdgeInsets.symmetric(horizontal: AppSpacing.md),
                                 child: ScheduleModeToggle(
                                   showMonthly: _showMonthly,
                                   onChanged: (monthly) {
@@ -194,7 +194,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                   },
                                 ),
                               ),
-                              const SizedBox(height: AppSpacing.md),
+                              const SizedBox(height: AppSpacing.sm),
                               Expanded(
                                 child: Padding(
                                   padding: const EdgeInsets.fromLTRB(

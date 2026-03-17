@@ -236,7 +236,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
     String sessionId,
     String termId,
   ) async {
-    final newCode = await AddCourseDialog.show(
+    final newCode = await CourseDialog.show(
       context,
       sessionId: sessionId,
       termId: termId,
@@ -253,7 +253,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
     String sessionId,
     String termId,
   ) async {
-    final newCode = await AddCourseDialog.show(
+    final newCode = await CourseDialog.show(
       context,
       sessionId: sessionId,
       termId: termId,

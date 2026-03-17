@@ -52,7 +52,7 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
           if (sessions.isEmpty) {
             return Center(
               child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
+                padding: const EdgeInsets.all(AppSpacing.md),
                 child: EmptyStateCard(
                   title: 'No academic session',
                   subtitle:
@@ -108,9 +108,9 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
 
               final header = Padding(
                 padding: const EdgeInsets.only(
-                  top: AppSpacing.lg,
-                  left: AppSpacing.lg,
-                  right: AppSpacing.lg,
+                  top: 0,
+                  left: AppSpacing.md,
+                  right: AppSpacing.md,
                   bottom: AppSpacing.sm,
                 ),
                 child: SessionHeader(
@@ -137,7 +137,7 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
                     ),
                     Center(
         child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.lg),
+          padding: const EdgeInsets.all(AppSpacing.md),
                         child: EmptyStateCard(
                           title: 'No timetable in ${selectedTerm.label}',
                           subtitle:
@@ -160,8 +160,8 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
                   header,
                   Padding(
                     padding: const EdgeInsets.only(
-                      left: AppSpacing.lg,
-                      right: AppSpacing.lg,
+                      left: AppSpacing.md,
+                      right: AppSpacing.md,
                       bottom: AppSpacing.xs,
                     ),
                     child: Row(
@@ -185,9 +185,9 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
                   Expanded(
                     child: ListView.builder(
                       padding: const EdgeInsets.only(
-                        left: AppSpacing.lg,
-                        right: AppSpacing.lg,
-                        bottom: AppSpacing.lg,
+                        left: AppSpacing.md,
+                        right: AppSpacing.md,
+                        bottom: AppSpacing.md,
                       ),
                       itemCount: filtered.length + 1,
                       itemBuilder: (context, index) {
@@ -390,7 +390,7 @@ class _TimetableCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      margin: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(20),
@@ -413,7 +413,7 @@ class _TimetableCard extends StatelessWidget {
               Theme.of(context).colorScheme.primary.withValues(alpha: 0.04),
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.md),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.md),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -619,7 +619,7 @@ class _TimetableEditorSheetState extends State<_TimetableEditorSheet> {
   }
 
   Future<String?> _addCourseRequested() async {
-    final newCode = await AddCourseDialog.show(
+    final newCode = await CourseDialog.show(
       context,
       sessionId: widget.sessionId,
       termId: widget.termId,

@@ -44,7 +44,7 @@ class _AcademicSessionsScreenState extends State<AcademicSessionsScreen> {
           if (sessions.isEmpty) {
             return Center(
               child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
+                padding: const EdgeInsets.all(AppSpacing.md),
                 child: EmptyStateCard(
                   title: 'No academic sessions',
                   subtitle: 'Add your first academic session to get started',
@@ -97,7 +97,7 @@ class _AcademicSessionsScreenState extends State<AcademicSessionsScreen> {
           }
 
           return ListView.builder(
-            padding: const EdgeInsets.all(AppSpacing.lg),
+            padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
             itemCount: sessions.length,
             itemBuilder: (context, index) {
               final session = sessions[index];
@@ -107,7 +107,7 @@ class _AcademicSessionsScreenState extends State<AcademicSessionsScreen> {
               final termWindows = buildTermWindows(session);
 
               return Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.md),
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
                 child: WhiteCard(
                   padding: EdgeInsets.zero,
                   borderRadius: 20,
