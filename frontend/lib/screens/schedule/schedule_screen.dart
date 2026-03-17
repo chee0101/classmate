@@ -21,13 +21,13 @@ import '../../core/utils/schedule_appointment_details.dart';
 import '../../core/utils/session_term_resolver.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/models/session_term_ref.dart';
+import '../../core/constants/months.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/common/session_term_context_label.dart';
 import '../../core/widgets/schedule/class_slot_sheet.dart';
 import '../../core/widgets/schedule/schedule_class_appointment_text.dart';
 import '../../core/widgets/schedule/schedule_overflow_popup_menu.dart';
-import '../../core/widgets/schedule/schedule_mode_toggle.dart';
 import '../../core/widgets/schedule/schedule_details_sheet.dart';
 import 'schedule_class_editor_screen.dart';
 import 'schedule_event_editor_screen.dart';
@@ -44,6 +44,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   final CalendarController _calendarController = CalendarController();
   DateTime _visibleDate = DateTime.now();
   Offset? _lastPointerGlobalPosition;
+
+  String get _calendarTitle {
+    final month = monthShortLabel(_visibleDate.month);
+    return '$month ${_visibleDate.year}';
+  }
+
+  void _setCalendarView(CalendarView view) {
+    setState(() {
+      _showMonthly = view == CalendarView.month;
+      _calendarController.view = view;
+      _calendarController.displayDate = _visibleDate;
+    });
+  }
 
   @override
   void initState() {
@@ -178,23 +191,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                   termLabel: selectedTerm.label,
                                 ),
                               ),
-                              Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                                child: ScheduleModeToggle(
-                                  showMonthly: _showMonthly,
-                                  onChanged: (monthly) {
-                                    setState(() {
-                                      _showMonthly = monthly;
-                                      _calendarController.view = monthly
-                                          ? CalendarView.month
-                                          : CalendarView.week;
-                                      _calendarController.displayDate = _visibleDate;
-                                    });
-                                  },
-                                ),
-                              ),
-                              const SizedBox(height: AppSpacing.sm),
                               Expanded(
                                 child: Padding(
                                   padding: const EdgeInsets.fromLTRB(
@@ -205,60 +201,67 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                   ),
                                   child: ClipRRect(
                                     borderRadius: BorderRadius.circular(16),
-                                    child: SfCalendar(
-                                        controller: _calendarController,
-                                        view: _showMonthly
-                                            ? CalendarView.month
-                                            : CalendarView.week,
-                                        backgroundColor: Colors.white,
-                                        dataSource: _ScheduleDataSource(appointments),
-                                        firstDayOfWeek: 1,
-                                        headerHeight: 40,
-                                        headerStyle: const CalendarHeaderStyle(
-                                          textStyle: TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            color: Colors.white,
-                                          ),
-                                          backgroundColor: Color(0xFF6E52D9),
-                                        ),
-                                        showNavigationArrow: true,
-                                        viewHeaderHeight: _showMonthly ? 40 : 58,
-                                        viewHeaderStyle: const ViewHeaderStyle(
-                                          backgroundColor: Color(0xFFE2E4FD),
-                                        ),
-                                        showDatePickerButton: true,
-                                        showCurrentTimeIndicator: true,
-                                        selectionDecoration: const BoxDecoration(
-                                          color: Colors.transparent,
-                                        ),
-                                        onViewChanged: (details) {
-                                          if (details.visibleDates.isEmpty) return;
-                                          final middle = details
-                                              .visibleDates[details.visibleDates.length ~/ 2];
-                                          if (!mounted || _visibleDate == middle) return;
-                                          WidgetsBinding.instance.addPostFrameCallback((_) {
-                                            if (!mounted || _visibleDate == middle) return;
-                                            setState(() {
-                                              _visibleDate = middle;
-                                            });
-                                          });
-                                        },
-                                        monthViewSettings: const MonthViewSettings(
-                                          appointmentDisplayMode:
-                                              MonthAppointmentDisplayMode.indicator,
-                                          showAgenda: true,
-                                          agendaItemHeight: 44,
-                                          agendaStyle: AgendaStyle(
-                                            backgroundColor: Color(0xFFE2E4FD),
-                                          ),
-                                        ),
-                                        timeSlotViewSettings: const TimeSlotViewSettings(
-                                          startHour: 0,
-                                          endHour: 24,
-                                          timeIntervalHeight: 64,
-                                        ),
-                                        appointmentBuilder:
-                                            (context, calendarAppointmentDetails) {
+                                    child: Column(
+                                      children: [
+                                        Expanded(
+                                          child: 
+                                          SfCalendar(
+                                              controller: _calendarController,
+                                              
+                                              allowedViews: const [
+                                                // CalendarView.day,
+                                                CalendarView.week,
+                                                CalendarView.month,
+                                              ],
+                                              backgroundColor: Colors.white,
+                                              dataSource: _ScheduleDataSource(appointments),
+                                              firstDayOfWeek: 1,
+                                              headerHeight: 40,
+                                              headerStyle: const CalendarHeaderStyle(
+                                                backgroundColor: Color(0xFFE2E4FD),
+                                                textStyle: TextStyle(color: Colors.black),
+                                              ),
+                                              showNavigationArrow: false,
+                                              showDatePickerButton: true,
+                                              viewHeaderStyle: const ViewHeaderStyle(
+                                                backgroundColor: Color(0xFFE2E4FD),
+                                              ),
+                                              showCurrentTimeIndicator: true,
+                                              selectionDecoration: const BoxDecoration(
+                                                color: Colors.transparent,
+                                              ),
+                                              onViewChanged: (details) {
+                                                if (details.visibleDates.isEmpty) return;
+                                                final middle = details.visibleDates[
+                                                    details.visibleDates.length ~/ 2];
+                                                final currentView = _calendarController.view;
+                                                if (!mounted || _visibleDate == middle) return;
+                                                WidgetsBinding.instance
+                                                    .addPostFrameCallback((_) {
+                                                  if (!mounted || _visibleDate == middle) return;
+                                                  setState(() {
+                                                    _visibleDate = middle;
+                                                    _showMonthly = currentView == CalendarView.month;
+                                                  });
+                                                });
+                                              },
+                                              monthViewSettings: const MonthViewSettings(
+                                                appointmentDisplayMode:
+                                                    MonthAppointmentDisplayMode.indicator,
+                                                showAgenda: true,
+                                                agendaItemHeight: 44,
+                                                agendaStyle: AgendaStyle(
+                                                  backgroundColor: Color(0xFFE2E4FD),
+                                                ),
+                                              ),
+                                              timeSlotViewSettings:
+                                                  const TimeSlotViewSettings(
+                                                startHour: 0,
+                                                endHour: 24,
+                                                timeIntervalHeight: 64,
+                                              ),
+                                              appointmentBuilder:
+                                                  (context, calendarAppointmentDetails) {
                                           final appointment =
                                               calendarAppointmentDetails
                                                   .appointments
@@ -405,6 +408,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                           );
                                         },
                                       ),
+                                        ),
+                                      ],
+                                    ),
                                   ),
                                 ),
                               ),
