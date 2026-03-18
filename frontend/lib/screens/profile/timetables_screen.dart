@@ -16,7 +16,11 @@ import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/home/session_header.dart';
 import '../../core/widgets/schedule/class_slot_sheet.dart';
+import '../../core/widgets/common/animated_segmented_switch.dart';
+import '../../core/widgets/common/label_chip.dart';
 import '../schedule/class_slot_editor_screen.dart';
+import '../../core/constants/app_colors.dart';
+import '../../core/models/course.dart';
 
 class TimetablesScreen extends StatefulWidget {
   const TimetablesScreen({super.key});
@@ -28,6 +32,88 @@ class TimetablesScreen extends StatefulWidget {
 class _TimetablesScreenState extends State<TimetablesScreen> {
   String? _selectedSessionId;
   String? _selectedTermId;
+
+  _TimetableViewMode _viewMode = _TimetableViewMode.byDay;
+
+  Color _parseCourseColorHex(String hex) {
+    final value = int.tryParse(hex.replaceFirst('#', '0xFF'));
+    return Color(value ?? appPrimarySwatch.value);
+  }
+
+  bool _sameTimetableSlot(TimetableSlot a, TimetableSlot b) {
+    final aId = (a.classSlotId).trim();
+    final bId = (b.classSlotId).trim();
+    if (aId.isNotEmpty && bId.isNotEmpty) return aId == bId;
+
+    return a.day.trim() == b.day.trim() &&
+        a.startTime.trim() == b.startTime.trim() &&
+        a.endTime.trim() == b.endTime.trim() &&
+        a.mode.trim() == b.mode.trim() &&
+        a.classType == b.classType &&
+        (a.venue ?? '').trim() == (b.venue ?? '').trim();
+  }
+
+  Future<void> _confirmAndDeleteSingleSlot({
+    required TimetableEntry entry,
+    required TimetableSlot slot,
+  }) async {
+    final shouldDelete = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            backgroundColor: Colors.white,
+            title: const Text('Delete class slot'),
+            content: Text(
+              'Delete class for ${entry.courseCode} on ${slot.day} (${slot.startTime} – ${slot.endTime})?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Cancel'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text(
+                  'Delete',
+                  style: TextStyle(color: Colors.red),
+                ),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+
+    if (!shouldDelete) return;
+
+    final nextSlots = entry.slots
+        .where((s) => !_sameTimetableSlot(s, slot))
+        .toList(growable: false);
+
+    if (nextSlots.isEmpty) {
+      await deleteTimetableEntry(entry.id);
+      return;
+    }
+
+    await updateTimetableEntry(
+      id: entry.id,
+      sessionId: entry.sessionId,
+      termId: entry.termId,
+      courseCode: entry.courseCode,
+      slots: nextSlots,
+    );
+  }
+
+  List<String> _sortedDays(Iterable<String> days) {
+    final sorted = days.toList(growable: false);
+    sorted.sort((a, b) {
+      final ai = weekdayOrderFromString(a);
+      final bi = weekdayOrderFromString(b);
+      if (ai == 99 && bi == 99) return a.compareTo(b);
+      if (ai == 99) return 1;
+      if (bi == 99) return -1;
+      return ai.compareTo(bi);
+    });
+    return sorted;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -98,14 +184,6 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
           return ValueListenableBuilder<List<TimetableEntry>>(
             valueListenable: timetablesNotifier,
             builder: (context, entries, _) {
-              final filtered = entries
-                  .where(
-                    (e) =>
-                        e.sessionId == selectedSession.id &&
-                        e.termId == selectedTerm.id,
-                  )
-                  .toList(growable: false);
-
               final header = Padding(
                 padding: const EdgeInsets.only(
                   top: 0,
@@ -126,7 +204,13 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
                 ),
               );
 
-              if (filtered.isEmpty) {
+              if (entries
+                  .where(
+                    (e) =>
+                        e.sessionId == selectedSession.id &&
+                        e.termId == selectedTerm.id,
+                  )
+                  .isEmpty) {
                 return Stack(
                   children: [
                     Column(
@@ -136,8 +220,8 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
                       ],
                     ),
                     Center(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
+                      child: Padding(
+                        padding: const EdgeInsets.all(AppSpacing.md),
                         child: EmptyStateCard(
                           title: 'No timetable in ${selectedTerm.label}',
                           subtitle:
@@ -155,112 +239,214 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
                 );
               }
 
-              return Column(
-                children: [
-                  header,
-                  Padding(
-                    padding: const EdgeInsets.only(
-                      left: AppSpacing.md,
-                      right: AppSpacing.md,
-                      bottom: AppSpacing.xs,
-                    ),
-                    child: Row(
-            children: [
-              Icon(
-                          Icons.info_outline,
-                          size: 14,
-                          color: Colors.grey.shade600,
-                        ),
-                        const SizedBox(width: 6),
-              Text(
-                          'Tap a schedule to edit',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Colors.grey.shade600,
-                                  ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: ListView.builder(
-                      padding: const EdgeInsets.only(
-                        left: AppSpacing.md,
-                        right: AppSpacing.md,
-                        bottom: AppSpacing.md,
-                      ),
-                      itemCount: filtered.length + 1,
-                      itemBuilder: (context, index) {
-                        if (index == filtered.length) {
-                          return Padding(
-                            padding: const EdgeInsets.only(top: AppSpacing.sm),
-                            child: SizedBox(
-                              width: double.infinity,
-                              child: OutlinedButton.icon(
-                                onPressed: () => _openEditor(
-                                  selectedSession: selectedSession,
-                                  selectedTerm: selectedTerm,
-                                ),
-                                icon: const Icon(Icons.add),
-                                label: const Text('Add timetable'),
-                                style: OutlinedButton.styleFrom(
-                                  side: BorderSide(
-                                    color: Theme.of(context)
-                                        .colorScheme
-                                        .primary
-                                        .withValues(alpha: 0.45),
-                                  ),
-                                  padding:
-                                      const EdgeInsets.symmetric(vertical: 14),
-                                  shape: const StadiumBorder(),
-                                ),
-                              ),
+              return ValueListenableBuilder<List<Course>>(
+                valueListenable: coursesNotifier,
+                builder: (context, courses, _) {
+                  final courseColorByCode = <String, Color>{
+                    for (final c in courses.where(
+                      (c) =>
+                          c.sessionId == selectedSession.id &&
+                          c.termId == selectedTerm.id,
+                    ))
+                      c.courseCode: _parseCourseColorHex(c.courseColor),
+                  };
+
+                  final filtered = entries
+                      .where(
+                        (e) =>
+                            e.sessionId == selectedSession.id &&
+                            e.termId == selectedTerm.id,
+                      )
+                      .toList(growable: false);
+
+                  final dayBuckets = <String, List<_DayCourseSlot>>{};
+                  for (final entry in filtered) {
+                    final color = courseColorByCode[entry.courseCode] ??
+                        appPrimarySwatch.shade700;
+                    for (final slot in entry.slots) {
+                      dayBuckets
+                          .putIfAbsent(slot.day, () => <_DayCourseSlot>[])
+                          .add(
+                            _DayCourseSlot(
+                              courseCode: entry.courseCode,
+                              entry: entry,
+                              slot: slot,
+                              courseColor: color,
                             ),
                           );
-                        }
+                    }
+                  }
 
-                        final entry = filtered[index];
-                        return _TimetableCard(
-                          entry: entry,
-                          onTap: () => _openEditor(
-                            selectedSession: selectedSession,
-                            selectedTerm: selectedTerm,
-                            initial: entry,
+                  return Column(
+                    children: [
+                      header,
+                      Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpacing.md,
+                          vertical: AppSpacing.sm,
+                        ),
+                        child: SizedBox(
+                          child: AnimatedSegmentedSwitch<_TimetableViewMode>(
+                            value: _viewMode,
+                            onChanged: (value) {
+                              setState(() {
+                                _viewMode = value;
+                              });
+                            },
+                            options: const [
+                              SegmentedSwitchOption<_TimetableViewMode>(
+                                value: _TimetableViewMode.byDay,
+                                label: 'By day',
+                              ),
+                              SegmentedSwitchOption<_TimetableViewMode>(
+                                value: _TimetableViewMode.byCourse,
+                                label: 'By course',
+                              ),
+                            ],
                           ),
-                          onDelete: () {
-                            showDialog<void>(
-                              context: context,
-                              builder: (context) => AlertDialog(
-                                backgroundColor: Colors.white,
-                                title: const Text('Delete timetable'),
-                                content: Text(
-                                  'Delete timetable for ${entry.courseCode}?',
-                                ),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(context),
-                                    child: const Text('Cancel'),
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          left: AppSpacing.md,
+                          right: AppSpacing.md,
+                          bottom: AppSpacing.xs,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.info_outline,
+                              size: 14,
+                              color: Colors.grey.shade600,
+                            ),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Tap a schedule to edit',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: Colors.grey.shade600,
                                   ),
-                                  TextButton(
-                                    onPressed: () async {
-                                      await deleteTimetableEntry(entry.id);
-                                      if (!context.mounted) return;
-                                      Navigator.pop(context);
-                                    },
-                                    child: const Text(
-                                      'Delete',
-                                      style: TextStyle(color: Colors.red),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: ListView.builder(
+                          padding: const EdgeInsets.only(
+                            left: AppSpacing.md,
+                            right: AppSpacing.md,
+                            bottom: AppSpacing.md,
+                          ),
+                          itemCount: _viewMode == _TimetableViewMode.byCourse
+                              ? filtered.length + 1
+                              : _sortedDays(dayBuckets.keys).length + 1,
+                          itemBuilder: (context, index) {
+                            final isLast = _viewMode ==
+                                    _TimetableViewMode.byCourse
+                                ? index == filtered.length
+                                : index == _sortedDays(dayBuckets.keys).length;
+                            if (isLast) {
+                              return Padding(
+                                padding:
+                                    const EdgeInsets.only(top: AppSpacing.md),
+                                child: SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton.icon(
+                                    onPressed: () => _openEditor(
+                                      selectedSession: selectedSession,
+                                      selectedTerm: selectedTerm,
+                                    ),
+                                    icon: const Icon(Icons.add),
+                                    label: const Text('Add schedule'),
+                                    style: OutlinedButton.styleFrom(
+                                      side: BorderSide(
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .primary
+                                            .withValues(alpha: 0.45),
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 14),
+                                      shape: const StadiumBorder(),
                                     ),
                                   ),
-                                ],
+                                ),
+                              );
+                            }
+
+                            if (_viewMode == _TimetableViewMode.byCourse) {
+                              final entry = filtered[index];
+                              final courseColor =
+                                  courseColorByCode[entry.courseCode] ??
+                                      appPrimarySwatch.shade700;
+                              return _TimetableCourseCard(
+                                entry: entry,
+                                courseColor: courseColor,
+                                onTap: () => _openEditor(
+                                  selectedSession: selectedSession,
+                                  selectedTerm: selectedTerm,
+                                  initial: entry,
+                                ),
+                                onDelete: () {
+                                  showDialog<void>(
+                                    context: context,
+                                    builder: (context) => AlertDialog(
+                                      backgroundColor: Colors.white,
+                                      title: const Text('Delete schedule'),
+                                      content: Text(
+                                        'Delete classes for ${entry.courseCode}?',
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () =>
+                                              Navigator.pop(context),
+                                          child: const Text('Cancel'),
+                                        ),
+                                        TextButton(
+                                          onPressed: () async {
+                                            await deleteTimetableEntry(
+                                                entry.id);
+                                            if (!context.mounted) return;
+                                            Navigator.pop(context);
+                                          },
+                                          child: const Text(
+                                            'Delete',
+                                            style: TextStyle(color: Colors.red),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              );
+                            }
+
+                            final sortedDayKeys = _sortedDays(dayBuckets.keys);
+                            final day = sortedDayKeys[index];
+                            final slots =
+                                dayBuckets[day] ?? const <_DayCourseSlot>[];
+                            return _TimetableDaySection(
+                              dayLabel: day,
+                              slots: slots,
+                              onEntryTap: (entry) => _openEditor(
+                                selectedSession: selectedSession,
+                                selectedTerm: selectedTerm,
+                                initial: entry,
+                              ),
+                              onSlotDelete: (item) =>
+                                  _confirmAndDeleteSingleSlot(
+                                entry: item.entry,
+                                slot: item.slot,
                               ),
                             );
                           },
-                        );
-                      },
-                    ),
-                  ),
-                ],
+                        ),
+                      ),
+                    ],
+                  );
+                },
               );
             },
           );
@@ -339,25 +525,250 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
   }
 }
 
-class _TimetableCard extends StatelessWidget {
-  const _TimetableCard({
+enum _TimetableViewMode {
+  byDay,
+  byCourse,
+}
+
+class _DayCourseSlot {
+  const _DayCourseSlot({
+    required this.courseCode,
     required this.entry,
+    required this.slot,
+    required this.courseColor,
+  });
+
+  final String courseCode;
+  final TimetableEntry entry;
+  final TimetableSlot slot;
+  final Color courseColor;
+}
+
+String _formatSlotLocation(TimetableSlot slot) {
+  if (slot.mode == 'Online') return 'Online';
+  final venue = slot.venue?.trim();
+  return (venue == null || venue.isEmpty) ? '-' : venue;
+}
+
+class _TimetableCardShell extends StatelessWidget {
+  const _TimetableCardShell({
+    required this.courseCode,
+    required this.courseColor,
+    required this.onTap,
+    required this.onDelete,
+    required this.child,
+  });
+
+  final String courseCode;
+  final Color courseColor;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: onTap,
+          child: Padding(
+            padding: const EdgeInsets.all(AppSpacing.md),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 16,
+                      height: 16,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: courseColor,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        courseCode,
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: Colors.grey,
+                      ),
+                      padding: EdgeInsets.zero,
+                      visualDensity: VisualDensity.compact,
+                      onPressed: onDelete,
+                    ),
+                  ],
+                ),
+                if (child is! SizedBox) ...[
+                  const SizedBox(height: AppSpacing.sm),
+                  child,
+                ] else
+                  child,
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TimetableSlotMeta extends StatelessWidget {
+  const _TimetableSlotMeta({
+    required this.slot,
+  });
+
+  final TimetableSlot slot;
+
+  @override
+  Widget build(BuildContext context) {
+    final location = _formatSlotLocation(slot);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(
+              Icons.access_time,
+              size: 16,
+              color: Color(0xFF6043BF),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              '${slot.startTime} – ${slot.endTime}',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            const Icon(
+              Icons.location_on_outlined,
+              size: 16,
+              color: Color(0xFF6043BF),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '${slot.classType.label} • $location',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _TimetableDaySection extends StatelessWidget {
+  const _TimetableDaySection({
+    required this.dayLabel,
+    required this.slots,
+    required this.onEntryTap,
+    required this.onSlotDelete,
+  });
+
+  final String dayLabel;
+  final List<_DayCourseSlot> slots;
+  final ValueChanged<TimetableEntry> onEntryTap;
+  final ValueChanged<_DayCourseSlot> onSlotDelete;
+
+  int _slotStartMinutes(_DayCourseSlot item) =>
+      parseTimeLabel12hToMinutes(item.slot.startTime.trim()) ?? 0;
+
+  @override
+  Widget build(BuildContext context) {
+    final sortedSlots = [...slots]
+      ..sort((a, b) => _slotStartMinutes(a).compareTo(_slotStartMinutes(b)));
+
+    final totalClasses = sortedSlots.length;
+    final classesLabel =
+        totalClasses == 1 ? '1 class' : '$totalClasses classes';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Day + chip row
+        Padding(
+          padding: const EdgeInsets.only(
+            top: AppSpacing.sm,
+            bottom: AppSpacing.sm,
+          ),
+          child: Row(
+            children: [
+              Text(
+                dayLabel,
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                      fontWeight: FontWeight.w700,
+                    ),
+              ),
+              const Spacer(),
+              LabelChip(
+                label: classesLabel.toUpperCase(),
+                background: Theme.of(context)
+                    .colorScheme
+                    .primary
+                    .withValues(alpha: 0.08),
+                foreground: Theme.of(context).colorScheme.primary,
+              ),
+            ],
+          ),
+        ),
+
+        // One card per class slot
+        ...sortedSlots.map(
+          (item) => _TimetableCardShell(
+            courseCode: item.courseCode,
+            courseColor: item.courseColor,
+            onTap: () => onEntryTap(item.entry),
+            onDelete: () => onSlotDelete(item),
+            child: _TimetableSlotMeta(slot: item.slot),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TimetableCourseCard extends StatelessWidget {
+  const _TimetableCourseCard({
+    required this.entry,
+    required this.courseColor,
     required this.onTap,
     required this.onDelete,
   });
 
   final TimetableEntry entry;
+  final Color courseColor;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
   int _slotStartMinutes(TimetableSlot slot) {
     return parseTimeLabel12hToMinutes(slot.startTime.trim()) ?? 0;
-  }
-
-  String _locationLabel(TimetableSlot slot) {
-    if (slot.mode == 'Online') return 'Online';
-    final venue = slot.venue?.trim();
-    return (venue == null || venue.isEmpty) ? '-' : venue;
   }
 
   Map<String, List<TimetableSlot>> _groupSlotsByDay(List<TimetableSlot> slots) {
@@ -388,116 +799,47 @@ class _TimetableCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(20),
-          splashColor:
-              Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
-          highlightColor:
-              Theme.of(context).colorScheme.primary.withValues(alpha: 0.04),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(AppSpacing.md, AppSpacing.sm, AppSpacing.md, AppSpacing.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        entry.courseCode,
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.delete_outline,
-                        color: Colors.grey,
-                      ),
-                      padding: EdgeInsets.zero,
-                      visualDensity: VisualDensity.compact,
-                      onPressed: onDelete,
-                    ),
-                  ],
-                ),
-                ...() {
-                  final grouped = _groupSlotsByDay(entry.slots);
-                  final days = _sortedDays(grouped.keys);
-                  return days.map((day) {
-                    final slots = grouped[day] ?? const <TimetableSlot>[];
-                    return Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            day.length >= 3 ? day.substring(0, 3) : day,
-                            style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                  color: Colors.grey.shade700,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                          ),
-                          const SizedBox(height: 2),
-                          ...slots.map(
-                            (slot) => Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  SizedBox(
-                                    width: 175,
-                                    child: Text(
-                                      '${slot.startTime} – ${slot.endTime}',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyLarge
-                                          ?.copyWith(
-                                            color:
-                                                Theme.of(context).colorScheme.primary,
-                                          ),
-                                    ),
-                                  ),
-                                  Expanded(
-                                    child: Text(
-                                      '${slot.classType.label} · ${_locationLabel(slot)}',
-                                      style: Theme.of(context)
-                                          .textTheme
-                                          .bodyLarge
-                                          ?.copyWith(
-                                            color:
-                                                Theme.of(context).colorScheme.primary,
-                                          ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  }).toList(growable: false);
-                }(),
-              ],
+    final grouped = _groupSlotsByDay(entry.slots);
+    final days = _sortedDays(grouped.keys);
+
+    return _TimetableCardShell(
+      courseCode: entry.courseCode,
+      courseColor: courseColor,
+      onTap: onTap,
+      onDelete: onDelete,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: List.generate(days.length, (index) {
+          final day = days[index];
+          final slots = grouped[day]!;
+
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: index == days.length - 1 ? 0 : AppSpacing.md,
             ),
-          ),
-        ),
+            child: SizedBox(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    day.length >= 3 ? day.substring(0, 3) : day,
+                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          color: const Color(0xFF6043BF),
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  ...slots.map(
+                    (slot) => Padding(
+                      padding: const EdgeInsets.only(top: 4),
+                      child: _TimetableSlotMeta(slot: slot),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }),
       ),
     );
   }
@@ -726,4 +1068,3 @@ class _TimetableEditorSheetState extends State<_TimetableEditorSheet> {
     );
   }
 }
-
