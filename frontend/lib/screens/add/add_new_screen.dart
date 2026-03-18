@@ -84,6 +84,10 @@ class _AddNewScreenState extends State<AddNewScreen> {
       _selectedSessionId = active.id;
       _selectedTermId = defaultTermId(buildTermWindows(active));
     }
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _updateShadowState();
+    });
   }
 
   @override
@@ -182,14 +186,12 @@ class _AddNewScreenState extends State<AddNewScreen> {
   Future<void> _pickEventEndDate(TermWindow term) async {
     final defaultEnd = _eventEndDate ?? _eventStartDate;
     final safeInitial = clampToTerm(defaultEnd, term);
-    final safeFirstDate = _eventStartDate.isBefore(term.start)
-        ? term.start
-        : _eventStartDate;
+    final safeFirstDate =
+        _eventStartDate.isBefore(term.start) ? term.start : _eventStartDate;
     final picked = await showDatePicker(
       context: context,
-      initialDate: safeInitial.isBefore(safeFirstDate)
-          ? safeFirstDate
-          : safeInitial,
+      initialDate:
+          safeInitial.isBefore(safeFirstDate) ? safeFirstDate : safeInitial,
       firstDate: safeFirstDate,
       lastDate: term.end,
       builder: (context, child) => Theme(
@@ -232,6 +234,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
     if (slot == null) return;
     setState(() => _classSlots.add(slot));
   }
+
   Future<String?> _showAddCourseDialogForTask(
     String sessionId,
     String termId,
@@ -409,6 +412,19 @@ class _AddNewScreenState extends State<AddNewScreen> {
     );
   }
 
+  void _updateShadowState() {
+    if (!_scrollController.hasClients) return;
+
+    final maxScroll = _scrollController.position.maxScrollExtent;
+    final currentScroll = _scrollController.position.pixels;
+
+    final shouldShow = maxScroll > 0 && currentScroll < maxScroll;
+
+    if (shouldShow != _hasMoreContentBelow) {
+      setState(() => _hasMoreContentBelow = shouldShow);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final activeSession = currentAcademicSessionNotifier.value;
@@ -418,7 +434,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
         appBar: AppBar(title: const Text('Add New')),
         body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
+            padding: const EdgeInsets.all(AppSpacing.md),
             child: EmptyStateCard(
               title: 'No Session Yet',
               subtitle:
@@ -467,11 +483,13 @@ class _AddNewScreenState extends State<AddNewScreen> {
               final currentSessionId = currentAcademicSessionNotifier.value?.id;
               final currentTermIdForSelectedSession =
                   selectedSession.id == currentSessionId
-                  ? defaultTermId(buildTermWindows(selectedSession))
-                  : null;
+                      ? defaultTermId(buildTermWindows(selectedSession))
+                      : null;
               // Filter courses by session and term
               final sessionAndTermCourses = courses
-                  .where((c) => c.sessionId == selectedSession.id && c.termId == selectedTerm.id)
+                  .where((c) =>
+                      c.sessionId == selectedSession.id &&
+                      c.termId == selectedTerm.id)
                   .toList(growable: false);
               final persistedClassSlotsByCourse = {
                 for (final entry in timetablesNotifier.value.where(
@@ -492,15 +510,18 @@ class _AddNewScreenState extends State<AddNewScreen> {
                       )
                       .toList(growable: false),
               };
-              
-              final courseCodes = sessionAndTermCourses.map((c) => c.courseCode).toSet().toList()
+
+              final courseCodes = sessionAndTermCourses
+                  .map((c) => c.courseCode)
+                  .toSet()
+                  .toList()
                 ..sort();
 
-              final canSaveTask =
-                  _taskTitleController.text.trim().isNotEmpty &&
+              final canSaveTask = _taskTitleController.text.trim().isNotEmpty &&
                   _taskCourseCode != null &&
                   isInTerm(_taskDueDateTime, selectedTerm);
-              final canSaveClass = _classCourseCode != null && _classSlots.isNotEmpty;
+              final canSaveClass =
+                  _classCourseCode != null && _classSlots.isNotEmpty;
               final eventDatesValid = isInTerm(_eventStartDate, selectedTerm) &&
                   _eventEndDate != null &&
                   isInTerm(_eventEndDate!, selectedTerm) &&
@@ -512,9 +533,10 @@ class _AddNewScreenState extends State<AddNewScreen> {
                       _eventEndTime != null &&
                       _areEventTimesValid());
 
-              final canSaveEvent = _eventNameController.text.trim().isNotEmpty &&
-                  eventDatesValid &&
-                  eventTimesValid;
+              final canSaveEvent =
+                  _eventNameController.text.trim().isNotEmpty &&
+                      eventDatesValid &&
+                      eventTimesValid;
 
               Widget typeSpecificForm;
               if (_selectedType == AddType.task) {
@@ -530,8 +552,8 @@ class _AddNewScreenState extends State<AddNewScreen> {
                       setState(() => _taskCourseCode = value),
                   onPickDate: () => _pickTaskDate(selectedTerm),
                   onPickTime: _pickTaskTime,
-                  onAddCourseRequested: () =>
-                      _showAddCourseDialogForTask(selectedSession.id, selectedTerm.id),
+                  onAddCourseRequested: () => _showAddCourseDialogForTask(
+                      selectedSession.id, selectedTerm.id),
                 );
               } else if (_selectedType == AddType.classSlot) {
                 typeSpecificForm = ClassForm(
@@ -552,8 +574,8 @@ class _AddNewScreenState extends State<AddNewScreen> {
                   onEditSlot: _editClassSlot,
                   onRemoveSlot: (slot) =>
                       setState(() => _classSlots.remove(slot)),
-                  onAddCourseRequested: () =>
-                      _showAddCourseDialogForClass(selectedSession.id, selectedTerm.id),
+                  onAddCourseRequested: () => _showAddCourseDialogForClass(
+                      selectedSession.id, selectedTerm.id),
                 );
               } else {
                 typeSpecificForm = EventForm(
@@ -595,13 +617,19 @@ class _AddNewScreenState extends State<AddNewScreen> {
               return Column(
                 children: [
                   Padding(
-                    padding: const EdgeInsets.all(AppSpacing.lg),
+                    padding: const EdgeInsets.fromLTRB(
+                        AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
                     child: Column(
                       children: [
                         _TypeTabs(
                           selected: _selectedType,
-                          onChanged: (value) =>
-                              setState(() => _selectedType = value),
+                          onChanged: (value) {
+                            setState(() => _selectedType = value);
+
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              _updateShadowState();
+                            });
+                          },
                         ),
                       ],
                     ),
@@ -609,25 +637,15 @@ class _AddNewScreenState extends State<AddNewScreen> {
                   Expanded(
                     child: NotificationListener<ScrollNotification>(
                       onNotification: (notification) {
-                        if (notification.metrics.maxScrollExtent <= 0) {
-                          if (_hasMoreContentBelow) {
-                            setState(() => _hasMoreContentBelow = false);
-                          }
-                          return false;
-                        }
-                        final atBottom =
-                            notification.metrics.pixels >=
-                            notification.metrics.maxScrollExtent - 1;
-                        final shouldShow = !atBottom;
-                        if (shouldShow != _hasMoreContentBelow) {
-                          setState(() => _hasMoreContentBelow = shouldShow);
-                        }
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _updateShadowState();
+                        });
                         return false;
                       },
                       child: SingleChildScrollView(
                         controller: _scrollController,
                         padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.lg,
+                          horizontal: AppSpacing.md,
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -696,7 +714,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
                             ),
                             const SizedBox(height: AppSpacing.md),
                             typeSpecificForm,
-                            const SizedBox(height: AppSpacing.lg),
+                            const SizedBox(height: AppSpacing.md),
                           ],
                         ),
                       ),
@@ -704,10 +722,10 @@ class _AddNewScreenState extends State<AddNewScreen> {
                   ),
                   Container(
                     padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.lg,
                       AppSpacing.md,
-                      AppSpacing.lg,
-                      AppSpacing.lg,
+                      AppSpacing.md,
+                      AppSpacing.md,
+                      AppSpacing.md,
                     ),
                     decoration: BoxDecoration(
                       color: Theme.of(context).scaffoldBackgroundColor,
@@ -780,7 +798,8 @@ class _TypeTabs extends StatelessWidget {
       onChanged: onChanged,
       options: const [
         SegmentedSwitchOption<AddType>(value: AddType.task, label: 'Task'),
-        SegmentedSwitchOption<AddType>(value: AddType.classSlot, label: 'Class'),
+        SegmentedSwitchOption<AddType>(
+            value: AddType.classSlot, label: 'Class'),
         SegmentedSwitchOption<AddType>(value: AddType.event, label: 'Event'),
       ],
     );
@@ -803,5 +822,3 @@ class _LabeledFieldHeader extends StatelessWidget {
     );
   }
 }
-
-
