@@ -25,6 +25,7 @@ import '../../core/constants/months.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/common/session_term_context_label.dart';
+import '../../core/widgets/common/confirm_dialog.dart';
 import '../../core/widgets/schedule/class_slot_sheet.dart';
 import '../../core/widgets/schedule/schedule_class_appointment_text.dart';
 import '../../core/widgets/schedule/schedule_overflow_popup_menu.dart';
@@ -673,30 +674,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     if (meta.type == ScheduleAppointmentMeta.typeEvent && meta.events.isNotEmpty) {
       final event = meta.events.first;
-      final shouldDelete = await showDialog<bool>(
-            context: context,
-            builder: (dialogContext) {
-              return AlertDialog(
-                backgroundColor: Colors.white,
-                title: const Text('Delete Event'),
-                content: const Text('Are you sure you want to delete this event?'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.of(dialogContext).pop(false),
-                    child: const Text('Cancel'),
-                  ),
-                  TextButton(
-                    onPressed: () => Navigator.of(dialogContext).pop(true),
-                    child: const Text(
-                      'Delete',
-                      style: TextStyle(color: Colors.red),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ) ??
-          false;
+      final shouldDelete = await showConfirmDeleteDialog(
+        context,
+        title: 'Delete Event',
+        message: 'Are you sure you want to delete this event?',
+      );
       if (!shouldDelete) return;
       await deleteAcademicEvent(event.id);
       if (!mounted) return;

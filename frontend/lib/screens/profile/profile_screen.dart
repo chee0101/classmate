@@ -5,6 +5,7 @@ import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/routes.dart';
 import '../../core/services/user_profile_store.dart';
+import '../../core/widgets/common/confirm_dialog.dart';
 import '../../core/widgets/common/white_card.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -40,36 +41,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _handleLogout() {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        backgroundColor: Colors.white,
-        title: const Text('Log out'),
-        content: const Text('Are you sure you want to log out?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(dialogContext);
-              await FirebaseAuth.instance.signOut();
-              if (!mounted) return;
-              Navigator.pushNamedAndRemoveUntil(
-                context,
-                AppRoutes.authChecker,
-                (route) => false,
-              );
-            },
-            child: const Text(
-              'Log out',
-              style: TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
-    );
+    showConfirmDialog(
+      context,
+      title: 'Log out',
+      message: 'Are you sure you want to log out?',
+      confirmText: 'Log out',
+      destructive: true,
+    ).then((confirmed) async {
+      if (!confirmed) return;
+      await FirebaseAuth.instance.signOut();
+      if (!mounted) return;
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        AppRoutes.authChecker,
+        (route) => false,
+      );
+    });
   }
 
   Future<void> _handleEditName() async {

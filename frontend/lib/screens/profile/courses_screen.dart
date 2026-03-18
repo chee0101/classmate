@@ -6,6 +6,7 @@ import '../../core/services/course_store.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/widgets/add/add_course_dialog.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
+import '../../core/widgets/common/confirm_dialog.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/home/session_header.dart';
 
@@ -283,35 +284,15 @@ class _CoursesScreenState extends State<CoursesScreen> {
                                     color: Colors.grey,
                                   ),
                                   onPressed: () {
-                                    showDialog<void>(
-                                      context: context,
-                                      builder: (context) => AlertDialog(
-                                        backgroundColor: Colors.white,
-                                        title: const Text('Delete course'),
-                                        content: Text(
+                                    showConfirmDeleteDialog(
+                                      context,
+                                      title: 'Delete course',
+                                      message:
                                           'Are you sure you want to delete ${course.courseCode}?',
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () =>
-                                                Navigator.pop(context),
-                                            child: const Text('Cancel'),
-                                          ),
-                                          TextButton(
-                                            onPressed: () {
-                                              deleteCourse(course.id);
-                                              Navigator.pop(context);
-                                            },
-                                            child: const Text(
-                                              'Delete',
-                                              style: TextStyle(
-                                                color: Colors.red,
-                                              ),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
+                                    ).then((confirmed) {
+                                      if (!confirmed) return;
+                                      deleteCourse(course.id);
+                                    });
                                   },
                                 ),
                               ),

@@ -7,6 +7,7 @@ import '../../core/services/academic_session_store.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
+import '../../core/widgets/common/confirm_dialog.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/common/label_chip.dart';
 import '../../core/widgets/common/white_card.dart';
@@ -168,35 +169,18 @@ class _AcademicSessionsScreenState extends State<AcademicSessionsScreen> {
                                 editSession: session,
                               );
                             } else if (value == 'delete') {
-                              showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  backgroundColor: Colors.white,
-                                  title: const Text('Delete Academic Session'),
-                                  content: Text(
-                                      'Are you sure you want to delete "${session.name}"?'),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () => Navigator.pop(context),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    TextButton(
-                                      onPressed: () {
-                                        Navigator.pop(context);
-                                        deleteAcademicSession(session.id);
-                                        ScaffoldMessenger.of(context)
-                                            .showSnackBar(
-                                          SnackBar(
-                                              content: Text(
-                                                  'Deleted "${session.name}"')),
-                                        );
-                                      },
-                                      child: const Text(
-                                        'Delete',
-                                        style: TextStyle(color: Colors.red),
-                                      ),
-                                    ),
-                                  ],
+                              final confirmed = await showConfirmDeleteDialog(
+                                context,
+                                title: 'Delete Academic Session',
+                                message:
+                                    'Are you sure you want to delete "${session.name}"?',
+                              );
+                              if (!confirmed) return;
+                              deleteAcademicSession(session.id);
+                              if (!context.mounted) return;
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Deleted "${session.name}"'),
                                 ),
                               );
                             }

@@ -18,6 +18,7 @@ import '../../core/widgets/home/session_header.dart';
 import '../../core/widgets/schedule/class_slot_sheet.dart';
 import '../../core/widgets/common/animated_segmented_switch.dart';
 import '../../core/widgets/common/label_chip.dart';
+import '../../core/widgets/common/confirm_dialog.dart';
 import '../schedule/class_slot_editor_screen.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/models/course.dart';
@@ -57,30 +58,12 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
     required TimetableEntry entry,
     required TimetableSlot slot,
   }) async {
-    final shouldDelete = await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            backgroundColor: Colors.white,
-            title: const Text('Delete class slot'),
-            content: Text(
-              'Delete class for ${entry.courseCode} on ${slot.day} (${slot.startTime} – ${slot.endTime})?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.pop(context, true),
-                child: const Text(
-                  'Delete',
-                  style: TextStyle(color: Colors.red),
-                ),
-              ),
-            ],
-          ),
-        ) ??
-        false;
+    final shouldDelete = await showConfirmDeleteDialog(
+      context,
+      title: 'Delete class slot',
+      message:
+          'Delete class for ${entry.courseCode} on ${slot.day} (${slot.startTime} – ${slot.endTime})?',
+    );
 
     if (!shouldDelete) return;
 
@@ -390,35 +373,15 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
                                   initial: entry,
                                 ),
                                 onDelete: () {
-                                  showDialog<void>(
-                                    context: context,
-                                    builder: (context) => AlertDialog(
-                                      backgroundColor: Colors.white,
-                                      title: const Text('Delete schedule'),
-                                      content: Text(
+                                  showConfirmDeleteDialog(
+                                    context,
+                                    title: 'Delete schedule',
+                                    message:
                                         'Delete classes for ${entry.courseCode}?',
-                                      ),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () =>
-                                              Navigator.pop(context),
-                                          child: const Text('Cancel'),
-                                        ),
-                                        TextButton(
-                                          onPressed: () async {
-                                            await deleteTimetableEntry(
-                                                entry.id);
-                                            if (!context.mounted) return;
-                                            Navigator.pop(context);
-                                          },
-                                          child: const Text(
-                                            'Delete',
-                                            style: TextStyle(color: Colors.red),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  );
+                                  ).then((confirmed) async {
+                                    if (!confirmed) return;
+                                    await deleteTimetableEntry(entry.id);
+                                  });
                                 },
                               );
                             }

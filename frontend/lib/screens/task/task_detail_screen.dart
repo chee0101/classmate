@@ -6,6 +6,7 @@ import '../../core/services/task_store.dart';
 import '../../core/widgets/task/task_card.dart';
 import '../../core/widgets/task/subtask_card.dart';
 import '../../core/widgets/task/task_edit_bottom_sheet.dart';
+import '../../core/widgets/common/confirm_dialog.dart';
 
 /// Task detail screen showing full task info, subtasks, and actions.
 class TaskDetailScreen extends StatefulWidget {
@@ -236,35 +237,19 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   void _handleDelete() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
-        title: const Text('Delete Task'),
-        content: const Text('Are you sure you want to delete this task?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await deleteTask(_task.id, deleteSubtasks: true);
-              if (!mounted) return;
-              Navigator.of(this.context).pop(); // Go back to task list
-              ScaffoldMessenger.of(this.context).showSnackBar(
-                const SnackBar(content: Text('Task deleted')),
-              );
-            },
-            child: const Text(
-              'Delete',
-              style: TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
-    );
+    showConfirmDeleteDialog(
+      context,
+      title: 'Delete Task',
+      message: 'Are you sure you want to delete this task?',
+    ).then((confirmed) async {
+      if (!confirmed) return;
+      await deleteTask(_task.id, deleteSubtasks: true);
+      if (!mounted) return;
+      Navigator.of(this.context).pop(); // Go back to task list
+      ScaffoldMessenger.of(this.context).showSnackBar(
+        const SnackBar(content: Text('Task deleted')),
+      );
+    });
   }
 
   Future<void> _handleMarkAsCompleted() async {
@@ -314,33 +299,18 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
   }
 
   void _handleDeleteSubtask(Task subtask) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Subtask'),
-        content: Text('Delete "${subtask.title}"?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await deleteTask(subtask.id);
-              if (!mounted) return;
-              ScaffoldMessenger.of(this.context).showSnackBar(
-                const SnackBar(content: Text('Subtask deleted')),
-              );
-            },
-            child: const Text(
-              'Delete',
-              style: TextStyle(color: Colors.red),
-            ),
-          ),
-        ],
-      ),
-    );
+    showConfirmDeleteDialog(
+      context,
+      title: 'Delete Subtask',
+      message: 'Delete "${subtask.title}"?',
+    ).then((confirmed) async {
+      if (!confirmed) return;
+      await deleteTask(subtask.id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(this.context).showSnackBar(
+        const SnackBar(content: Text('Subtask deleted')),
+      );
+    });
   }
 
   Future<void> _handleEditSubtask(Task subtask) async {
