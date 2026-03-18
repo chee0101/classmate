@@ -88,7 +88,6 @@ class _AuthScreenState extends State<AuthScreen> {
   // Toggle UI
   // --------------------------------------------------
   Widget _buildToggle(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     return AnimatedSegmentedSwitch<bool>(
       value: isLogin,
       options: const [

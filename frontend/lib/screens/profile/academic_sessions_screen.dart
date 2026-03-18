@@ -120,7 +120,7 @@ class _AcademicSessionsScreenState extends State<AcademicSessionsScreen> {
                     child: ExpansionTile(
                       leading: Icon(
                         isExpanded ? Icons.expand_more : Icons.chevron_right,
-                        color: AppPrimarySwatch.shade700,
+                        color: appPrimarySwatch.shade700,
                       ),
                       title: Row(
                         children: [
@@ -252,11 +252,11 @@ class _AcademicSessionsScreenState extends State<AcademicSessionsScreen> {
                                         decoration: BoxDecoration(
                                           shape: BoxShape.circle,
                                           color: isCurrent
-                                              ? AppPrimarySwatch.shade700
+                                              ? appPrimarySwatch.shade700
                                               : Colors.transparent,
                                           border: Border.all(
                                             color: isCurrent
-                                                ? AppPrimarySwatch.shade700
+                                                ? appPrimarySwatch.shade700
                                                 : Colors.grey.shade400,
                                             width: 2,
                                           ),
@@ -298,7 +298,7 @@ class _AcademicSessionsScreenState extends State<AcademicSessionsScreen> {
                                        '${_formatDate(term.start)} – ${_formatDate(term.end)}',
                                        style: textTheme.bodyMedium?.copyWith(
                                          color: isCurrent
-                                             ? AppPrimarySwatch.shade600
+                                             ? appPrimarySwatch.shade600
                                              : Colors.grey.shade500,
                                        ),
                                      ),

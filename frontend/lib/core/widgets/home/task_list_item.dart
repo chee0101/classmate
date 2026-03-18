@@ -44,14 +44,14 @@ class TaskListItem extends StatelessWidget {
                 task.title,
                 style: textTheme.bodyLarge?.copyWith(
                   fontWeight: FontWeight.w600,
-                  color: AppPrimarySwatch.shade900,
+                  color: appPrimarySwatch.shade900,
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 'Due: ${formatRelativeDueDate(task.dueDateTime)}, ${formatTime12h(task.dueDateTime)}',
                 style: textTheme.bodySmall?.copyWith(
-                  color: AppPrimarySwatch.shade600,
+                  color: appPrimarySwatch.shade600,
                 ),
               ),
             ],

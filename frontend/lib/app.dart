@@ -31,18 +31,18 @@ class MyApp extends StatelessWidget {
       theme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: AppPrimarySwatch,
+          seedColor: appPrimarySwatch,
           brightness: Brightness.light,
-          primary: AppPrimarySwatch.shade700,
-          surface: AppPrimarySwatch.shade50,
+          primary: appPrimarySwatch.shade700,
+          surface: appPrimarySwatch.shade50,
         ),
         appBarTheme: AppBarTheme(
-          backgroundColor: AppPrimarySwatch.shade50,
+          backgroundColor: appPrimarySwatch.shade50,
           elevation: 0,
           scrolledUnderElevation: 0,
           surfaceTintColor: Colors.transparent,
         ),
-        scaffoldBackgroundColor: AppPrimarySwatch.shade50,
+        scaffoldBackgroundColor: appPrimarySwatch.shade50,
         textTheme: GoogleFonts.poppinsTextTheme().copyWith(
           /// App title / splash title
           headlineLarge: GoogleFonts.poppins(
@@ -113,7 +113,7 @@ class MyApp extends StatelessWidget {
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
           style: ElevatedButton.styleFrom(
-            backgroundColor: AppPrimarySwatch.shade700,
+            backgroundColor: appPrimarySwatch.shade700,
             foregroundColor: Colors.white,
             minimumSize: const Size(double.infinity, 56),
             shape: RoundedRectangleBorder(
@@ -159,7 +159,7 @@ class MyApp extends StatelessWidget {
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide(color: AppPrimarySwatch.shade700),
+            borderSide: BorderSide(color: appPrimarySwatch.shade700),
           ),
         ),
         dropdownMenuTheme: DropdownMenuThemeData(
@@ -194,7 +194,7 @@ class MyApp extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppPrimarySwatch.shade700),
+              borderSide: BorderSide(color: appPrimarySwatch.shade700),
             ),
           ),
           menuStyle: const MenuStyle(

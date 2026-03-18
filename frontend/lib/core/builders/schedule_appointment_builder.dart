@@ -147,7 +147,7 @@ class ScheduleAppointmentBuilder {
             startTime: event.startDateTime,
             endTime: event.endDateTime,
             subject: event.title,
-            color: AppPrimarySwatch.shade700,
+            color: appPrimarySwatch.shade700,
             isAllDay: event.allDay,
             notes: ScheduleAppointmentMeta.typeEvent,
             id: ScheduleAppointmentMeta(
@@ -331,7 +331,7 @@ class ScheduleAppointmentBuilder {
           startTime: earliestStart,
           endTime: latestEnd,
           subject: '+${others.length}',
-          color: AppPrimarySwatch.shade800,
+          color: appPrimarySwatch.shade800,
           isAllDay: false,
           notes: ScheduleAppointmentMeta.typeDenseOverflow,
           id: ScheduleAppointmentMeta(
@@ -405,7 +405,7 @@ class ScheduleAppointmentBuilder {
       startTime: startTime,
       endTime: endTime,
       subject: event.title,
-      color: AppPrimarySwatch.shade700,
+      color: appPrimarySwatch.shade700,
       isAllDay: isAllDay,
       notes: ScheduleAppointmentMeta.typeEvent,
       id: ScheduleAppointmentMeta(
@@ -425,7 +425,7 @@ class ScheduleAppointmentBuilder {
       startTime: startTime,
       endTime: endTime,
       subject: '+${hiddenEvents.length}',
-      color: AppPrimarySwatch.shade800,
+      color: appPrimarySwatch.shade800,
       isAllDay: isAllDay,
       notes: ScheduleAppointmentMeta.typeEventOverflow,
       id: ScheduleAppointmentMeta(

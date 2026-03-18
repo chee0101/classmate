@@ -27,7 +27,7 @@ List<Appointment> expandAppointmentsForDetails(List<Appointment> appointments) {
             startTime: event.startDateTime,
             endTime: event.endDateTime,
             subject: event.title,
-            color: AppPrimarySwatch.shade700,
+            color: appPrimarySwatch.shade700,
             isAllDay:
                 event.allDay || !isSameDate(event.startDateTime, event.endDateTime),
             notes: ScheduleAppointmentMeta.typeEvent,
@@ -53,7 +53,7 @@ List<Appointment> expandAppointmentsForDetails(List<Appointment> appointments) {
                 startTime: event.startDateTime,
                 endTime: event.endDateTime,
                 subject: event.title,
-                color: AppPrimarySwatch.shade700,
+                color: appPrimarySwatch.shade700,
                 isAllDay: event.allDay ||
                     !isSameDate(event.startDateTime, event.endDateTime),
                 notes: ScheduleAppointmentMeta.typeEvent,

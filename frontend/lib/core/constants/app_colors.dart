@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 const int _primaryPurpleValue = 0xFF6043BF;
 
-const MaterialColor AppPrimarySwatch = MaterialColor(
+const MaterialColor appPrimarySwatch = MaterialColor(
   _primaryPurpleValue,
   <int, Color>{
     50:  Color(0xFFEFF1FE),

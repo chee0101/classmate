@@ -218,7 +218,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                               firstDayOfWeek: 1,
                                               headerHeight: 40,
                                               headerStyle: const CalendarHeaderStyle(
-                                                backgroundColor: Color(0xFFE2E4FD),
+                                                backgroundColor: Color(0xFFCBCDFA),
                                                 textStyle: TextStyle(color: Colors.black),
                                               ),
                                               showNavigationArrow: false,
@@ -362,7 +362,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                                             .textTheme
                                                             .bodySmall
                                                             ?.copyWith(
-                                                              color: AppPrimarySwatch.shade900,
+                                                              color: appPrimarySwatch.shade900,
                                                             ),
                                                       ),
                                           ),

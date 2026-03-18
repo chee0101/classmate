@@ -232,7 +232,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         Text(
           _userEmail,
           style: textTheme.bodyMedium?.copyWith(
-            color: AppPrimarySwatch.shade600,
+            color: appPrimarySwatch.shade600,
           ),
           textAlign: TextAlign.center,
         ),
@@ -245,7 +245,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       title,
       style: textTheme.titleMedium?.copyWith(
         fontWeight: FontWeight.w600,
-        color: AppPrimarySwatch.shade900,
+        color: appPrimarySwatch.shade900,
       ),
     );
   }

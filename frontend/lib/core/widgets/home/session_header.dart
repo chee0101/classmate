@@ -33,7 +33,7 @@ class SessionHeader extends StatelessWidget {
     final darkPurpleTextStyle = GoogleFonts.poppins(
       fontSize: 14,
       fontWeight: FontWeight.w600,
-      color: AppPrimarySwatch.shade900,
+      color: appPrimarySwatch.shade900,
     );
 
     // Build dropdown entries for all (session, term) combinations.
