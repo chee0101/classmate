@@ -4,6 +4,9 @@ import '../../constants/app_spacing.dart';
 import '../../models/task.dart';
 import '../../services/course_store.dart';
 import '../../utils/date_time_format.dart';
+import '../common/course_selector.dart';
+import '../common/form_fields.dart';
+import '../add/add_course_dialog.dart';
 
 /// Bottom sheet for editing a main Task.
 ///
@@ -55,6 +58,8 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
   late String _selectedCourseCode;
   late DateTime _selectedDueDateTime;
   late List<String> _courseOptions;
+  String? _scopeSessionId;
+  String? _scopeTermId;
   String? _titleError;
   String? _timeError;
   bool _hasTime = true;
@@ -69,14 +74,26 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
     _selectedCourseCode = widget.task.courseCode;
     _selectedDueDateTime = widget.task.dueDateTime;
 
-    _courseOptions =
-        coursesNotifier.value.map((course) => course.courseCode).toSet().toList()
-          ..sort();
-    if (!_courseOptions.contains(_selectedCourseCode)) {
-      _courseOptions.add(_selectedCourseCode);
-      _courseOptions.sort();
+    if (_selectedCourseId != null) {
+      final byId = coursesNotifier.value.where((c) => c.id == _selectedCourseId);
+      if (byId.isNotEmpty) {
+        _scopeSessionId = byId.first.sessionId;
+        _scopeTermId = byId.first.termId;
+      }
     }
+
     _selectedCourseId ??= _resolveCourseIdByCode(_selectedCourseCode);
+    if (_scopeSessionId == null || _scopeTermId == null) {
+      final byCode = coursesNotifier.value.where(
+        (c) => c.id == _selectedCourseId,
+      );
+      if (byCode.isNotEmpty) {
+        _scopeSessionId = byCode.first.sessionId;
+        _scopeTermId = byCode.first.termId;
+      }
+    }
+
+    _courseOptions = _buildCourseOptions();
   }
 
   @override
@@ -200,12 +217,54 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
     Navigator.pop(context, updated);
   }
 
+  List<String> _buildCourseOptions() {
+    final sessionId = _scopeSessionId;
+    final termId = _scopeTermId;
+    final inScope = (sessionId == null || termId == null)
+        ? coursesNotifier.value
+        : coursesNotifier.value
+            .where((c) => c.sessionId == sessionId && c.termId == termId)
+            .toList(growable: false);
+
+    final options = inScope.map((c) => c.courseCode).toSet().toList()..sort();
+    if (_selectedCourseCode.trim().isNotEmpty &&
+        !options.contains(_selectedCourseCode)) {
+      options.add(_selectedCourseCode);
+      options.sort();
+    }
+    return options;
+  }
+
   String? _resolveCourseIdByCode(String code) {
     final normalizedCode = code.trim().toUpperCase();
+    final sessionId = _scopeSessionId;
+    final termId = _scopeTermId;
     final matched = coursesNotifier.value.where((course) {
-      return course.courseCode.toUpperCase() == normalizedCode;
+      final sameScope = sessionId == null || termId == null
+          ? true
+          : (course.sessionId == sessionId && course.termId == termId);
+      return sameScope && course.courseCode.toUpperCase() == normalizedCode;
     });
     return matched.isEmpty ? null : matched.first.id;
+  }
+
+  Future<String?> _addCourseRequested() async {
+    final sessionId = _scopeSessionId;
+    final termId = _scopeTermId;
+    if (sessionId == null || termId == null) {
+      if (!mounted) return null;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Unable to determine academic session/term for this task.'),
+        ),
+      );
+      return null;
+    }
+    return CourseDialog.show(
+      context,
+      sessionId: sessionId,
+      termId: termId,
+    );
   }
 
   @override
@@ -230,135 +289,55 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
             style: Theme.of(context).textTheme.headlineMedium,
           ),
           const SizedBox(height: AppSpacing.md),
-          TextField(
+          LabeledTextField(
+            label: 'Title',
+            hintText: 'Task title',
             controller: _titleController,
-            decoration: const InputDecoration(
-              labelText: 'Title',
-            ),
+            errorText: _titleError,
             onChanged: (_) {
               if (_titleError != null) {
                 setState(() => _titleError = null);
               }
             },
           ),
-          if (_titleError != null) ...[
-            const SizedBox(height: 4),
-            Text(
-              _titleError!,
-              style: TextStyle(
-                color: Colors.red.shade600,
-                fontSize: 12,
-              ),
-            ),
-          ],
           const SizedBox(height: AppSpacing.md),
-          DropdownButtonFormField<String>(
-            initialValue: _selectedCourseCode,
-            decoration: const InputDecoration(
-              labelText: 'Course code',
-            ),
-            items: _courseOptions
-                .map(
-                  (code) => DropdownMenuItem(
-                    value: code,
-                    child: Text(code),
-                  ),
-                )
-                .toList(),
-            onChanged: widget.isSubtask
-                ? null
-                : (value) {
-                    if (value == null) return;
-                    setState(() {
-                      _selectedCourseCode = value;
-                      _selectedCourseId = _resolveCourseIdByCode(value);
-                    });
-                  },
+          CourseSelector(
+            courseCodes: _courseOptions,
+            selected: _selectedCourseCode,
+            enabled: !widget.isSubtask,
+            onAddCourseRequested: widget.isSubtask ? null : _addCourseRequested,
+            onChanged: (value) {
+              if (value == null) return;
+              setState(() {
+                _selectedCourseCode = value;
+                _selectedCourseId = _resolveCourseIdByCode(value);
+                final matched = coursesNotifier.value.where((c) => c.id == _selectedCourseId);
+                if (matched.isNotEmpty) {
+                  _scopeSessionId = matched.first.sessionId;
+                  _scopeTermId = matched.first.termId;
+                }
+                _courseOptions = _buildCourseOptions();
+              });
+            },
           ),
           const SizedBox(height: AppSpacing.md),
           Row(
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Due date',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.grey.shade700,
-                            fontWeight: FontWeight.w500,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    InkWell(
-                      onTap: _pickDate,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 14,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          formatDateDdMmYyyy(_selectedDueDateTime),
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyMedium
-                              ?.copyWith(
-                                color: Colors.grey.shade800,
-                              ),
-                        ),
-                      ),
-                    ),
-                  ],
+                child: TapField(
+                  label: 'Due Date',
+                  value: formatDateDdMmYyyy(_selectedDueDateTime),
+                  onTap: _pickDate,
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Due time',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.grey.shade700,
-                            fontWeight: FontWeight.w500,
-                          ),
-                    ),
-                    const SizedBox(height: 4),
-                    InkWell(
-                      onTap: _pickTime,
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 14,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          _hasTime
-                              ? formatTime12h(_selectedDueDateTime)
-                              : 'Select time',
-                          style: Theme.of(context)
-                              .textTheme
-                              .bodyMedium
-                              ?.copyWith(
-                                color: _hasTime
-                                    ? Colors.grey.shade800
-                                    : Colors.grey.shade500,
-                              ),
-                        ),
-                      ),
-                    ),
-                  ],
+                child: TapField(
+                  label: 'Due Time',
+                  value:
+                      _hasTime ? formatTime12h(_selectedDueDateTime) : 'Select time',
+                  onTap: _pickTime,
+                  hintText: 'Select time',
                 ),
               ),
             ],
@@ -374,11 +353,11 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
             ),
           ],
           const SizedBox(height: AppSpacing.md),
-          TextField(
+          LabeledTextField(
+            label: 'Note (Optional)',
+            hintText: 'Enter task details',
             controller: _descriptionController,
-            decoration: const InputDecoration(
-              labelText: 'Description',
-            ),
+            onChanged: (_) {},
             maxLines: 3,
           ),
           const SizedBox(height: AppSpacing.lg),

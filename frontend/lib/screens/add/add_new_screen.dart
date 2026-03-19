@@ -55,7 +55,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
   TimeOfDay? _eventStartTime;
   TimeOfDay? _eventEndTime;
   bool _eventAllDay = true;
-  bool _hideClassesInEvent = true;
+  bool _hideClassesInEvent = false;
 
   DateTime _startOfDay(DateTime date) =>
       DateTime(date.year, date.month, date.day, 0, 0);

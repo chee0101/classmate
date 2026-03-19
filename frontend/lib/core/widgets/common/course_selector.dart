@@ -9,12 +9,14 @@ class CourseSelector extends StatelessWidget {
     required this.selected,
     required this.onChanged,
     this.onAddCourseRequested,
+    this.enabled = true,
   });
 
   final List<String> courseCodes;
   final String? selected;
   final ValueChanged<String?> onChanged;
   final Future<String?> Function()? onAddCourseRequested;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -36,19 +38,21 @@ class CourseSelector extends StatelessWidget {
           label: code,
         ),
       ),
-      DropdownMenuEntry<String>(
-        value: addCourseValue,
-        label: '+ Add course',
-        style: ButtonStyle(
-          textStyle: WidgetStateProperty.all<TextStyle?>(
-            textTheme.bodyMedium?.copyWith(
-              color: colorScheme.primary,
-              fontWeight: FontWeight.w600,
+      if (onAddCourseRequested != null)
+        DropdownMenuEntry<String>(
+          value: addCourseValue,
+          label: '+ Add course',
+          style: ButtonStyle(
+            textStyle: WidgetStateProperty.all<TextStyle?>(
+              textTheme.bodyMedium?.copyWith(
+                color: colorScheme.primary,
+                fontWeight: FontWeight.w600,
+              ),
             ),
+            foregroundColor:
+                WidgetStatePropertyAll<Color?>(colorScheme.primary),
           ),
-          foregroundColor: WidgetStatePropertyAll<Color?>(colorScheme.primary),
         ),
-      ),
     ];
 
     final currentSelection =
@@ -57,29 +61,30 @@ class CourseSelector extends StatelessWidget {
         ? normalizedSelected
         : null;
 
-    return DropdownField<String>(
+    final field = DropdownField<String>(
       label: 'Course Code',
       value: currentSelection,
       hintText: courseCodes.isEmpty ? 'No course yet' : 'Select course code',
       items: entries,
       onChanged: (value) async {
         if (value == addCourseValue) {
-          if (onAddCourseRequested != null) {
-            final newCode = await onAddCourseRequested!();
-            if (newCode != null && newCode.trim().isNotEmpty) {
-              onChanged(newCode.trim().toUpperCase());
-            }
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Add course (mock).'),
-              ),
-            );
+          final newCode = await onAddCourseRequested!();
+          if (newCode != null && newCode.trim().isNotEmpty) {
+            onChanged(newCode.trim().toUpperCase());
           }
           return;
         }
         onChanged(value);
       },
+    );
+
+    if (enabled) return field;
+
+    return Opacity(
+      opacity: 0.6,
+      child: AbsorbPointer(
+        child: field,
+      ),
     );
   }
 }

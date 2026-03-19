@@ -26,7 +26,7 @@ class _AuthScreenState extends State<AuthScreen> {
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSpacing.lg,
+            horizontal: AppSpacing.md,
             vertical: AppSpacing.xl,
           ),
           child: Column(
@@ -57,7 +57,7 @@ class _AuthScreenState extends State<AuthScreen> {
               /// Login / Sign up toggle
               _buildToggle(context),
 
-              const SizedBox(height: AppSpacing.lg),
+              const SizedBox(height: AppSpacing.md),
 
               /// Form Card
               Container(
