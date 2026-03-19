@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/routes.dart';
@@ -8,6 +9,7 @@ import '../../core/models/task.dart';
 import '../../core/services/session_term_selection_store.dart';
 import '../../core/services/task_store.dart';
 import '../../core/utils/term_windows.dart';
+import '../../core/utils/task_utils.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/common/session_term_context_label.dart';
@@ -26,6 +28,35 @@ class _TaskScreenState extends State<TaskScreen> {
   TaskStatus _selectedStatus = TaskStatus.ongoing;
 
   String? _selectedCourseCode; // null = All courses
+
+  int? _lastRebuildMinute;
+
+  // Ensures overdue status updates as time passes.
+  late final Ticker _ticker;
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = Ticker(_onTick)..start();
+  }
+
+  void _onTick(Duration _) {
+    if (!mounted) return;
+    // Rebuild occasionally; 1 tick/frame is too frequent.
+    // Throttle by only rebuilding when the minute changes.
+    final now = DateTime.now();
+    final shouldRebuild =
+        (_lastRebuildMinute == null) || now.minute != _lastRebuildMinute;
+    if (!shouldRebuild) return;
+    _lastRebuildMinute = now.minute;
+    setState(() {});
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -117,7 +148,8 @@ class _TaskScreenState extends State<TaskScreen> {
                 ..sort();
 
               final tasks = topLevelTasks.where((t) {
-                final matchesStatus = t.status == _selectedStatus;
+                final matchesStatus =
+                    TaskUtils.effectiveStatus(t) == _selectedStatus;
                 final matchesCourse =
                     _selectedCourseCode == null || t.courseCode == _selectedCourseCode;
                 return matchesStatus && matchesCourse;

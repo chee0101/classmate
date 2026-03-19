@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../constants/app_spacing.dart';
 import '../../models/task.dart';
 import '../../utils/date_time_format.dart';
+import '../../utils/task_utils.dart';
 import '../common/label_chip.dart';
 
 class TaskCard extends StatelessWidget {
@@ -30,6 +31,7 @@ class TaskCard extends StatelessWidget {
 
     final dueDateStr =
         '${formatRelativeDueDate(task.dueDateTime)}, ${formatTime12h(task.dueDateTime)}';
+    final effectiveStatus = TaskUtils.effectiveStatus(task);
 
     final mainContent = Padding(
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -43,13 +45,13 @@ class TaskCard extends StatelessWidget {
               color: task.courseColor,
             ),
             const Spacer(),
-            if (task.status == TaskStatus.overdue)
+            if (effectiveStatus == TaskStatus.overdue)
               const LabelChip(
                 label: 'Overdue',
                 background: Color(0xFFFFE5E5),
                 foreground: Color(0xFFE53935),
               )
-            else if (task.status == TaskStatus.ongoing)
+            else if (effectiveStatus == TaskStatus.ongoing)
               const LabelChip(
                 label: 'Ongoing',
                 background: Color(0xFFFFF3CD),
@@ -98,9 +100,9 @@ class TaskCard extends StatelessWidget {
                 ),
               ),
             ),
-            if (task.status != TaskStatus.completed && showMarkDone)
+            if (effectiveStatus != TaskStatus.completed && showMarkDone)
               const SizedBox(width: 8),
-            if (task.status != TaskStatus.completed && showMarkDone)
+            if (effectiveStatus != TaskStatus.completed && showMarkDone)
               TextButton(
                 onPressed: onMarkDone,
                 style: TextButton.styleFrom(

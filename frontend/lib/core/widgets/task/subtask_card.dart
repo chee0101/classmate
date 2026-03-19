@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../constants/app_spacing.dart';
 import '../../models/task.dart';
 import '../../utils/date_time_format.dart';
+import '../../utils/task_utils.dart';
 
 class SubtaskCard extends StatelessWidget {
   const SubtaskCard({
@@ -28,7 +29,8 @@ class SubtaskCard extends StatelessWidget {
     final dueDateStr =
         '${formatRelativeDueDate(subtask.dueDateTime)}, ${formatTime12h(subtask.dueDateTime)}';
 
-    final isCompleted = subtask.status == TaskStatus.completed;
+    final effectiveStatus = TaskUtils.effectiveStatus(subtask);
+    final isCompleted = effectiveStatus == TaskStatus.completed;
 
     final mainContent = Padding(
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -39,7 +41,7 @@ class SubtaskCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                if (subtask.status == TaskStatus.overdue)
+                if (effectiveStatus == TaskStatus.overdue)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.sm,
@@ -57,7 +59,7 @@ class SubtaskCard extends StatelessWidget {
                       ),
                     ),
                   )
-                else if (subtask.status == TaskStatus.ongoing)
+                else if (effectiveStatus == TaskStatus.ongoing)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: AppSpacing.sm,
