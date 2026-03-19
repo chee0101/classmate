@@ -75,21 +75,17 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
     _selectedDueDateTime = widget.task.dueDateTime;
 
     if (_selectedCourseId != null) {
-      final byId = coursesNotifier.value.where((c) => c.id == _selectedCourseId);
-      if (byId.isNotEmpty) {
-        _scopeSessionId = byId.first.sessionId;
-        _scopeTermId = byId.first.termId;
-      }
+      final scope = courseScopeForCourseId(_selectedCourseId!);
+      _scopeSessionId = scope?.sessionId;
+      _scopeTermId = scope?.termId;
     }
 
     _selectedCourseId ??= _resolveCourseIdByCode(_selectedCourseCode);
     if (_scopeSessionId == null || _scopeTermId == null) {
-      final byCode = coursesNotifier.value.where(
-        (c) => c.id == _selectedCourseId,
-      );
-      if (byCode.isNotEmpty) {
-        _scopeSessionId = byCode.first.sessionId;
-        _scopeTermId = byCode.first.termId;
+      if (_selectedCourseId != null) {
+        final scope = courseScopeForCourseId(_selectedCourseId!);
+        _scopeSessionId = scope?.sessionId;
+        _scopeTermId = scope?.termId;
       }
     }
 
@@ -220,32 +216,41 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
   List<String> _buildCourseOptions() {
     final sessionId = _scopeSessionId;
     final termId = _scopeTermId;
-    final inScope = (sessionId == null || termId == null)
-        ? coursesNotifier.value
-        : coursesNotifier.value
-            .where((c) => c.sessionId == sessionId && c.termId == termId)
-            .toList(growable: false);
-
-    final options = inScope.map((c) => c.courseCode).toSet().toList()..sort();
-    if (_selectedCourseCode.trim().isNotEmpty &&
-        !options.contains(_selectedCourseCode)) {
-      options.add(_selectedCourseCode);
-      options.sort();
+    if (sessionId == null || termId == null) {
+      final options = coursesNotifier.value
+          .map((c) => c.courseCode.trim().toUpperCase())
+          .where((c) => c.isNotEmpty)
+          .toSet()
+          .toList(growable: false)
+        ..sort();
+      final selected = _selectedCourseCode.trim().toUpperCase();
+      if (selected.isNotEmpty && !options.contains(selected)) {
+        return ([...options, selected]..sort());
+      }
+      return options;
     }
-    return options;
+    return courseCodesForSessionAndTerm(
+      sessionId: sessionId,
+      termId: termId,
+      includeCode: _selectedCourseCode,
+    );
   }
 
   String? _resolveCourseIdByCode(String code) {
-    final normalizedCode = code.trim().toUpperCase();
     final sessionId = _scopeSessionId;
     final termId = _scopeTermId;
-    final matched = coursesNotifier.value.where((course) {
-      final sameScope = sessionId == null || termId == null
-          ? true
-          : (course.sessionId == sessionId && course.termId == termId);
-      return sameScope && course.courseCode.toUpperCase() == normalizedCode;
-    });
-    return matched.isEmpty ? null : matched.first.id;
+    if (sessionId == null || termId == null) {
+      final normalizedCode = code.trim().toUpperCase();
+      final matched = coursesNotifier.value.where((course) {
+        return course.courseCode.toUpperCase() == normalizedCode;
+      });
+      return matched.isEmpty ? null : matched.first.id;
+    }
+    return resolveCourseIdByCodeInSessionAndTerm(
+      sessionId: sessionId,
+      termId: termId,
+      courseCode: code,
+    );
   }
 
   Future<String?> _addCourseRequested() async {

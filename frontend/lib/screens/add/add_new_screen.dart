@@ -485,12 +485,6 @@ class _AddNewScreenState extends State<AddNewScreen> {
                   selectedSession.id == currentSessionId
                       ? defaultTermId(buildTermWindows(selectedSession))
                       : null;
-              // Filter courses by session and term
-              final sessionAndTermCourses = courses
-                  .where((c) =>
-                      c.sessionId == selectedSession.id &&
-                      c.termId == selectedTerm.id)
-                  .toList(growable: false);
               final persistedClassSlotsByCourse = {
                 for (final entry in timetablesNotifier.value.where(
                   (e) =>
@@ -511,11 +505,10 @@ class _AddNewScreenState extends State<AddNewScreen> {
                       .toList(growable: false),
               };
 
-              final courseCodes = sessionAndTermCourses
-                  .map((c) => c.courseCode)
-                  .toSet()
-                  .toList()
-                ..sort();
+              final courseCodes = courseCodesForSessionAndTerm(
+                sessionId: selectedSession.id,
+                termId: selectedTerm.id,
+              );
 
               final canSaveTask = _taskTitleController.text.trim().isNotEmpty &&
                   _taskCourseCode != null &&

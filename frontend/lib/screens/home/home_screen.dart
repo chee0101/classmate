@@ -163,14 +163,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                   };
 
                                   final courseColorByCode = <String, Color>{
-                                    for (final c in courses.where(
-                                      (c) =>
-                                          c.sessionId == selectedSession.id &&
-                                          c.termId == selectedTerm.id,
+                                    for (final c in coursesForSessionAndTerm(
+                                      sessionId: selectedSession.id,
+                                      termId: selectedTerm.id,
                                     ))
                                       c.courseCode:
                                           ScheduleAppointmentBuilder.parseHexColor(
-                                              c.courseColor),
+                                        c.courseColor,
+                                      ),
                                   };
 
                                   final todayItems = timetables

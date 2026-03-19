@@ -67,6 +67,57 @@ List<Course> coursesForSession(String sessionId) {
       .toList(growable: false);
 }
 
+List<Course> coursesForSessionAndTerm({
+  required String sessionId,
+  required String termId,
+}) {
+  return coursesNotifier.value
+      .where((c) => c.sessionId == sessionId && c.termId == termId)
+      .toList(growable: false);
+}
+
+List<String> courseCodesForSessionAndTerm({
+  required String sessionId,
+  required String termId,
+  String? includeCode,
+}) {
+  final set = coursesForSessionAndTerm(sessionId: sessionId, termId: termId)
+      .map((c) => c.courseCode.trim().toUpperCase())
+      .where((c) => c.isNotEmpty)
+      .toSet();
+  final normalizedInclude = includeCode?.trim().toUpperCase();
+  if (normalizedInclude != null && normalizedInclude.isNotEmpty) {
+    set.add(normalizedInclude);
+  }
+  final list = set.toList(growable: false)..sort();
+  return list;
+}
+
+String? resolveCourseIdByCodeInSessionAndTerm({
+  required String sessionId,
+  required String termId,
+  required String courseCode,
+}) {
+  final normalized = courseCode.trim().toUpperCase();
+  final matched = coursesNotifier.value.where(
+    (c) =>
+        c.sessionId == sessionId &&
+        c.termId == termId &&
+        c.courseCode.toUpperCase() == normalized,
+  );
+  return matched.isEmpty ? null : matched.first.id;
+}
+
+({String sessionId, String termId})? courseScopeForCourseId(String courseId) {
+  final matched = coursesNotifier.value.where((c) => c.id == courseId);
+  if (matched.isEmpty) return null;
+  final course = matched.first;
+  if (course.sessionId.trim().isEmpty || course.termId.trim().isEmpty) {
+    return null;
+  }
+  return (sessionId: course.sessionId, termId: course.termId);
+}
+
 bool hasCoursesForSession(String sessionId) {
   return coursesNotifier.value.any((c) => c.sessionId == sessionId);
 }

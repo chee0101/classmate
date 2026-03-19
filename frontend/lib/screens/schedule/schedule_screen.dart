@@ -150,12 +150,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                               .toList(growable: false);
 
                           final courseColorByCode = <String, Color>{
-                            for (final c in courses.where(
-                              (c) =>
-                                  c.sessionId == selectedSession.id &&
-                                  c.termId == selectedTerm.id,
+                            for (final c in coursesForSessionAndTerm(
+                              sessionId: selectedSession.id,
+                              termId: selectedTerm.id,
                             ))
-                              c.courseCode: ScheduleAppointmentBuilder.parseHexColor(c.courseColor),
+                              c.courseCode: ScheduleAppointmentBuilder.parseHexColor(
+                                c.courseColor,
+                              ),
                           };
 
                           final selectedTermEvents = events
