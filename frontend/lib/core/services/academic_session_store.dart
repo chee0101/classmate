@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/academic_session.dart';
+import '../models/academic_event.dart';
 import 'session_term_selection_store.dart';
 import '../utils/term_windows.dart';
 
@@ -161,7 +162,9 @@ Future<void> addAcademicSession(AcademicSession session) async {
   if (exists) return;
 
   final isFirstSession = academicSessionsNotifier.value.isEmpty;
-  await _sessionsCollection(user.uid).doc().set({
+  // Use the provided client-side id as the Firestore document id so that
+  // `AcademicSession.id` stays consistent across screens and when seeding events.
+  await _sessionsCollection(user.uid).doc(session.id).set({
     'name': session.name,
     'startDate': Timestamp.fromDate(normalizedStart),
     'endDate': Timestamp.fromDate(normalizedEnd),
@@ -170,6 +173,11 @@ Future<void> addAcademicSession(AcademicSession session) async {
     'createdAt': FieldValue.serverTimestamp(),
     'updatedAt': FieldValue.serverTimestamp(),
   });
+
+  await _seedAcademicBreakEventsForSession(
+    userUid: user.uid,
+    session: normalizedSession,
+  );
 }
 
 Future<void> updateAcademicSession(AcademicSession updatedSession) async {
@@ -193,6 +201,184 @@ Future<void> updateAcademicSession(AcademicSession updatedSession) async {
     'isCurrent': isCurrent,
     'updatedAt': FieldValue.serverTimestamp(),
   }, SetOptions(merge: true));
+
+  await _seedAcademicBreakEventsForSession(
+    userUid: user.uid,
+    session: normalizedSession,
+  );
+}
+
+DateTime _clampToTerm(DateTime value, DateTime termStart, DateTime termEnd) {
+  if (value.isBefore(termStart)) return termStart;
+  if (value.isAfter(termEnd)) return termEnd;
+  return value;
+}
+
+class _SeededAcademicBreak {
+  const _SeededAcademicBreak({
+    required this.title,
+    required this.weekStart,
+    required this.weekLength,
+  });
+
+  final String title;
+  final int weekStart; // 1-based week within the term
+  final int weekLength; // in weeks; use a large value + clamp for remainder
+}
+
+List<_SeededAcademicBreak> _academicBreaksForTerm(TermWindow term) {
+  // Semester 1 pattern:
+  // 1-7: T&L, 8: Mid-sem break, 9-15: T&L, 16: Revision, 17-19: Exam, 20-23: Mid-sem break (4 weeks)
+  // Semester 2 pattern:
+  // 1-7: T&L, 8: Mid-sem break, 9-15: T&L, 16: Revision, 17-19: Exam, 20+: Long break
+  final isSem1 = term.id == 'sem1' || term.label.toLowerCase().contains('semester 1');
+
+  if (isSem1) {
+    return const [
+      _SeededAcademicBreak(title: 'Mid-Semester Break', weekStart: 8, weekLength: 1),
+      _SeededAcademicBreak(title: 'Revision Week', weekStart: 16, weekLength: 1),
+      _SeededAcademicBreak(title: 'Exam Week', weekStart: 17, weekLength: 3),
+      _SeededAcademicBreak(title: 'Mid-Semester Break', weekStart: 20, weekLength: 4),
+    ];
+  }
+
+  final isSem2 = term.id == 'sem2' || term.label.toLowerCase().contains('semester 2');
+  if (isSem2) {
+    return const [
+      _SeededAcademicBreak(title: 'Mid-Semester Break', weekStart: 8, weekLength: 1),
+      _SeededAcademicBreak(title: 'Revision Week', weekStart: 16, weekLength: 1),
+      _SeededAcademicBreak(title: 'Exam Week', weekStart: 17, weekLength: 3),
+      // weekLength is clamped to term.end inside the seeding function.
+      _SeededAcademicBreak(title: 'Long Break', weekStart: 20, weekLength: 999),
+    ];
+  }
+
+  return const [];
+}
+
+bool _intervalsOverlap(DateTime aStart, DateTime aEnd, DateTime bStart, DateTime bEnd) {
+  return !aEnd.isBefore(bStart) && !aStart.isAfter(bEnd);
+}
+
+Future<void> _seedAcademicBreakEventsForSession({
+  required String userUid,
+  required AcademicSession session,
+}) async {
+  final eventCollection = FirebaseFirestore.instance
+      .collection('users')
+      .doc(userUid)
+      .collection('events');
+
+  final terms = buildTermWindows(session);
+
+  // Fetch existing events for this session so we can update/migrate older docs
+  // that might exist without `isAcademicBreak`.
+  final existingSnap =
+      await eventCollection.where('sessionId', isEqualTo: session.id).get();
+  final existingDocs = existingSnap.docs;
+
+  final seeded = <AcademicEvent>[];
+  for (final term in terms) {
+    final breaks = _academicBreaksForTerm(term);
+    for (final b in breaks) {
+      final startCandidate = term.start.add(Duration(days: (b.weekStart - 1) * 7));
+      // The above formula can be hard to reason about; compute as:
+      // start = weekStart-1 weeks from term start
+      // end = start + weekLength weeks - 1 day
+      final startDay = DateTime(
+        startCandidate.year,
+        startCandidate.month,
+        startCandidate.day,
+        0,
+        0,
+      );
+      final endDayRaw = startCandidate.add(Duration(days: b.weekLength * 7 - 1));
+      final start = startDay.isBefore(term.start) ? term.start : _startOfDay(startDay);
+      final end = _clampToTerm(_endOfDay(endDayRaw), term.start, term.end);
+
+      if (end.isBefore(start)) continue;
+
+      seeded.add(
+        AcademicEvent(
+          id: '',
+          sessionId: session.id,
+          termId: term.id,
+          title: b.title,
+          startDateTime: start,
+          endDateTime: end,
+          allDay: true,
+          hideClassesDuringEvent: false,
+          isAcademicBreak: true,
+          location: null,
+        ),
+      );
+    }
+  }
+
+  // Upsert/migrate: try to match existing events by sessionId+termId+title
+  // and overlap with the seeded range. Prefer ones already marked as academic break.
+  final batch = FirebaseFirestore.instance.batch();
+  for (final breakEvent in seeded) {
+    final matches = existingDocs.where((doc) {
+      final data = doc.data();
+      if ((data['termId'] as String?)?.trim() != breakEvent.termId) return false;
+      if ((data['title'] as String?)?.trim() != breakEvent.title) return false;
+      final startTs = data['startDateTime'] as Timestamp?;
+      final endTs = data['endDateTime'] as Timestamp?;
+      if (startTs == null || endTs == null) return false;
+      final start = startTs.toDate();
+      final end = endTs.toDate();
+      return _intervalsOverlap(start, end, breakEvent.startDateTime, breakEvent.endDateTime);
+    }).toList(growable: false);
+
+    // Choose:
+    // 1) any already-flagged academic break event, otherwise
+    // 2) the first overlap match to migrate.
+    QueryDocumentSnapshot<Map<String, dynamic>>? selectedMatch;
+    for (final doc in matches) {
+      if ((doc.data()['isAcademicBreak'] as bool?) == true) {
+        selectedMatch = doc;
+        break;
+      }
+    }
+    selectedMatch ??= matches.isNotEmpty ? matches.first : null;
+
+    final updatePayload = {
+      'sessionId': breakEvent.sessionId,
+      'termId': breakEvent.termId,
+      'title': breakEvent.title,
+      'startDateTime': Timestamp.fromDate(breakEvent.startDateTime),
+      'endDateTime': Timestamp.fromDate(breakEvent.endDateTime),
+      'allDay': breakEvent.allDay,
+      'hideClassesDuringEvent': breakEvent.hideClassesDuringEvent,
+      'isAcademicBreak': true,
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+
+    if (selectedMatch != null) {
+      batch.set(
+        selectedMatch.reference,
+        updatePayload,
+        SetOptions(merge: true),
+      );
+      continue;
+    }
+
+    final safeStartKey =
+        '${breakEvent.startDateTime.year}-${breakEvent.startDateTime.month.toString().padLeft(2, '0')}-${breakEvent.startDateTime.day.toString().padLeft(2, '0')}';
+    final docId =
+        'academic_break_${breakEvent.termId}_${breakEvent.title.replaceAll(RegExp(r'\\s+'), '_').toLowerCase()}_$safeStartKey';
+    batch.set(
+      eventCollection.doc(docId),
+      {
+        ...updatePayload,
+        'createdAt': FieldValue.serverTimestamp(),
+      },
+      SetOptions(merge: true),
+    );
+  }
+
+  await batch.commit();
 }
 
 Future<void> deleteAcademicSession(String sessionId) async {

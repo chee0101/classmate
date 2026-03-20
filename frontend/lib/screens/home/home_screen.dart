@@ -19,7 +19,9 @@ import '../../core/utils/date_time_format.dart';
 import '../../core/utils/task_utils.dart';
 import '../../core/utils/session_term_resolver.dart';
 import '../../core/utils/term_windows.dart';
+import '../../core/utils/event_time_utils.dart';
 import '../../core/models/session_term_ref.dart';
+import '../../core/utils/day_bounds_utils.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/home/session_header.dart';
@@ -113,10 +115,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       return ValueListenableBuilder<List<Course>>(
                         valueListenable: coursesNotifier,
                         builder: (context, courses, _) {
-                          return ValueListenableBuilder<List<ClassSlotOverride>>(
+                          return ValueListenableBuilder<
+                              List<ClassSlotOverride>>(
                             valueListenable: classSlotOverridesNotifier,
                             builder: (context, classOverrides, _) {
-                              return ValueListenableBuilder<List<TimetableEntry>>(
+                              return ValueListenableBuilder<
+                                  List<TimetableEntry>>(
                                 valueListenable: timetablesNotifier,
                                 builder: (context, timetables, _) {
                                   // Get upcoming tasks and filter by selected term window
@@ -127,13 +131,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                         .toList(),
                                   );
                                   final upcomingTasks = allUpcomingTasks
-                                      .where((task) =>
-                                          isInTerm(task.dueDateTime, selectedTerm))
+                                      .where((task) => isInTerm(
+                                          task.dueDateTime, selectedTerm))
                                       .toList();
                                   final upcomingEvents = events
                                       .where(
                                         (event) =>
-                                            event.sessionId == selectedSession.id &&
+                                            event.sessionId ==
+                                                selectedSession.id &&
                                             event.termId == selectedTerm.id &&
                                             !event.endDateTime.isBefore(
                                               DateTime(
@@ -146,18 +151,21 @@ class _HomeScreenState extends State<HomeScreen> {
                                             ),
                                       )
                                       .toList(growable: false)
-                                    ..sort((a, b) =>
-                                        a.startDateTime.compareTo(b.startDateTime));
+                                    ..sort((a, b) => a.startDateTime
+                                        .compareTo(b.startDateTime));
 
                                   final today =
                                       DateTime(now.year, now.month, now.day);
                                   final weekdayOrder = weekdayNamesMondayFirst;
-                                  final todayName = weekdayOrder[today.weekday - 1];
+                                  final todayName =
+                                      weekdayOrder[today.weekday - 1];
 
-                                  final overridesByOccurrenceKey = <String, ClassSlotOverride>{
+                                  final overridesByOccurrenceKey =
+                                      <String, ClassSlotOverride>{
                                     for (final o in classOverrides)
                                       if (o.occurrenceDate.year == today.year &&
-                                          o.occurrenceDate.month == today.month &&
+                                          o.occurrenceDate.month ==
+                                              today.month &&
                                           o.occurrenceDate.day == today.day)
                                         o.occurrenceKey: o,
                                   };
@@ -167,8 +175,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                       sessionId: selectedSession.id,
                                       termId: selectedTerm.id,
                                     ))
-                                      c.courseCode:
-                                          ScheduleAppointmentBuilder.parseHexColor(
+                                      c.courseCode: ScheduleAppointmentBuilder
+                                          .parseHexColor(
                                         c.courseColor,
                                       ),
                                   };
@@ -180,24 +188,30 @@ class _HomeScreenState extends State<HomeScreen> {
                                             e.termId == selectedTerm.id,
                                       )
                                       .expand((entry) => entry.slots
-                                          .where((slot) => slot.day == todayName)
-                                          .map((slot) {
+                                              .where((slot) =>
+                                                  slot.day == todayName)
+                                              .map((slot) {
                                             final overrideKey = ClassSlotOverride
                                                 .buildClassSlotOccurrenceKey(
                                               classSlotId: slot.classSlotId,
                                               occurrenceDate: today,
                                             );
                                             final override =
-                                                overridesByOccurrenceKey[overrideKey];
+                                                overridesByOccurrenceKey[
+                                                    overrideKey];
                                             if (override?.action ==
-                                                ClassSlotOverrideAction.cancel) {
+                                                ClassSlotOverrideAction
+                                                    .cancel) {
                                               return null;
                                             }
                                             final overrideMode =
-                                                (override?.overrideMode ?? '').trim();
+                                                (override?.overrideMode ?? '')
+                                                    .trim();
                                             final overrideVenue =
-                                                (override?.overrideVenue ?? '').trim();
-                                            final effectiveSlot = override == null
+                                                (override?.overrideVenue ?? '')
+                                                    .trim();
+                                            final effectiveSlot = override ==
+                                                    null
                                                 ? slot
                                                 : slot.copyWith(
                                                     mode: overrideMode.isEmpty
@@ -229,6 +243,133 @@ class _HomeScreenState extends State<HomeScreen> {
                                       return aStart.compareTo(bStart);
                                     });
 
+                                  // Determine academic break / hide-classes events for today
+                                  final todayStart = startOfDay(today);
+                                  final todayEnd = endOfDayInclusive(today);
+
+                                  final todayEvents = events
+                                      .where(
+                                        (event) =>
+                                            event.sessionId ==
+                                                selectedSession.id &&
+                                            event.termId == selectedTerm.id &&
+                                            !event.endDateTime
+                                                .isBefore(todayStart) &&
+                                            !event.startDateTime
+                                                .isAfter(todayEnd),
+                                      )
+                                      .toList(growable: false);
+
+                                  AcademicEvent? academicBreakEvent;
+                                  final hideClassEvents = <AcademicEvent>[];
+                                  for (final event in todayEvents) {
+                                    if (event.isAcademicBreak) {
+                                      academicBreakEvent = event;
+                                    } else if (event.hideClassesDuringEvent) {
+                                      hideClassEvents.add(event);
+                                    }
+                                  }
+
+                                  final isAcademicBreakToday =
+                                      academicBreakEvent != null;
+                                  // const isAcademicBreakToday = true;
+                                  final hasHideClassEventsToday =
+                                      !isAcademicBreakToday &&
+                                          hideClassEvents.isNotEmpty;
+
+                                  List<TodayClassItem> visibleTodayItems =
+                                      todayItems;
+
+                                  if (hasHideClassEventsToday) {
+                                    final processed = <TodayClassItem>[];
+
+                                    for (final item in todayItems) {
+                                      final classStart = parseTimeLabel12hToMinutes(
+                                        item.slot.startTime,
+                                      );
+                                      final classEnd = parseTimeLabel12hToMinutes(
+                                        item.slot.endTime,
+                                      );
+
+                                      // If we can't parse time, keep it as-is.
+                                      if (classStart == null ||
+                                          classEnd == null) {
+                                        processed.add(item);
+                                        continue;
+                                      }
+
+                                      bool fullyHidden = false;
+                                      bool partiallyAffected = false;
+
+                                      for (final event in hideClassEvents) {
+                                        final range =
+                                            eventTimeRangeForDay(event, today);
+
+                                        final eventStart = range.startMinutes;
+                                        final eventEndExclusive =
+                                            range.endMinutesExclusive;
+
+                                        if (eventEndExclusive <=
+                                            eventStart) continue;
+
+                                        if (!intervalsOverlap(
+                                          classStart,
+                                          classEnd,
+                                          eventStart,
+                                          eventEndExclusive,
+                                        )) {
+                                          continue;
+                                        }
+
+                                        final isFullOverlap = isFullContain(
+                                          classStart,
+                                          classEnd,
+                                          eventStart,
+                                          eventEndExclusive,
+                                        );
+
+                                        if (isFullOverlap) {
+                                          fullyHidden = true;
+                                          break;
+                                        }
+
+                                        // Overlap but not full.
+                                        partiallyAffected = true;
+                                      }
+
+                                      if (fullyHidden) continue;
+
+                                      processed.add(
+                                        partiallyAffected
+                                            ? TodayClassItem(
+                                                slot: item.slot,
+                                                courseCode: item.courseCode,
+                                                courseColor: item.courseColor,
+                                                partiallyAffected: true,
+                                              )
+                                            : item,
+                                      );
+                                    }
+
+                                    visibleTodayItems = processed;
+                                  }
+
+                                  // Academic breaks: hide classes entirely and show message below.
+                                  if (isAcademicBreakToday) {
+                                    visibleTodayItems =
+                                        const <TodayClassItem>[];
+                                  }
+
+                                  final String? emptySubtitleOverride;
+                                  if (isAcademicBreakToday) {
+                                    emptySubtitleOverride = 'No classes today';
+                                  } else if (hasHideClassEventsToday &&
+                                      visibleTodayItems.isEmpty) {
+                                    emptySubtitleOverride = 'No classes today';
+                                  } else {
+                                    emptySubtitleOverride = null;
+                                  }
+
                                   return Column(
                                     children: [
                                       Padding(
@@ -240,7 +381,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                           sessions: sessions,
                                           selectedSessionId: selectedSession.id,
                                           selectedTermId: selectedTerm.id,
-                                          onSelectionChanged: (sessionId, termId) {
+                                          onSelectionChanged:
+                                              (sessionId, termId) {
                                             setSelectedSessionTerm(
                                               sessionId: sessionId,
                                               termId: termId,
@@ -261,11 +403,21 @@ class _HomeScreenState extends State<HomeScreen> {
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.start,
                                             children: [
-                                              TodayClassesCard(items: todayItems),
-                                              const SizedBox(height: AppSpacing.md),
+                                              TodayClassesCard(
+                                                items: visibleTodayItems,
+                                                showAcademicBreakMessage:
+                                                    isAcademicBreakToday,
+                                                academicBreakTitle:
+                                                    academicBreakEvent?.title,
+                                                emptySubtitleOverride:
+                                                    emptySubtitleOverride,
+                                              ),
+                                              const SizedBox(
+                                                  height: AppSpacing.md),
                                               UpcomingEventsCard(
                                                   events: upcomingEvents),
-                                              const SizedBox(height: AppSpacing.md),
+                                              const SizedBox(
+                                                  height: AppSpacing.md),
                                               UpcomingDeadlinesCard(
                                                   tasks: upcomingTasks),
                                             ],

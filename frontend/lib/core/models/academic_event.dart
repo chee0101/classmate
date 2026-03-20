@@ -8,6 +8,7 @@ class AcademicEvent {
     required this.endDateTime,
     required this.allDay,
     required this.hideClassesDuringEvent,
+    this.isAcademicBreak = false,
     this.location,
   });
 
@@ -19,6 +20,11 @@ class AcademicEvent {
   final DateTime endDateTime;
   final bool allDay;
   final bool hideClassesDuringEvent;
+  /// Marks this event as an academic break (e.g. Mid-sem break, exams).
+  ///
+  /// When true, classes are shown in a disabled / greyed-out state on
+  /// the Home and Schedule screens with a "No classes today" message.
+  final bool isAcademicBreak;
   final String? location;
 
   AcademicEvent copyWith({
@@ -30,6 +36,7 @@ class AcademicEvent {
     DateTime? endDateTime,
     bool? allDay,
     bool? hideClassesDuringEvent,
+    bool? isAcademicBreak,
     String? location,
   }) {
     return AcademicEvent(
@@ -42,6 +49,7 @@ class AcademicEvent {
       allDay: allDay ?? this.allDay,
       hideClassesDuringEvent:
           hideClassesDuringEvent ?? this.hideClassesDuringEvent,
+      isAcademicBreak: isAcademicBreak ?? this.isAcademicBreak,
       location: location ?? this.location,
     );
   }
