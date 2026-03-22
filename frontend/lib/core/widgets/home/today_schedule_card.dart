@@ -49,6 +49,13 @@ class TodayScheduleCard extends StatelessWidget {
   final String? academicBreakTitle;
   final bool showAcademicBreakChip;
 
+  static final _cardDecoration = BoxDecoration(
+    color: Colors.white,
+    borderRadius: BorderRadius.circular(20),
+  );
+
+  static const _timeLabelColor = Color(0xFF5C4ED9);
+
   int _safeMinutes(int minutes) {
     // Handle the "end of day" representation (1440) by showing 23:59.
     if (minutes >= 24 * 60) return 23 * 60 + 59;
@@ -71,10 +78,185 @@ class TodayScheduleCard extends StatelessWidget {
     return 'No classes today';
   }
 
+  TextStyle? _timeLabelStyle(TextTheme textTheme) {
+    return textTheme.bodyMedium?.copyWith(
+      color: _timeLabelColor,
+      fontWeight: FontWeight.w600,
+    );
+  }
+
+  IconData _venueIcon(TodayScheduleItem item) {
+    if (item.type == TodayScheduleItemType.classItem && item.isOnline) {
+      return Icons.videocam_outlined;
+    }
+    return Icons.location_on_outlined;
+  }
+
+  Widget _scheduleHeader(
+    TextTheme textTheme, {
+    required bool expandTitle,
+    EdgeInsetsGeometry padding = EdgeInsets.zero,
+    bool showAcademicBreakInHeader = false,
+  }) {
+    final title = Text(
+      "Today's Schedule",
+      style: textTheme.titleLarge,
+    );
+    final showChip =
+        showAcademicBreakInHeader && showAcademicBreakChip && academicBreakTitle != null;
+    return Padding(
+      padding: padding,
+      child: Row(
+        children: [
+          if (expandTitle) Expanded(child: title) else title,
+          if (showChip)
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 5,
+              ),
+              decoration: BoxDecoration(
+                color: appPrimarySwatch.shade700.withAlpha(20),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                academicBreakTitle!,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.bodySmall?.copyWith(
+                  color: appPrimarySwatch.shade700,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildScheduleItemRow(
+    TextTheme textTheme,
+    TodayScheduleItem item,
+  ) {
+    const warningColor = Colors.orange;
+    final startLabel = _formatMinutes24h(item.startMinutes);
+    final endLabel = _formatMinutes24h(item.endMinutes);
+    final timeStyle = _timeLabelStyle(textTheme);
+    final isClass = item.type == TodayScheduleItemType.classItem;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          SizedBox(
+            width: 42,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Text(startLabel, style: timeStyle),
+                const SizedBox(height: 4),
+                Text(endLabel, style: timeStyle),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          SizedBox(
+            width: 16,
+            child: Center(
+              child: Container(
+                width: 16,
+                height: 16,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: item.color,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Container(
+              padding: const EdgeInsets.all(AppSpacing.md),
+              decoration: BoxDecoration(
+                color: item.color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: item.color,
+                  width: 0.8,
+                  style: BorderStyle.solid,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Icon(
+                        isClass ? Icons.school : Icons.event,
+                        size: 16,
+                        color: item.color,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          item.title,
+                          style: textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (isClass && item.overlapsWithEventTitle != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      '⚠ Overlaps with ${item.overlapsWithEventTitle}',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: warningColor.shade700,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                  if (item.venueLabel != null) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Icon(
+                          _venueIcon(item),
+                          size: 16,
+                          color: Colors.grey.shade700,
+                        ),
+                        const SizedBox(width: 4),
+                        Flexible(
+                          child: Text(
+                            item.venueLabel!,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: Colors.grey.shade700,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ]
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    const warningColor = Colors.orange;
 
     if (items.isEmpty) {
       final isAcademicBreak = academicBreakTitle != null;
@@ -85,13 +267,15 @@ class TodayScheduleCard extends StatelessWidget {
       return Container(
         width: double.infinity,
         padding: const EdgeInsets.all(AppSpacing.md),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-        ),
+        decoration: _cardDecoration,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
+            _scheduleHeader(
+              textTheme,
+              expandTitle: false,
+              padding: const EdgeInsets.only(bottom: AppSpacing.md),
+            ),
             SvgPicture.asset(
               'assets/images/rest.svg',
               height: 120,
@@ -116,7 +300,7 @@ class TodayScheduleCard extends StatelessWidget {
                 textAlign: TextAlign.center,
               ),
             ],
-            const SizedBox(height: 10),
+            const SizedBox(height: 4),
             Text(
               subtitle,
               style: textTheme.bodyMedium?.copyWith(
@@ -135,181 +319,17 @@ class TodayScheduleCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
-      ),
+      decoration: _cardDecoration,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  "Today's Schedule",
-                  style: textTheme.titleLarge,
-                ),
-              ),
-              if (showAcademicBreakChip && academicBreakTitle != null)
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 5,
-                  ),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF4E5),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(
-                      color: appPrimarySwatch.shade700.withOpacity(0.35),
-                    ),
-                  ),
-                  child: Text(
-                    academicBreakTitle!,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodySmall?.copyWith(
-                      color: appPrimarySwatch.shade700,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-            ],
+          _scheduleHeader(
+            textTheme,
+            expandTitle: true,
+            showAcademicBreakInHeader: true,
           ),
           const SizedBox(height: AppSpacing.sm),
-          ...items.map((item) {
-            final startLabel = _formatMinutes24h(item.startMinutes);
-            final endLabel = _formatMinutes24h(item.endMinutes);
-
-            final venueIcon = item.type == TodayScheduleItemType.classItem
-                ? (item.isOnline
-                    ? Icons.videocam_outlined
-                    : Icons.location_on_outlined)
-                : Icons.location_on_outlined;
-
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  SizedBox(
-                    width: 42,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          startLabel,
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: const Color(0xFF5C4ED9),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          endLabel,
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: const Color(0xFF5C4ED9),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  SizedBox(
-                    width: 16,
-                    child: Center(
-                      child: Container(
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: item.color,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(AppSpacing.md),
-                      decoration: BoxDecoration(
-                        color: item.color.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(18),
-                        border: Border.all(
-                          color: item.color,
-                          width: 0.8,
-                          style: BorderStyle.solid,
-                        ),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            children: [
-                              Icon(
-                                item.type == TodayScheduleItemType.classItem
-                                    ? Icons.school
-                                    : Icons.event,
-                                size: 16,
-                                color: item.color,
-                              ),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  item.title,
-                                  style: textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (item.type == TodayScheduleItemType.classItem &&
-                              item.overlapsWithEventTitle != null) ...[
-                            const SizedBox(height: 8),
-                            Text(
-                              '⚠ Overlaps with ${item.overlapsWithEventTitle}',
-                              style: textTheme.bodySmall?.copyWith(
-                                color: warningColor.shade700,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                          if (item.venueLabel != null) ...[
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Icon(
-                                  venueIcon,
-                                  size: 16,
-                                  color: Colors.grey.shade700,
-                                ),
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(
-                                    item.venueLabel!,
-                                    style: textTheme.bodyMedium?.copyWith(
-                                      color: Colors.grey.shade700,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ]
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }).toList(),
+          ...items.map((item) => _buildScheduleItemRow(textTheme, item)),
         ],
       ),
     );
