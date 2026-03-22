@@ -5,7 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/course.dart';
-import '../utils/course_display.dart';
+import '../utils/course_resolver.dart';
 import 'cascade_cleanup.dart';
 
 final ValueNotifier<List<Course>> coursesNotifier = ValueNotifier<List<Course>>(

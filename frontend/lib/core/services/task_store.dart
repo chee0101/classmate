@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 
 import '../models/task.dart';
 import 'course_store.dart';
+import 'session_term_selection_store.dart';
 
 final ValueNotifier<List<Task>> tasksNotifier = ValueNotifier<List<Task>>([]);
 
@@ -123,6 +124,17 @@ String? _resolveCourseIdFromTask(Task task) {
   }
   final normalizedCode = task.courseCode.trim().toUpperCase();
   if (normalizedCode.isEmpty) return null;
+
+  final selection = selectedSessionTermNotifier.value;
+  if (selection != null) {
+    final scoped = resolveCourseIdByCodeInSessionAndTerm(
+      sessionId: selection.sessionId,
+      termId: selection.termId,
+      courseCode: normalizedCode,
+    );
+    if (scoped != null) return scoped;
+  }
+
   final matched = coursesNotifier.value.where(
     (course) => course.courseCode.toUpperCase() == normalizedCode,
   );
