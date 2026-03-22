@@ -19,6 +19,7 @@ class TodayScheduleItem {
     required this.isOnline,
     this.venueLabel,
     this.overlapsWithEventTitle,
+    this.isAllDay = false,
   });
 
   final TodayScheduleItemType type;
@@ -35,6 +36,9 @@ class TodayScheduleItem {
 
   /// For classes only: label of the first overlapping event.
   final String? overlapsWithEventTitle;
+
+  /// When true (events only), time column shows "All" / "day" instead of a range.
+  final bool isAllDay;
 }
 
 class TodayScheduleCard extends StatelessWidget {
@@ -134,15 +138,153 @@ class TodayScheduleCard extends StatelessWidget {
     );
   }
 
+  Widget _buildItemCard(TextTheme textTheme, TodayScheduleItem item) {
+    const warningColor = Colors.orange;
+    final isClass = item.type == TodayScheduleItemType.classItem;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: item.color.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: item.color,
+          width: 0.8,
+          style: BorderStyle.solid,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Icon(
+                isClass ? Icons.school : Icons.event,
+                size: 16,
+                color: item.color,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  item.title,
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+          if (isClass && item.overlapsWithEventTitle != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              '⚠ Overlaps with ${item.overlapsWithEventTitle}',
+              style: textTheme.bodySmall?.copyWith(
+                color: warningColor.shade700,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+          if (item.venueLabel != null) ...[
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Icon(
+                  _venueIcon(item),
+                  size: 16,
+                  color: Colors.grey.shade700,
+                ),
+                const SizedBox(width: 4),
+                Flexible(
+                  child: Text(
+                    item.venueLabel!,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: Colors.grey.shade700,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ],
+            ),
+          ]
+        ],
+      ),
+    );
+  }
+
+  /// Single "All / day" label; stacks all all-day events on the right.
+  Widget _buildAllDayGroup(
+    TextTheme textTheme,
+    List<TodayScheduleItem> allDayItems,
+  ) {
+    final timeStyle = _timeLabelStyle(textTheme);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 42,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.start,
+              children: [
+                Text('All', style: timeStyle),
+                const SizedBox(height: 4),
+                Text('day', style: timeStyle),
+              ],
+            ),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var i = 0; i < allDayItems.length; i++) ...[
+                  if (i > 0) const SizedBox(height: AppSpacing.sm),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 16,
+                        child: Center(
+                          child: Container(
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: allDayItems[i].color,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.md),
+                      Expanded(
+                        child: _buildItemCard(textTheme, allDayItems[i]),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// One row: time range + dot + card (timed items only).
   Widget _buildScheduleItemRow(
     TextTheme textTheme,
     TodayScheduleItem item,
   ) {
-    const warningColor = Colors.orange;
     final startLabel = _formatMinutes24h(item.startMinutes);
     final endLabel = _formatMinutes24h(item.endMinutes);
     final timeStyle = _timeLabelStyle(textTheme);
-    final isClass = item.type == TodayScheduleItemType.classItem;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: AppSpacing.sm),
@@ -177,77 +319,7 @@ class TodayScheduleCard extends StatelessWidget {
           ),
           const SizedBox(width: AppSpacing.md),
           Expanded(
-            child: Container(
-              padding: const EdgeInsets.all(AppSpacing.md),
-              decoration: BoxDecoration(
-                color: item.color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(
-                  color: item.color,
-                  width: 0.8,
-                  style: BorderStyle.solid,
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Icon(
-                        isClass ? Icons.school : Icons.event,
-                        size: 16,
-                        color: item.color,
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          item.title,
-                          style: textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w700,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  if (isClass && item.overlapsWithEventTitle != null) ...[
-                    const SizedBox(height: 8),
-                    Text(
-                      '⚠ Overlaps with ${item.overlapsWithEventTitle}',
-                      style: textTheme.bodySmall?.copyWith(
-                        color: warningColor.shade700,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                  if (item.venueLabel != null) ...[
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        Icon(
-                          _venueIcon(item),
-                          size: 16,
-                          color: Colors.grey.shade700,
-                        ),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            item.venueLabel!,
-                            style: textTheme.bodyMedium?.copyWith(
-                              color: Colors.grey.shade700,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ]
-                ],
-              ),
-            ),
+            child: _buildItemCard(textTheme, item),
           ),
         ],
       ),
@@ -329,9 +401,23 @@ class TodayScheduleCard extends StatelessWidget {
             showAcademicBreakInHeader: true,
           ),
           const SizedBox(height: AppSpacing.sm),
-          ...items.map((item) => _buildScheduleItemRow(textTheme, item)),
+          ..._buildScheduleItemList(textTheme),
         ],
       ),
     );
+  }
+
+  List<Widget> _buildScheduleItemList(TextTheme textTheme) {
+    final allDayItems = items.where((i) => i.isAllDay).toList(growable: false);
+    final timedItems = items.where((i) => !i.isAllDay).toList(growable: false);
+
+    final out = <Widget>[];
+    if (allDayItems.isNotEmpty) {
+      out.add(_buildAllDayGroup(textTheme, allDayItems));
+    }
+    for (final item in timedItems) {
+      out.add(_buildScheduleItemRow(textTheme, item));
+    }
+    return out;
   }
 }

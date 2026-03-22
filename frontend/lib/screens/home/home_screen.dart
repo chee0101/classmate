@@ -30,6 +30,22 @@ import '../../core/widgets/home/today_schedule_card.dart';
 import '../../core/widgets/home/upcoming_events_card.dart';
 import '../../core/widgets/home/upcoming_deadlines_card.dart';
 
+/// Puts all-day events first, then sorts by start time (see [TodayScheduleItem.isAllDay]).
+int _compareTodayScheduleItems(TodayScheduleItem a, TodayScheduleItem b) {
+  if (a.isAllDay != b.isAllDay) {
+    return a.isAllDay ? -1 : 1;
+  }
+  if (a.startMinutes != b.startMinutes) {
+    return a.startMinutes.compareTo(b.startMinutes);
+  }
+  final aPri =
+      a.type == TodayScheduleItemType.eventItem ? 0 : 1;
+  final bPri =
+      b.type == TodayScheduleItemType.eventItem ? 0 : 1;
+  if (aPri != bPri) return aPri.compareTo(bPri);
+  return a.endMinutes.compareTo(b.endMinutes);
+}
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -264,13 +280,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                           }))
                                       .whereType<TodayScheduleItem>()
                                       .toList(growable: false)
-                                    ..sort((a, b) {
-                                      if (a.startMinutes != b.startMinutes) {
-                                        return a.startMinutes.compareTo(
-                                            b.startMinutes);
-                                      }
-                                      return a.endMinutes.compareTo(b.endMinutes);
-                                    });
+                                    ..sort(_compareTodayScheduleItems);
 
                                   // -----------------------------
                                   // 2) Today's event items
@@ -309,6 +319,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                             eventTimeRangeForDay(event, today);
                                         final startMinutes = range.startMinutes;
                                         final endMinutes = range.endMinutesExclusive;
+                                        // Match calendar "full day" rows: flag set, or clipped range is whole day.
+                                        final isAllDayDisplay = event.allDay ||
+                                            (startMinutes == 0 &&
+                                                endMinutes >= 24 * 60);
 
                                         final venueLabel = (event
                                                     .location
@@ -326,6 +340,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                           color: appPrimarySwatch.shade700,
                                           isOnline: false,
                                           venueLabel: venueLabel,
+                                          isAllDay: isAllDayDisplay,
                                         );
                                       })
                                       .toList(growable: false);
@@ -402,13 +417,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   if (academicBreakEvent != null &&
                                       nonAcademicEventItems.isNotEmpty) {
                                     final scheduleItems = [...nonAcademicEventItems]
-                                      ..sort((a, b) {
-                                        if (a.startMinutes != b.startMinutes) {
-                                          return a.startMinutes.compareTo(
-                                              b.startMinutes);
-                                        }
-                                        return a.endMinutes.compareTo(b.endMinutes);
-                                      });
+                                      ..sort(_compareTodayScheduleItems);
 
                                     return Column(
                                       children: [
@@ -514,23 +523,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   final scheduleItems = [
                                     ...nonAcademicEventItems,
                                     ...scheduleClassItems,
-                                  ]..sort((a, b) {
-                                      if (a.startMinutes != b.startMinutes) {
-                                        return a.startMinutes
-                                            .compareTo(b.startMinutes);
-                                      }
-                                      // Tie-break: events first.
-                                      final aPri = a.type ==
-                                              TodayScheduleItemType.eventItem
-                                          ? 0
-                                          : 1;
-                                      final bPri = b.type ==
-                                              TodayScheduleItemType.eventItem
-                                          ? 0
-                                          : 1;
-                                      if (aPri != bPri) return aPri.compareTo(bPri);
-                                      return a.endMinutes.compareTo(b.endMinutes);
-                                    });
+                                  ]..sort(_compareTodayScheduleItems);
 
                                   return Column(
                                     children: [

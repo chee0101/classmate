@@ -43,6 +43,17 @@ void initializeAcademicEventsSync() {
   });
 }
 
+bool _readBool(dynamic value) {
+  if (value == null) return false;
+  if (value is bool) return value;
+  if (value is num) return value != 0;
+  if (value is String) {
+    final s = value.toLowerCase().trim();
+    return s == 'true' || s == '1' || s == 'yes';
+  }
+  return false;
+}
+
 AcademicEvent _eventFromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
   final data = doc.data() ?? const <String, dynamic>{};
   final startTimestamp = data['startDateTime'] as Timestamp?;
@@ -56,7 +67,7 @@ AcademicEvent _eventFromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
     title: ((data['title'] as String?) ?? '').trim(),
     startDateTime: startTimestamp?.toDate() ?? now,
     endDateTime: endTimestamp?.toDate() ?? now,
-    allDay: (data['allDay'] as bool?) ?? false,
+    allDay: _readBool(data['allDay']),
     hideClassesDuringEvent: (data['hideClassesDuringEvent'] as bool?) ?? true,
     isAcademicBreak: (data['isAcademicBreak'] as bool?) ?? false,
     location: (data['location'] as String?)?.trim(),
