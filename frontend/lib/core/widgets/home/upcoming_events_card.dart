@@ -1,19 +1,35 @@
 import 'package:flutter/material.dart';
 
+import '../../builders/schedule_appointment_builder.dart';
 import '../../constants/app_spacing.dart';
 import '../../constants/routes.dart';
 import '../../models/academic_event.dart';
 import '../../utils/date_time_format.dart';
+import '../../utils/schedule_event_appointment_actions.dart';
+import '../../utils/term_windows.dart';
+import '../schedule/schedule_appointments_bottom_sheet.dart';
 import '../../../screens/add/add_new_screen.dart' show AddType;
 import '../common/empty_state_card.dart';
 
-class UpcomingEventsCard extends StatelessWidget {
+class UpcomingEventsCard extends StatefulWidget {
   const UpcomingEventsCard({
     super.key,
     required this.events,
+    required this.selectedTerm,
   });
 
   final List<AcademicEvent> events;
+  final TermWindow selectedTerm;
+
+  @override
+  State<UpcomingEventsCard> createState() => _UpcomingEventsCardState();
+}
+
+class _UpcomingEventsCardState extends State<UpcomingEventsCard> {
+  bool _expanded = false;
+
+  static const _tooltipMessage =
+      'Events starting in the next 7 days (after today).';
 
   String _eventSubtitle(AcademicEvent event) {
     final startDay = DateTime(
@@ -44,10 +60,47 @@ class UpcomingEventsCard extends StatelessWidget {
     );
   }
 
+  Future<void> _openMultiEventSheet() async {
+    final events = widget.events;
+    if (events.isEmpty) return;
+    final appointments = events
+        .take(5)
+        .map(ScheduleAppointmentBuilder.appointmentForEventDetail)
+        .toList(growable: false);
+    await showScheduleAppointmentsBottomSheet(
+      context: context,
+      appointments: appointments,
+      onEditAppointment: (a) => scheduleEventAppointmentEdit(
+        context,
+        a,
+        selectedTerm: widget.selectedTerm,
+      ),
+      onCancelAppointment: (a) => scheduleEventAppointmentDelete(context, a),
+    );
+  }
+
+  Future<void> _openSingleEventSheet(AcademicEvent event) async {
+    final appointment =
+        ScheduleAppointmentBuilder.appointmentForEventDetail(event);
+    await showScheduleAppointmentsBottomSheet(
+      context: context,
+      appointments: [appointment],
+      onEditAppointment: (a) => scheduleEventAppointmentEdit(
+        context,
+        a,
+        selectedTerm: widget.selectedTerm,
+      ),
+      onCancelAppointment: (a) => scheduleEventAppointmentDelete(context, a),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final preview = events.take(5).toList(growable: false);
+    final events = widget.events;
+    final hasMany = events.length > 5;
+    final visible =
+        !_expanded && hasMany ? events.take(5).toList(growable: false) : events;
 
     if (events.isEmpty) {
       return EmptyStateCard(
@@ -76,12 +129,51 @@ class UpcomingEventsCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Upcoming Events',
-              style: textTheme.titleLarge,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Row(
+                    children: [
+                      InkWell(
+                        onTap: _openMultiEventSheet,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Text(
+                            'Upcoming Events',
+                            style: textTheme.titleLarge,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Tooltip(
+                        message: _tooltipMessage,
+                        child: Icon(
+                          Icons.info_outline,
+                          size: 20,
+                          color: Colors.grey.shade700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (hasMany)
+                  TextButton(
+                    onPressed: () {
+                      setState(() => _expanded = !_expanded);
+                    },
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text(_expanded ? 'Show less' : 'Show All'),
+                  ),
+              ],
             ),
             const SizedBox(height: 8),
-            ...preview.asMap().entries.map((entry) {
+            ...visible.asMap().entries.map((entry) {
               final i = entry.key;
               final event = entry.value;
               return Column(
@@ -89,6 +181,7 @@ class UpcomingEventsCard extends StatelessWidget {
                   ListTile(
                     contentPadding: EdgeInsets.zero,
                     dense: true,
+                    onTap: () => _openSingleEventSheet(event),
                     leading: const Icon(Icons.event, size: 20),
                     title: Text(
                       event.title,
@@ -103,7 +196,7 @@ class UpcomingEventsCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  if (i < preview.length - 1)
+                  if (i < visible.length - 1)
                     const Divider(
                       height: 1,
                       thickness: 1,
@@ -112,20 +205,20 @@ class UpcomingEventsCard extends StatelessWidget {
                 ],
               );
             }),
-            if (events.length > preview.length) ...[
-              const SizedBox(height: 6),
-              Text(
-                '+${events.length - preview.length} more events',
-                style: textTheme.bodySmall?.copyWith(
-                  color: Colors.grey.shade700,
-                  fontStyle: FontStyle.italic,
+            if (hasMany && !_expanded)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text(
+                  '+${events.length - 5} more',
+                  style: textTheme.bodySmall?.copyWith(
+                    color: Colors.grey.shade700,
+                    fontStyle: FontStyle.italic,
+                  ),
                 ),
               ),
-            ],
           ],
         ),
       ),
     );
   }
 }
-

@@ -395,6 +395,16 @@ class ScheduleAppointmentBuilder {
     return a.endTime.compareTo(b.endTime);
   }
 
+  /// Single-event [Appointment] for calendar/detail sheets (not expanded for overflow).
+  static Appointment appointmentForEventDetail(AcademicEvent event) {
+    return _buildEventAppointment(
+      event: event,
+      startTime: event.startDateTime,
+      endTime: event.endDateTime,
+      isAllDay: event.allDay,
+    );
+  }
+
   static Appointment _buildEventAppointment({
     required AcademicEvent event,
     required DateTime startTime,

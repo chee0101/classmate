@@ -135,30 +135,27 @@ class _HomeScreenState extends State<HomeScreen> {
                                       .where((task) => isInTerm(
                                           task.dueDateTime, selectedTerm))
                                       .toList();
+                                  final today =
+                                      DateTime(now.year, now.month, now.day);
+                                  final todayStart = startOfDay(today);
+                                  final todayEnd = endOfDayInclusive(today);
+                                  final next7DaysEnd = endOfDayInclusive(
+                                    today.add(const Duration(days: 7)),
+                                  );
                                   final upcomingEvents = events
                                       .where(
                                         (event) =>
                                             event.sessionId ==
                                                 selectedSession.id &&
                                             event.termId == selectedTerm.id &&
-                                            event.startDateTime.isAfter(
-                                              DateTime(
-                                                now.year,
-                                                now.month,
-                                                now.day,
-                                                23,
-                                                59,
-                                                59,
-                                                999,
-                                              ),
-                                            ),
+                                            event.startDateTime
+                                                .isAfter(todayEnd) &&
+                                            !event.startDateTime
+                                                .isAfter(next7DaysEnd),
                                       )
                                       .toList(growable: false)
                                     ..sort((a, b) => a.startDateTime
                                         .compareTo(b.startDateTime));
-
-                                  final today =
-                                      DateTime(now.year, now.month, now.day);
                                   final weekdayOrder = weekdayNamesMondayFirst;
                                   final todayName =
                                       weekdayOrder[today.weekday - 1];
@@ -183,9 +180,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                         c.courseColor,
                                       ),
                                   };
-
-                                  final todayStart = startOfDay(today);
-                                  final todayEnd = endOfDayInclusive(today);
 
                                   // -----------------------------
                                   // 1) Today's class items
@@ -390,7 +384,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 ),
                                                 const SizedBox(height: AppSpacing.md),
                                                 UpcomingEventsCard(
-                                                    events: upcomingEvents),
+                                                  events: upcomingEvents,
+                                                  selectedTerm: selectedTerm,
+                                                ),
                                                 const SizedBox(height: AppSpacing.md),
                                                 UpcomingDeadlinesCard(
                                                     tasks: upcomingTasks),
@@ -456,7 +452,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 ),
                                                 const SizedBox(height: AppSpacing.md),
                                                 UpcomingEventsCard(
-                                                    events: upcomingEvents),
+                                                  events: upcomingEvents,
+                                                  selectedTerm: selectedTerm,
+                                                ),
                                                 const SizedBox(height: AppSpacing.md),
                                                 UpcomingDeadlinesCard(
                                                     tasks: upcomingTasks),
@@ -574,7 +572,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                               const SizedBox(
                                                   height: AppSpacing.md),
                                               UpcomingEventsCard(
-                                                  events: upcomingEvents),
+                                                events: upcomingEvents,
+                                                selectedTerm: selectedTerm,
+                                              ),
                                               const SizedBox(
                                                   height: AppSpacing.md),
                                               UpcomingDeadlinesCard(

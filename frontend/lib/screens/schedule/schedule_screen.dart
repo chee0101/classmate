@@ -25,14 +25,13 @@ import '../../core/utils/day_bounds_utils.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/common/session_term_context_label.dart';
-import '../../core/widgets/common/confirm_dialog.dart';
 import '../../core/widgets/schedule/class_slot_sheet.dart';
 import '../../core/widgets/schedule/schedule_class_appointment_text.dart';
 import '../../core/widgets/schedule/schedule_overflow_popup_menu.dart';
-import '../../core/widgets/schedule/schedule_details_sheet.dart';
+import '../../core/widgets/schedule/schedule_appointments_bottom_sheet.dart';
 import 'schedule_class_editor_screen.dart';
-import 'schedule_event_editor_screen.dart';
 import '../../core/utils/event_time_utils.dart';
+import '../../core/utils/schedule_event_appointment_actions.dart';
 import '../../core/utils/schedule_week_utils.dart';
 
 class ScheduleScreen extends StatefulWidget {
@@ -656,139 +655,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     List<Appointment> appointments, {
     required TermWindow selectedTerm,
   }) {
-    final first = appointments.first;
-    final isClassDetails = first.notes == ScheduleAppointmentMeta.typeClass;
-    final sheetTitle = appointments.length == 1
-        ? (isClassDetails ? 'Class Details' : 'Event Details')
-        : 'Details';
-
-    showModalBottomSheet<void>(
+    showScheduleAppointmentsBottomSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.white,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      appointments: appointments,
+      onEditAppointment: (appointment) => _handleDetailsEdit(
+        appointment,
+        selectedTerm: selectedTerm,
       ),
-      builder: (context) {
-        final textTheme = Theme.of(context).textTheme;
-        final maxSheetHeight = MediaQuery.sizeOf(context).height * 0.75;
-        final isSingle = appointments.length == 1;
-        if (isSingle) {
-          final appointment = appointments.first;
-          if (isClassDetails) {
-            return ScheduleDetailsSheet(
-              sheetTitle: sheetTitle,
-              appointment: appointment,
-              type: ScheduleDetailsType.classDetails,
-              onEditPressed: () => _handleDetailsEdit(
-                appointment,
-                selectedTerm: selectedTerm,
-              ),
-              onCancelPressed: () => _handleDetailsCancel(
-                appointment,
-              ),
-            );
-          } else {
-            return ScheduleDetailsSheet(
-              sheetTitle: sheetTitle,
-              appointment: appointment,
-              type: ScheduleDetailsType.eventDetails,
-              onEditPressed: () => _handleDetailsEdit(
-                appointment,
-                selectedTerm: selectedTerm,
-              ),
-              onCancelPressed: () => _handleDetailsCancel(
-                appointment,
-              ),
-            );
-          }
-        }
-
-        return SafeArea(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxHeight: maxSheetHeight),
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    sheetTitle,
-                    style: textTheme.titleLarge,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  Flexible(
-                    child: ListView.builder(
-                      shrinkWrap: true,
-                      itemCount: appointments.length,
-                      itemBuilder: (context, index) {
-                        final appointment = appointments[index];
-                        final meta = appointment.id;
-                        String? eventLocation;
-                        if (meta is ScheduleAppointmentMeta &&
-                            meta.type == ScheduleAppointmentMeta.typeEvent &&
-                            meta.events.isNotEmpty) {
-                          eventLocation = meta.events.first.location?.trim();
-                          if (eventLocation != null && eventLocation.isEmpty) {
-                            eventLocation = null;
-                          }
-                        }
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.md),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: 4,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  color: appointment.color,
-                                  borderRadius: BorderRadius.circular(99),
-                                ),
-                              ),
-                              const SizedBox(width: AppSpacing.sm),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      appointment.subject,
-                                      style: textTheme.titleSmall?.copyWith(
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      formatAppointmentRange(appointment),
-                                      style: textTheme.bodySmall?.copyWith(
-                                        color: Colors.grey.shade700,
-                                      ),
-                                    ),
-                                    if (eventLocation != null) ...[
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '📍 $eventLocation',
-                                        style: textTheme.bodySmall?.copyWith(
-                                          color: Colors.grey.shade700,
-                                        ),
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+      onCancelAppointment: _handleDetailsCancel,
     );
   }
 
@@ -802,16 +676,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     if (meta.type == ScheduleAppointmentMeta.typeEvent &&
         meta.events.isNotEmpty) {
-      final updated = await ScheduleEventEditorScreen.show(
+      await runScheduleEventAppointmentEdit(
         context,
-        initialEvent: meta.events.first,
+        appointment,
         selectedTerm: selectedTerm,
-      );
-      if (updated == null || !mounted) return;
-      await updateAcademicEvent(updated);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Event updated.')),
       );
       return;
     }
@@ -898,18 +766,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
     if (meta.type == ScheduleAppointmentMeta.typeEvent &&
         meta.events.isNotEmpty) {
-      final event = meta.events.first;
-      final shouldDelete = await showConfirmDeleteDialog(
-        context,
-        title: 'Delete Event',
-        message: 'Are you sure you want to delete this event?',
-      );
-      if (!shouldDelete) return;
-      await deleteAcademicEvent(event.id);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Event deleted.')),
-      );
+      await runScheduleEventAppointmentDelete(context, appointment);
       return;
     }
 
