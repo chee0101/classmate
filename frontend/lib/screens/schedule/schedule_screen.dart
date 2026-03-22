@@ -905,9 +905,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     required Appointment appointment,
     required _ClassSourceMeta meta,
   }) {
-    final lines = appointment.subject.split('\n');
-    final classTypeLabel =
-        lines.length > 1 ? lines[1].trim().toLowerCase() : '';
+    final fullMeta = appointment.id as ScheduleAppointmentMeta;
+    // Subject line 2 is venue/location for display — class type lives on [ScheduleAppointmentMeta.classType].
+    final classTypeLabel = (fullMeta.classType ?? '').trim().toLowerCase();
     var classType = ClassType.other;
     for (final value in ClassType.values) {
       if (value.label.toLowerCase() == classTypeLabel) {
@@ -925,14 +925,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       ),
       startTime: formatTime12h(appointment.startTime),
       endTime: formatTime12h(appointment.endTime),
-      mode:
-          ((appointment.id as ScheduleAppointmentMeta).mode ?? 'Online').trim(),
+      mode: (fullMeta.mode ?? 'Online').trim(),
       classType: classType,
-      venue: ((appointment.id as ScheduleAppointmentMeta).venue ?? '')
-              .trim()
-              .isEmpty
+      venue: (fullMeta.venue ?? '').trim().isEmpty
           ? null
-          : (appointment.id as ScheduleAppointmentMeta).venue?.trim(),
+          : fullMeta.venue?.trim(),
     );
   }
 

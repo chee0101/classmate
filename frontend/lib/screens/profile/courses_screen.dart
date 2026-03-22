@@ -135,7 +135,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
                     ),
                     Center(
                       child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.lg),
+                        padding: const EdgeInsets.all(AppSpacing.md),
                         child: EmptyStateCard(
                           title: 'No courses in ${selectedTerm.label}',
                           subtitle:

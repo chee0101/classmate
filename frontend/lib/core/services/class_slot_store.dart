@@ -9,6 +9,7 @@ import '../models/class_type.dart';
 import '../models/timetable_entry.dart';
 import '../utils/course_display.dart';
 import '../utils/date_time_format.dart';
+import 'cascade_cleanup.dart';
 import 'course_store.dart';
 
 final ValueNotifier<List<TimetableEntry>> timetablesNotifier =
@@ -17,24 +18,18 @@ final ValueNotifier<List<TimetableEntry>> timetablesNotifier =
 StreamSubscription<User?>? _authSubscription;
 StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? _slotsSubscription;
 
+/// Last class slot docs; re-mapped when [coursesNotifier] updates (labels from [courseId]).
+List<QueryDocumentSnapshot<Map<String, dynamic>>> _cachedSlotDocs = const [];
+
+void _rebuildTimetablesFromCourseCache() {
+  if (_cachedSlotDocs.isEmpty) return;
+  timetablesNotifier.value = _mapSlotDocsToTimetableEntries(_cachedSlotDocs);
+}
+
 CollectionReference<Map<String, dynamic>> _classSlotsCollection(String uid) {
   return FirebaseFirestore.instance.collection('users').doc(uid).collection(
     'classSlots',
   );
-}
-
-CollectionReference<Map<String, dynamic>> _coursesCollection(String uid) {
-  return FirebaseFirestore.instance.collection('users').doc(uid).collection(
-    'courses',
-  );
-}
-
-String _buildScopedKey({
-  required String sessionId,
-  required String termId,
-  required String courseCode,
-}) {
-  return '${sessionId.trim()}::${termId.trim()}::${courseCode.trim().toUpperCase()}';
 }
 
 void initializeClassSlotsSync() {
@@ -43,15 +38,20 @@ void initializeClassSlotsSync() {
   _authSubscription = FirebaseAuth.instance.authStateChanges().listen((user) {
     _slotsSubscription?.cancel();
     _slotsSubscription = null;
+    coursesNotifier.removeListener(_rebuildTimetablesFromCourseCache);
 
     if (user == null) {
+      _cachedSlotDocs = const [];
       timetablesNotifier.value = const <TimetableEntry>[];
       return;
     }
 
+    coursesNotifier.addListener(_rebuildTimetablesFromCourseCache);
+
     _slotsSubscription = _classSlotsCollection(user.uid).snapshots().listen((
       snapshot,
     ) {
+      _cachedSlotDocs = snapshot.docs;
       timetablesNotifier.value = _mapSlotDocsToTimetableEntries(snapshot.docs);
     });
   });
@@ -68,37 +68,20 @@ List<TimetableEntry> _mapSlotDocsToTimetableEntries(
     final termId = (data['termId'] as String?)?.trim() ?? '';
     if (sessionId.isEmpty || termId.isEmpty) continue;
 
-    final storedCourseCode =
-        (data['courseCode'] as String?)?.trim().toUpperCase() ?? '';
     final rawCourseId = (data['courseId'] as String?)?.trim();
     final effectiveCourseId =
         (rawCourseId != null && rawCourseId.isNotEmpty) ? rawCourseId : null;
+    if (effectiveCourseId == null) continue;
 
-    final String groupKey;
-    if (effectiveCourseId != null) {
-      groupKey = effectiveCourseId;
-    } else {
-      final fallbackKey = (data['timetableScopedKey'] as String?)?.trim();
-      groupKey = (fallbackKey != null && fallbackKey.isNotEmpty)
-          ? fallbackKey
-          : (storedCourseCode.isNotEmpty
-                ? _buildScopedKey(
-                    sessionId: sessionId,
-                    termId: termId,
-                    courseCode: storedCourseCode,
-                  )
-                : '');
-    }
-    if (groupKey.isEmpty) continue;
+    final groupKey = effectiveCourseId;
 
     final displayCode = displayCourseCodeForTimetableData(
       courseId: effectiveCourseId,
-      storedCourseCode: storedCourseCode,
       courses: courses,
     );
     if (displayCode.isEmpty) continue;
 
-    final slot = _slotFromMap(data, fallbackClassSlotId: doc.id);
+    final slot = _slotFromMap(data, firestoreDocId: doc.id);
     if (slot == null) continue;
 
     grouped.putIfAbsent(
@@ -107,7 +90,6 @@ List<TimetableEntry> _mapSlotDocsToTimetableEntries(
         id: groupKey,
         sessionId: sessionId,
         termId: termId,
-        courseId: effectiveCourseId,
         courseCode: displayCode,
       ),
     );
@@ -120,7 +102,6 @@ List<TimetableEntry> _mapSlotDocsToTimetableEntries(
       id: builder.id,
       sessionId: builder.sessionId,
       termId: builder.termId,
-      courseId: builder.courseId,
       courseCode: builder.courseCode,
       slots: builder.slots,
     );
@@ -147,18 +128,11 @@ TimetableEntry? _findTimetableEntryForCourse({
     termId: termId,
     courseCode: normalizedCourseCode,
   );
-  for (final item in timetablesNotifier.value) {
-    if (item.sessionId != sessionId || item.termId != termId) continue;
-    if (resolvedId != null &&
-        item.courseId != null &&
-        item.courseId == resolvedId) {
-      return item;
-    }
-  }
+  if (resolvedId == null) return null;
   for (final item in timetablesNotifier.value) {
     if (item.sessionId == sessionId &&
         item.termId == termId &&
-        item.courseCode.toUpperCase() == normalizedCourseCode) {
+        item.id == resolvedId) {
       return item;
     }
   }
@@ -167,7 +141,7 @@ TimetableEntry? _findTimetableEntryForCourse({
 
 TimetableSlot? _slotFromMap(
   Map<String, dynamic> data, {
-  required String fallbackClassSlotId,
+  required String firestoreDocId,
 }) {
   final day = (data['day'] as String?)?.trim();
   final startMinutes = (data['startMinutes'] as num?)?.toInt();
@@ -186,9 +160,7 @@ TimetableSlot? _slotFromMap(
   if (endMinutes <= startMinutes) return null;
 
   return TimetableSlot(
-    classSlotId: ((data['classSlotId'] as String?)?.trim().isNotEmpty ?? false)
-        ? (data['classSlotId'] as String).trim()
-        : fallbackClassSlotId,
+    classSlotId: firestoreDocId,
     day: day,
     startTime: _formatMinutes12h(startMinutes),
     endTime: _formatMinutes12h(endMinutes),
@@ -220,11 +192,11 @@ Future<void> upsertTimetableByCourse({
   if (user == null) return;
 
   final normalizedCourseCode = courseCode.trim().toUpperCase();
-  final courseId = await _resolveCourseId(
+  final courseId = await findCourseIdBySessionTermCode(
     uid: user.uid,
     sessionId: sessionId,
     termId: termId,
-    courseCode: normalizedCourseCode,
+    normalizedCourseCode: normalizedCourseCode,
   );
   if (courseId == null) {
     debugPrint(
@@ -233,20 +205,9 @@ Future<void> upsertTimetableByCourse({
     );
     return;
   }
-  final scopedKey = _buildScopedKey(
-    sessionId: sessionId,
-    termId: termId,
-    courseCode: normalizedCourseCode,
-  );
-
-  var existing = await _classSlotsCollection(user.uid)
+  final existing = await _classSlotsCollection(user.uid)
       .where('courseId', isEqualTo: courseId)
       .get();
-  if (existing.docs.isEmpty) {
-    existing = await _classSlotsCollection(user.uid)
-        .where('timetableScopedKey', isEqualTo: scopedKey)
-        .get();
-  }
 
   final incomingSlots = slots
       .map(_SlotPayload.fromTimetableSlot)
@@ -283,7 +244,7 @@ Future<void> upsertTimetableByCourse({
 
   final remainingExisting = <_PersistedSlot>[];
   final invalidExisting = <_PersistedSlot>[];
-  for (var i = 0; i <existingSlots.length; i++) {
+  for (var i = 0; i < existingSlots.length; i++) {
     if (matchedExisting.contains(i)) continue;
     final existingSlot = existingSlots[i];
     if (existingSlot.payload == null) {
@@ -314,11 +275,6 @@ Future<void> upsertTimetableByCourse({
         sessionId: sessionId,
         termId: termId,
         courseId: courseId,
-        courseCode: normalizedCourseCode,
-        scopedKey: scopedKey,
-        classSlotId: incomingSlot.classSlotId.isEmpty
-            ? (existingSlot.payload?.classSlotId ?? existingSlot.doc.id)
-            : incomingSlot.classSlotId,
         slot: incomingSlot,
         includeCreatedAt: false,
       ),
@@ -336,11 +292,6 @@ Future<void> upsertTimetableByCourse({
         sessionId: sessionId,
         termId: termId,
         courseId: courseId,
-        courseCode: normalizedCourseCode,
-        scopedKey: scopedKey,
-        classSlotId: remainingIncoming[i].classSlotId.isEmpty
-            ? ref.id
-            : remainingIncoming[i].classSlotId,
         slot: remainingIncoming[i],
         includeCreatedAt: true,
       ),
@@ -348,7 +299,21 @@ Future<void> upsertTimetableByCourse({
     hasChanges = true;
   }
 
-  // Pass 4: delete extra or invalid persisted slots.
+  // Pass 4: delete extra or invalid persisted slots (overrides first).
+  final slotIdsToDelete = <String>[];
+  for (var i = sharedCount; i < remainingExisting.length; i++) {
+    slotIdsToDelete.add(remainingExisting[i].doc.id);
+  }
+  for (final invalid in invalidExisting) {
+    slotIdsToDelete.add(invalid.doc.id);
+  }
+  if (slotIdsToDelete.isNotEmpty) {
+    await CascadeCleanup.deleteOverridesForClassSlotDocIds(
+      user.uid,
+      slotIdsToDelete,
+    );
+    hasChanges = true;
+  }
   for (var i = sharedCount; i < remainingExisting.length; i++) {
     batch.delete(remainingExisting[i].doc.reference);
     hasChanges = true;
@@ -362,35 +327,6 @@ Future<void> upsertTimetableByCourse({
   await batch.commit();
 }
 
-Future<String?> _resolveCourseId({
-  required String uid,
-  required String sessionId,
-  required String termId,
-  required String courseCode,
-}) async {
-  for (final course in coursesNotifier.value) {
-    if (course.sessionId == sessionId &&
-        course.termId == termId &&
-        course.courseCode.toUpperCase() == courseCode.toUpperCase()) {
-      return course.id;
-    }
-  }
-
-  final scopedKey = _buildScopedKey(
-    sessionId: sessionId,
-    termId: termId,
-    courseCode: courseCode,
-  );
-  final snapshot = await _coursesCollection(uid)
-      .where('courseScopedKey', isEqualTo: scopedKey)
-      .limit(1)
-      .get();
-  if (snapshot.docs.isNotEmpty) {
-    return snapshot.docs.first.id;
-  }
-  return null;
-}
-
 Future<void> updateTimetableEntry({
   required String id,
   required String sessionId,
@@ -402,24 +338,15 @@ Future<void> updateTimetableEntry({
   if (user == null) return;
 
   final normalizedCode = courseCode.trim().toUpperCase();
-  final newCourseId = await _resolveCourseId(
+  final newCourseId = await findCourseIdBySessionTermCode(
     uid: user.uid,
     sessionId: sessionId,
     termId: termId,
-    courseCode: normalizedCode,
+    normalizedCourseCode: normalizedCode,
   );
   if (newCourseId == null) return;
 
-  if (id.contains('::')) {
-    final newScopedKey = _buildScopedKey(
-      sessionId: sessionId,
-      termId: termId,
-      courseCode: normalizedCode,
-    );
-    if (id != newScopedKey) {
-      await deleteTimetableEntry(id);
-    }
-  } else if (id != newCourseId) {
+  if (id.trim() != newCourseId) {
     await deleteTimetableEntry(id);
   }
   await upsertTimetableByCourse(
@@ -434,9 +361,6 @@ Map<String, dynamic> _slotWriteData({
   required String sessionId,
   required String termId,
   required String courseId,
-  required String courseCode,
-  required String scopedKey,
-  required String classSlotId,
   required _SlotPayload slot,
   required bool includeCreatedAt,
 }) {
@@ -444,9 +368,6 @@ Map<String, dynamic> _slotWriteData({
     'sessionId': sessionId.trim(),
     'termId': termId.trim(),
     'courseId': courseId,
-    'courseCode': courseCode,
-    'timetableScopedKey': scopedKey,
-    'classSlotId': classSlotId.trim(),
     'day': slot.day,
     'startMinutes': slot.startMinutes,
     'endMinutes': slot.endMinutes,
@@ -461,32 +382,22 @@ Map<String, dynamic> _slotWriteData({
   return data;
 }
 
+/// [id] is the Firestore course document id (same as [TimetableEntry.id]).
 Future<void> deleteTimetableEntry(String id) async {
   final user = FirebaseAuth.instance.currentUser;
   if (user == null) return;
 
-  QuerySnapshot<Map<String, dynamic>> snapshot;
-  if (id.contains('::')) {
-    snapshot = await _classSlotsCollection(user.uid)
-        .where('timetableScopedKey', isEqualTo: id)
-        .get();
-  } else {
-    snapshot = await _classSlotsCollection(user.uid)
-        .where('courseId', isEqualTo: id)
-        .get();
-    if (snapshot.docs.isEmpty) {
-      snapshot = await _classSlotsCollection(user.uid)
-          .where('timetableScopedKey', isEqualTo: id)
-          .get();
-    }
-  }
+  final courseId = id.trim();
+  if (courseId.isEmpty) return;
+
+  final snapshot = await _classSlotsCollection(user.uid)
+      .where('courseId', isEqualTo: courseId)
+      .get();
   if (snapshot.docs.isEmpty) return;
 
-  final batch = FirebaseFirestore.instance.batch();
-  for (final doc in snapshot.docs) {
-    batch.delete(doc.reference);
-  }
-  await batch.commit();
+  final slotIds = snapshot.docs.map((d) => d.id).toList(growable: false);
+  await CascadeCleanup.deleteOverridesForClassSlotDocIds(user.uid, slotIds);
+  await CascadeCleanup.deleteQuerySnapshotDocs(snapshot);
 }
 
 int? parseTimeLabelToMinutes(String value) => _parseMinutes12h(value);
@@ -642,14 +553,12 @@ class _EntryBuilder {
     required this.id,
     required this.sessionId,
     required this.termId,
-    this.courseId,
     required this.courseCode,
   });
 
   final String id;
   final String sessionId;
   final String termId;
-  final String? courseId;
   final String courseCode;
   final List<TimetableSlot> slots = <TimetableSlot>[];
 
@@ -709,7 +618,7 @@ class _SlotPayload {
 
   static _SlotPayload? fromFirestore(
     Map<String, dynamic> data, {
-    required String fallbackClassSlotId,
+    required String firestoreDocId,
   }) {
     final day = (data['day'] as String?)?.trim();
     final startMinutes = (data['startMinutes'] as num?)?.toInt();
@@ -726,9 +635,7 @@ class _SlotPayload {
       return null;
     }
     return _SlotPayload(
-      classSlotId: ((data['classSlotId'] as String?)?.trim().isNotEmpty ?? false)
-          ? (data['classSlotId'] as String).trim()
-          : fallbackClassSlotId,
+      classSlotId: firestoreDocId,
       day: day,
       startMinutes: startMinutes,
       endMinutes: endMinutes,
@@ -753,7 +660,7 @@ class _PersistedSlot {
       doc: doc,
       payload: _SlotPayload.fromFirestore(
         doc.data(),
-        fallbackClassSlotId: doc.id,
+        firestoreDocId: doc.id,
       ),
     );
   }

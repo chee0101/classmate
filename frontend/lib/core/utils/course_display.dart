@@ -4,6 +4,16 @@ import '../models/course.dart';
 import '../models/task.dart';
 import '../models/timetable_entry.dart';
 
+/// Resolves a [Course] from the list by Firestore document id.
+Course? lookupCourseById(String? courseId, List<Course> courses) {
+  final id = courseId?.trim();
+  if (id == null || id.isEmpty) return null;
+  for (final c in courses) {
+    if (c.id == id) return c;
+  }
+  return null;
+}
+
 Color _parseCourseHex(String colorHex) {
   final parsed = int.tryParse(colorHex.replaceFirst('#', '0xFF'));
   return Color(parsed ?? 0xFF6C4DD9);
@@ -11,64 +21,44 @@ Color _parseCourseHex(String colorHex) {
 
 /// Resolves the label from the canonical [Course] row when [courseId] is set.
 String displayCourseCodeForTask(Task task, List<Course> courses) {
-  final id = task.courseId?.trim();
-  if (id != null && id.isNotEmpty) {
-    for (final c in courses) {
-      if (c.id == id) return c.courseCode;
-    }
-  }
+  final c = lookupCourseById(task.courseId, courses);
+  if (c != null) return c.courseCode;
   return task.courseCode;
 }
 
 Color displayCourseColorForTask(Task task, List<Course> courses) {
-  final id = task.courseId?.trim();
-  if (id != null && id.isNotEmpty) {
-    for (final c in courses) {
-      if (c.id == id) {
-        return _parseCourseHex(c.courseColor);
-      }
-    }
-  }
+  final c = lookupCourseById(task.courseId, courses);
+  if (c != null) return _parseCourseHex(c.courseColor);
   return task.courseColor;
 }
 
+/// [courseId] is the Firestore `courses/{id}` document id.
 String displayCourseCodeForTimetableData({
   required String? courseId,
-  required String storedCourseCode,
   required List<Course> courses,
 }) {
-  final id = courseId?.trim();
-  if (id != null && id.isNotEmpty) {
-    for (final c in courses) {
-      if (c.id == id) return c.courseCode;
-    }
-  }
-  return storedCourseCode;
+  final c = lookupCourseById(courseId, courses);
+  return c?.courseCode ?? '';
 }
 
 String displayCourseCodeForTimetableEntry(
   TimetableEntry entry,
   List<Course> courses,
 ) {
-  return displayCourseCodeForTimetableData(
-    courseId: entry.courseId,
-    storedCourseCode: entry.courseCode,
+  final fromCourse = displayCourseCodeForTimetableData(
+    courseId: entry.id,
     courses: courses,
   );
+  if (fromCourse.isNotEmpty) return fromCourse;
+  return entry.courseCode;
 }
 
 Color displayCourseColorForTimetableData({
   required String? courseId,
   required List<Course> courses,
 }) {
-  final id = courseId?.trim();
-  if (id != null && id.isNotEmpty) {
-    for (final c in courses) {
-      if (c.id == id) {
-        return _parseCourseHex(c.courseColor);
-      }
-    }
-  }
+  final c = lookupCourseById(courseId, courses);
+  if (c != null) return _parseCourseHex(c.courseColor);
   return const Color(0xFF6C4DD9);
 }
 
@@ -77,7 +67,7 @@ Color displayCourseColorForTimetableEntry(
   List<Course> courses,
 ) {
   return displayCourseColorForTimetableData(
-    courseId: entry.courseId,
+    courseId: entry.id,
     courses: courses,
   );
 }

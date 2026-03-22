@@ -5,6 +5,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/course.dart';
+import '../utils/course_display.dart';
+import 'cascade_cleanup.dart';
 
 final ValueNotifier<List<Course>> coursesNotifier = ValueNotifier<List<Course>>(
   [],
@@ -19,12 +21,32 @@ CollectionReference<Map<String, dynamic>> _coursesCollection(String uid) {
   );
 }
 
-String _buildCourseScopedKey({
+/// Resolves a course doc id by [sessionId], [termId], and normalized [courseCode].
+/// Uses cache first, then a single `sessionId` query and filters in memory (avoids extra composite fields).
+Future<String?> findCourseIdBySessionTermCode({
+  required String uid,
   required String sessionId,
   required String termId,
-  required String courseCode,
-}) {
-  return '${sessionId.trim()}::${termId.trim()}::${courseCode.trim().toUpperCase()}';
+  required String normalizedCourseCode,
+}) async {
+  final cached = resolveCourseIdByCodeInSessionAndTerm(
+    sessionId: sessionId,
+    termId: termId,
+    courseCode: normalizedCourseCode,
+  );
+  if (cached != null) return cached;
+
+  final snapshot =
+      await _coursesCollection(uid).where('sessionId', isEqualTo: sessionId).get();
+  for (final doc in snapshot.docs) {
+    final d = doc.data();
+    if ((d['termId'] as String?)?.trim() == termId.trim() &&
+        (d['courseCode'] as String?)?.trim().toUpperCase() ==
+            normalizedCourseCode) {
+      return doc.id;
+    }
+  }
+  return null;
 }
 
 Course _courseFromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
@@ -93,6 +115,11 @@ List<String> courseCodesForSessionAndTerm({
   return list;
 }
 
+/// Canonical [Course] row for the current user cache; null if unknown or missing.
+Course? courseByIdFromNotifier(String courseId) {
+  return lookupCourseById(courseId, coursesNotifier.value);
+}
+
 String? resolveCourseIdByCodeInSessionAndTerm({
   required String sessionId,
   required String termId,
@@ -137,13 +164,12 @@ bool courseCodeExistsInSessionAndTerm({
   required String termId,
   required String courseCode,
 }) {
-  final normalized = courseCode.trim().toUpperCase();
-  return coursesNotifier.value.any(
-    (c) =>
-        c.sessionId == sessionId &&
-        c.termId == termId &&
-        c.courseCode.toUpperCase() == normalized,
-  );
+  return resolveCourseIdByCodeInSessionAndTerm(
+        sessionId: sessionId,
+        termId: termId,
+        courseCode: courseCode,
+      ) !=
+      null;
 }
 
 bool courseCodeExistsInSessionAndTermExcludingCourse({
@@ -172,17 +198,13 @@ Future<void> addCourse({
   if (user == null) return;
 
   final normalizedCode = courseCode.trim().toUpperCase();
-  final scopedKey = _buildCourseScopedKey(
+  final existingId = await findCourseIdBySessionTermCode(
+    uid: user.uid,
     sessionId: sessionId,
     termId: termId,
-    courseCode: normalizedCode,
+    normalizedCourseCode: normalizedCode,
   );
-
-  final existsSnapshot = await _coursesCollection(user.uid)
-      .where('courseScopedKey', isEqualTo: scopedKey)
-      .limit(1)
-      .get();
-  if (existsSnapshot.docs.isNotEmpty) {
+  if (existingId != null) {
     return;
   }
 
@@ -191,8 +213,6 @@ Future<void> addCourse({
     'sessionId': sessionId,
     'termId': termId,
     'courseCode': normalizedCode,
-    'courseCodeNormalized': normalizedCode,
-    'courseScopedKey': scopedKey,
     'courseColor': courseColor,
     'createdAt': FieldValue.serverTimestamp(),
     'updatedAt': FieldValue.serverTimestamp(),
@@ -210,19 +230,13 @@ Future<void> updateCourse({
   if (user == null) return;
 
   final normalizedCode = courseCode.trim().toUpperCase();
-  final scopedKey = _buildCourseScopedKey(
+  final conflictId = await findCourseIdBySessionTermCode(
+    uid: user.uid,
     sessionId: sessionId,
     termId: termId,
-    courseCode: normalizedCode,
+    normalizedCourseCode: normalizedCode,
   );
-
-  final duplicateSnapshot = await _coursesCollection(user.uid)
-      .where('courseScopedKey', isEqualTo: scopedKey)
-      .limit(2)
-      .get();
-  final exists = duplicateSnapshot.docs.any((doc) => doc.id != id);
-
-  if (exists) {
+  if (conflictId != null && conflictId != id) {
     return;
   }
 
@@ -230,8 +244,6 @@ Future<void> updateCourse({
     'sessionId': sessionId,
     'termId': termId,
     'courseCode': normalizedCode,
-    'courseCodeNormalized': normalizedCode,
-    'courseScopedKey': scopedKey,
     'courseColor': courseColor,
     'updatedAt': FieldValue.serverTimestamp(),
   }, SetOptions(merge: true));
@@ -241,5 +253,6 @@ Future<void> deleteCourse(String id) async {
   final user = FirebaseAuth.instance.currentUser;
   if (user == null) return;
 
+  await CascadeCleanup.deleteCourseDependents(user.uid, id);
   await _coursesCollection(user.uid).doc(id).delete();
 }

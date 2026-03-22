@@ -8,6 +8,8 @@ import '../models/academic_session.dart';
 import '../models/academic_event.dart';
 import 'session_term_selection_store.dart';
 import '../utils/term_windows.dart';
+import 'cascade_cleanup.dart';
+import 'course_store.dart';
 
 DateTime _startOfDay(DateTime date) =>
     DateTime(date.year, date.month, date.day, 0, 0);
@@ -384,6 +386,19 @@ Future<void> _seedAcademicBreakEventsForSession({
 Future<void> deleteAcademicSession(String sessionId) async {
   final user = FirebaseAuth.instance.currentUser;
   if (user == null) return;
+
+  final coursesSnap = await FirebaseFirestore.instance
+      .collection('users')
+      .doc(user.uid)
+      .collection('courses')
+      .where('sessionId', isEqualTo: sessionId)
+      .get();
+  for (final doc in coursesSnap.docs) {
+    await deleteCourse(doc.id);
+  }
+
+  await CascadeCleanup.deleteEventsForSessionId(user.uid, sessionId);
+  await CascadeCleanup.deleteClassSlotsForSessionId(user.uid, sessionId);
 
   final deletingCurrent = currentAcademicSessionNotifier.value?.id == sessionId;
   await _sessionsCollection(user.uid).doc(sessionId).delete();

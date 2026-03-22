@@ -4,7 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-import '../models/course.dart';
 import '../models/task.dart';
 import 'course_store.dart';
 
@@ -61,13 +60,6 @@ Color _colorFromHex(String? hex) {
   return Color(value ?? 0xFF6C4DD9);
 }
 
-Course? _courseById(String courseId) {
-  for (final c in coursesNotifier.value) {
-    if (c.id == courseId) return c;
-  }
-  return null;
-}
-
 Task _taskFromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
   final data = doc.data() ?? const <String, dynamic>{};
   final rawCourseId = (data['courseId'] as String?)?.trim();
@@ -80,7 +72,7 @@ Task _taskFromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
   Color courseColor = _colorFromHex(storedColorHex);
 
   if (rawCourseId != null && rawCourseId.isNotEmpty) {
-    final course = _courseById(rawCourseId);
+    final course = courseByIdFromNotifier(rawCourseId);
     if (course != null) {
       courseCode = course.courseCode;
       courseColor = _colorFromHex(course.courseColor);

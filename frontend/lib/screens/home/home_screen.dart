@@ -60,7 +60,7 @@ class _HomeScreenState extends State<HomeScreen> {
           if (sessions.isEmpty) {
             return Center(
               child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.lg),
+                padding: const EdgeInsets.all(AppSpacing.md),
                 child: EmptyStateCard(
                   onPressed: () {
                     AcademicSessionSetupBottomSheet.show(context);

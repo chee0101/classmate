@@ -40,18 +40,16 @@ class TimetableSlot {
   }
 }
 
+/// One row per course timetable; [id] is the Firestore `courses/{id}` document id.
 class TimetableEntry {
   const TimetableEntry({
     required this.id,
     required this.sessionId,
     required this.termId,
-    this.courseId,
     required this.courseCode,
     required this.slots,
   });
 
-  /// Firestore course document id when present; [id] often matches this for deletes.
-  final String? courseId;
   final String id;
   final String sessionId;
   final String termId;
@@ -62,7 +60,6 @@ class TimetableEntry {
     String? id,
     String? sessionId,
     String? termId,
-    String? courseId,
     String? courseCode,
     List<TimetableSlot>? slots,
   }) {
@@ -70,10 +67,8 @@ class TimetableEntry {
       id: id ?? this.id,
       sessionId: sessionId ?? this.sessionId,
       termId: termId ?? this.termId,
-      courseId: courseId ?? this.courseId,
       courseCode: courseCode ?? this.courseCode,
       slots: slots ?? this.slots,
     );
   }
 }
-
