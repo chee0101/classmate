@@ -71,7 +71,17 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
     _descriptionController =
         TextEditingController(text: widget.task.description ?? '');
     _selectedCourseId = widget.task.courseId;
-    _selectedCourseCode = widget.task.courseCode;
+    var initialCode = widget.task.courseCode;
+    final cid = _selectedCourseId;
+    if (cid != null && cid.isNotEmpty) {
+      for (final c in coursesNotifier.value) {
+        if (c.id == cid) {
+          initialCode = c.courseCode;
+          break;
+        }
+      }
+    }
+    _selectedCourseCode = initialCode;
     _selectedDueDateTime = widget.task.dueDateTime;
 
     if (_selectedCourseId != null) {
@@ -201,6 +211,18 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
       }
     }
 
+    var courseColor = widget.task.courseColor;
+    final selectedId = _selectedCourseId;
+    if (selectedId != null && selectedId.isNotEmpty) {
+      for (final c in coursesNotifier.value) {
+        if (c.id == selectedId) {
+          final v = int.tryParse(c.courseColor.replaceFirst('#', '0xFF'));
+          courseColor = Color(v ?? 0xFF6C4DD9);
+          break;
+        }
+      }
+    }
+
     final updated = widget.task.copyWith(
       title: trimmedTitle,
       description: _descriptionController.text.trim().isEmpty
@@ -208,6 +230,7 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
           : _descriptionController.text.trim(),
       courseId: _selectedCourseId,
       courseCode: _selectedCourseCode,
+      courseColor: courseColor,
       dueDateTime: _selectedDueDateTime,
     );
     Navigator.pop(context, updated);

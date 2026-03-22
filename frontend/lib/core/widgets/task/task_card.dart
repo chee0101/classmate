@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 
 import '../../constants/app_spacing.dart';
+import '../../models/course.dart';
 import '../../models/task.dart';
+import '../../utils/course_display.dart';
 import '../../utils/date_time_format.dart';
 import '../../utils/task_utils.dart';
 import '../common/label_chip.dart';
@@ -15,6 +17,7 @@ class TaskCard extends StatelessWidget {
     this.showMarkDone = true,
     this.nextSubtaskTitle,
     this.footer,
+    this.courses,
   });
 
   final Task task;
@@ -23,6 +26,7 @@ class TaskCard extends StatelessWidget {
   final bool showMarkDone;
   final String? nextSubtaskTitle;
   final Widget? footer;
+  final List<Course>? courses;
 
   @override
   Widget build(BuildContext context) {
@@ -41,8 +45,12 @@ class TaskCard extends StatelessWidget {
         Row(
           children: [
             LabelChip(
-              label: task.courseCode,
-              color: task.courseColor,
+              label: courses == null
+                  ? task.courseCode
+                  : displayCourseCodeForTask(task, courses!),
+              color: courses == null
+                  ? task.courseColor
+                  : displayCourseColorForTask(task, courses!),
             ),
             const Spacer(),
             if (effectiveStatus == TaskStatus.overdue)

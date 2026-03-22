@@ -13,9 +13,9 @@ import '../../core/constants/weekdays.dart';
 import '../../core/models/class_slot_override.dart';
 import '../../core/models/timetable_entry.dart';
 import '../../core/services/course_store.dart';
-import '../../core/builders/schedule_appointment_builder.dart';
 import '../../core/models/course.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/course_display.dart';
 import '../../core/utils/date_time_format.dart';
 import '../../core/utils/task_utils.dart';
 import '../../core/utils/session_term_resolver.dart';
@@ -170,16 +170,10 @@ class _HomeScreenState extends State<HomeScreen> {
                                         o.occurrenceKey: o,
                                   };
 
-                                  final courseColorByCode = <String, Color>{
-                                    for (final c in coursesForSessionAndTerm(
-                                      sessionId: selectedSession.id,
-                                      termId: selectedTerm.id,
-                                    ))
-                                      c.courseCode: ScheduleAppointmentBuilder
-                                          .parseHexColor(
-                                        c.courseColor,
-                                      ),
-                                  };
+                                  final termCourses = coursesForSessionAndTerm(
+                                    sessionId: selectedSession.id,
+                                    termId: selectedTerm.id,
+                                  );
 
                                   // -----------------------------
                                   // 1) Today's class items
@@ -256,10 +250,14 @@ class _HomeScreenState extends State<HomeScreen> {
                                                   TodayScheduleItemType.classItem,
                                               startMinutes: startMinutes,
                                               endMinutes: endMinutes,
-                                              title: entry.courseCode,
-                                              color:
-                                                  courseColorByCode[entry.courseCode] ??
-                                                      const Color(0xFF6C4DD9),
+                                              title: displayCourseCodeForTimetableEntry(
+                                                entry,
+                                                termCourses,
+                                              ),
+                                              color: displayCourseColorForTimetableEntry(
+                                                entry,
+                                                termCourses,
+                                              ),
                                               isOnline: isOnline,
                                               venueLabel: venueLabel,
                                             );
@@ -389,7 +387,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 ),
                                                 const SizedBox(height: AppSpacing.md),
                                                 UpcomingDeadlinesCard(
-                                                    tasks: upcomingTasks),
+                                                  tasks: upcomingTasks,
+                                                  courses: courses,
+                                                ),
                                               ],
                                             ),
                                           ),
@@ -457,7 +457,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 ),
                                                 const SizedBox(height: AppSpacing.md),
                                                 UpcomingDeadlinesCard(
-                                                    tasks: upcomingTasks),
+                                                  tasks: upcomingTasks,
+                                                  courses: courses,
+                                                ),
                                               ],
                                             ),
                                           ),
@@ -578,7 +580,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                               const SizedBox(
                                                   height: AppSpacing.md),
                                               UpcomingDeadlinesCard(
-                                                  tasks: upcomingTasks),
+                                                tasks: upcomingTasks,
+                                                courses: courses,
+                                              ),
                                             ],
                                           ),
                                         ),

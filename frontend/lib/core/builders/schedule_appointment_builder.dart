@@ -6,7 +6,9 @@ import '../constants/weekdays.dart';
 import '../models/academic_event.dart';
 import '../models/class_slot_override.dart';
 import '../models/class_type.dart';
+import '../models/course.dart';
 import '../models/timetable_entry.dart';
+import '../utils/course_display.dart';
 import '../utils/date_time_format.dart';
 import '../utils/term_windows.dart';
 
@@ -22,7 +24,7 @@ class ScheduleAppointmentBuilder {
 
   static List<Appointment> build({
     required List<TimetableEntry> entries,
-    required Map<String, Color> courseColorByCode,
+    required List<Course> courses,
     required List<AcademicEvent> events,
     List<ClassSlotOverride> classOverrides = const [],
     required TermWindow term,
@@ -30,7 +32,7 @@ class ScheduleAppointmentBuilder {
     required ScheduleContentFilter contentFilter,
   }) {
     final appointments = <Appointment>[];
-    final classSlots = _flattenSlots(entries, courseColorByCode);
+    final classSlots = _flattenSlots(entries, courses);
     final includeClasses =
         forMonthlyAgenda || contentFilter != ScheduleContentFilter.eventOnly;
     final includeEvents =
@@ -447,11 +449,13 @@ class ScheduleAppointmentBuilder {
 
   static List<_RenderedClassSlot> _flattenSlots(
     List<TimetableEntry> entries,
-    Map<String, Color> courseColorByCode,
+    List<Course> courses,
   ) {
     final output = <_RenderedClassSlot>[];
     for (final entry in entries) {
-      final color = courseColorByCode[entry.courseCode] ?? const Color(0xFF6C4DD9);
+      final displayCode =
+          displayCourseCodeForTimetableEntry(entry, courses);
+      final color = displayCourseColorForTimetableEntry(entry, courses);
       for (final slot in entry.slots) {
         final dayIndex = weekdayIndexFromString(slot.day);
         if (dayIndex == -1) continue;
@@ -462,7 +466,7 @@ class ScheduleAppointmentBuilder {
           _RenderedClassSlot(
             sessionId: entry.sessionId,
             termId: entry.termId,
-            courseCode: entry.courseCode,
+            courseCode: displayCode,
             classSlotId: slot.classSlotId,
             dayIndex: dayIndex,
             startMinutes: start,

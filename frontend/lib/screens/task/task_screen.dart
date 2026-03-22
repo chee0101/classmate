@@ -7,7 +7,9 @@ import '../../core/models/academic_session.dart';
 import '../../core/services/academic_session_store.dart';
 import '../../core/models/task.dart';
 import '../../core/services/session_term_selection_store.dart';
+import '../../core/services/course_store.dart';
 import '../../core/services/task_store.dart';
+import '../../core/utils/course_display.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/utils/task_utils.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
@@ -131,6 +133,13 @@ class _TaskScreenState extends State<TaskScreen> {
               return ValueListenableBuilder(
                 valueListenable: tasksNotifier,
                 builder: (context, allTasks, _) {
+              return ValueListenableBuilder(
+                valueListenable: coursesNotifier,
+                builder: (context, _, __) {
+              final termCourses = coursesForSessionAndTerm(
+                sessionId: selectedRef.session.id,
+                termId: selectedRef.term.id,
+              );
               // Only show top-level tasks in the list (subtasks are shown in detail view).
               final topLevelTasks = allTasks
                   .where(
@@ -140,9 +149,9 @@ class _TaskScreenState extends State<TaskScreen> {
                   )
                   .toList();
 
-              // Build distinct course codes for the filter.
+              // Build distinct display course codes for the filter.
               final courseCodes = topLevelTasks
-                  .map((t) => t.courseCode)
+                  .map((t) => displayCourseCodeForTask(t, termCourses))
                   .toSet()
                   .toList()
                 ..sort();
@@ -150,8 +159,11 @@ class _TaskScreenState extends State<TaskScreen> {
               final tasks = topLevelTasks.where((t) {
                 final matchesStatus =
                     TaskUtils.effectiveStatus(t) == _selectedStatus;
+                final displayCode =
+                    displayCourseCodeForTask(t, termCourses);
                 final matchesCourse =
-                    _selectedCourseCode == null || t.courseCode == _selectedCourseCode;
+                    _selectedCourseCode == null ||
+                    displayCode == _selectedCourseCode;
                 return matchesStatus && matchesCourse;
               }).toList()
                 ..sort((a, b) => a.dueDateTime.compareTo(b.dueDateTime));
@@ -230,6 +242,7 @@ class _TaskScreenState extends State<TaskScreen> {
                               onMarkDone: () async => _markTaskAsCompleted(task),
                               onTap: () => _navigateToTaskDetail(task),
                               nextSubtaskTitle: nextSubtaskTitle,
+                              courses: termCourses,
                             );
                           },
                         ),
@@ -237,6 +250,8 @@ class _TaskScreenState extends State<TaskScreen> {
               ),
             ],
             );
+                },
+              );
                 },
               );
             },

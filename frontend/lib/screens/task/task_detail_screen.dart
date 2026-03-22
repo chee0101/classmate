@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
+import '../../core/models/course.dart';
 import '../../core/models/task.dart';
+import '../../core/utils/course_display.dart';
+import '../../core/services/course_store.dart';
 import '../../core/services/task_store.dart';
 import '../../core/widgets/task/task_card.dart';
 import '../../core/widgets/task/subtask_card.dart';
@@ -109,7 +112,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Main task card with edit button
-            _buildMainTaskCard(textTheme, colorScheme),
+            _buildMainTaskCard(context, textTheme, colorScheme),
             const SizedBox(height: AppSpacing.lg),
 
             // Sub Tasks section
@@ -133,27 +136,44 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
     );
   }
 
-  Widget _buildMainTaskCard(TextTheme textTheme, ColorScheme colorScheme) {
-    return TaskCard(
-      task: _task,
-      onMarkDone: () {}, // Disabled in detail view
-      showMarkDone: false,
-      footer: _isEditing
-          ? SizedBox(
-              height: 44,
-              child: Center(
-                child: TextButton(
-                  onPressed: () async => _handleEdit(),
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(0, 0),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+  Widget _buildMainTaskCard(
+    BuildContext context,
+    TextTheme textTheme,
+    ColorScheme colorScheme,
+  ) {
+    return ValueListenableBuilder<List<Course>>(
+      valueListenable: coursesNotifier,
+      builder: (context, _, __) {
+        final scope = courseScopeForCourseId(_task.courseId ?? '');
+        final termCourses = scope == null
+            ? coursesNotifier.value
+            : coursesForSessionAndTerm(
+                sessionId: scope.sessionId,
+                termId: scope.termId,
+              );
+        return TaskCard(
+          task: _task,
+          onMarkDone: () {}, // Disabled in detail view
+          showMarkDone: false,
+          courses: termCourses,
+          footer: _isEditing
+              ? SizedBox(
+                  height: 44,
+                  child: Center(
+                    child: TextButton(
+                      onPressed: () async => _handleEdit(),
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(0, 0),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      child: const Text('Edit'),
+                    ),
                   ),
-                  child: const Text('Edit'),
-                ),
-              ),
-            )
-          : null,
+                )
+              : null,
+        );
+      },
     );
   }
 
@@ -266,8 +286,8 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
       id: 'sub-${DateTime.now().millisecondsSinceEpoch}',
       parentTaskId: _task.id,
       courseId: _task.courseId,
-      courseCode: _task.courseCode,
-      courseColor: _task.courseColor,
+      courseCode: displayCourseCodeForTask(_task, coursesNotifier.value),
+      courseColor: displayCourseColorForTask(_task, coursesNotifier.value),
       title: '',
       description: null,
       dueDateTime: _task.dueDateTime,

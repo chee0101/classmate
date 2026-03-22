@@ -8,7 +8,12 @@ enum TaskStatus {
 
 class Task {
   final String id;
+
+  /// Firestore `users/.../courses/{id}` — canonical link for course-linked tasks.
   final String? courseId;
+
+  /// In-memory label/color, preferably resolved from [Course] via [courseId].
+  /// Firestore task docs store only [courseId] for course data once migrated.
   final String courseCode;
   final Color courseColor;
   final String title;

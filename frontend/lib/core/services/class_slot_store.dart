@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../constants/weekdays.dart';
 import '../models/class_type.dart';
 import '../models/timetable_entry.dart';
+import '../utils/course_display.dart';
 import '../utils/date_time_format.dart';
 import 'course_store.dart';
 
@@ -59,36 +60,58 @@ void initializeClassSlotsSync() {
 List<TimetableEntry> _mapSlotDocsToTimetableEntries(
   List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
 ) {
+  final courses = coursesNotifier.value;
   final grouped = <String, _EntryBuilder>{};
   for (final doc in docs) {
     final data = doc.data();
     final sessionId = (data['sessionId'] as String?)?.trim() ?? '';
     final termId = (data['termId'] as String?)?.trim() ?? '';
-    final courseCode = (data['courseCode'] as String?)?.trim().toUpperCase() ?? '';
-    if (sessionId.isEmpty || termId.isEmpty || courseCode.isEmpty) continue;
+    if (sessionId.isEmpty || termId.isEmpty) continue;
 
-    final key =
-        (data['timetableScopedKey'] as String?)?.trim().isNotEmpty == true
-        ? (data['timetableScopedKey'] as String).trim()
-        : _buildScopedKey(
-            sessionId: sessionId,
-            termId: termId,
-            courseCode: courseCode,
-          );
+    final storedCourseCode =
+        (data['courseCode'] as String?)?.trim().toUpperCase() ?? '';
+    final rawCourseId = (data['courseId'] as String?)?.trim();
+    final effectiveCourseId =
+        (rawCourseId != null && rawCourseId.isNotEmpty) ? rawCourseId : null;
+
+    final String groupKey;
+    if (effectiveCourseId != null) {
+      groupKey = effectiveCourseId;
+    } else {
+      final fallbackKey = (data['timetableScopedKey'] as String?)?.trim();
+      groupKey = (fallbackKey != null && fallbackKey.isNotEmpty)
+          ? fallbackKey
+          : (storedCourseCode.isNotEmpty
+                ? _buildScopedKey(
+                    sessionId: sessionId,
+                    termId: termId,
+                    courseCode: storedCourseCode,
+                  )
+                : '');
+    }
+    if (groupKey.isEmpty) continue;
+
+    final displayCode = displayCourseCodeForTimetableData(
+      courseId: effectiveCourseId,
+      storedCourseCode: storedCourseCode,
+      courses: courses,
+    );
+    if (displayCode.isEmpty) continue;
 
     final slot = _slotFromMap(data, fallbackClassSlotId: doc.id);
     if (slot == null) continue;
 
     grouped.putIfAbsent(
-      key,
+      groupKey,
       () => _EntryBuilder(
-        id: key,
+        id: groupKey,
         sessionId: sessionId,
         termId: termId,
-        courseCode: courseCode,
+        courseId: effectiveCourseId,
+        courseCode: displayCode,
       ),
     );
-    grouped[key]!.slots.add(slot);
+    grouped[groupKey]!.slots.add(slot);
   }
 
   final entries = grouped.values.map((builder) {
@@ -97,6 +120,7 @@ List<TimetableEntry> _mapSlotDocsToTimetableEntries(
       id: builder.id,
       sessionId: builder.sessionId,
       termId: builder.termId,
+      courseId: builder.courseId,
       courseCode: builder.courseCode,
       slots: builder.slots,
     );
@@ -111,6 +135,34 @@ List<TimetableEntry> _mapSlotDocsToTimetableEntries(
   });
 
   return entries;
+}
+
+TimetableEntry? _findTimetableEntryForCourse({
+  required String sessionId,
+  required String termId,
+  required String normalizedCourseCode,
+}) {
+  final resolvedId = resolveCourseIdByCodeInSessionAndTerm(
+    sessionId: sessionId,
+    termId: termId,
+    courseCode: normalizedCourseCode,
+  );
+  for (final item in timetablesNotifier.value) {
+    if (item.sessionId != sessionId || item.termId != termId) continue;
+    if (resolvedId != null &&
+        item.courseId != null &&
+        item.courseId == resolvedId) {
+      return item;
+    }
+  }
+  for (final item in timetablesNotifier.value) {
+    if (item.sessionId == sessionId &&
+        item.termId == termId &&
+        item.courseCode.toUpperCase() == normalizedCourseCode) {
+      return item;
+    }
+  }
+  return null;
 }
 
 TimetableSlot? _slotFromMap(
@@ -187,9 +239,14 @@ Future<void> upsertTimetableByCourse({
     courseCode: normalizedCourseCode,
   );
 
-  final existing = await _classSlotsCollection(user.uid)
-      .where('timetableScopedKey', isEqualTo: scopedKey)
+  var existing = await _classSlotsCollection(user.uid)
+      .where('courseId', isEqualTo: courseId)
       .get();
+  if (existing.docs.isEmpty) {
+    existing = await _classSlotsCollection(user.uid)
+        .where('timetableScopedKey', isEqualTo: scopedKey)
+        .get();
+  }
 
   final incomingSlots = slots
       .map(_SlotPayload.fromTimetableSlot)
@@ -341,18 +398,34 @@ Future<void> updateTimetableEntry({
   required String courseCode,
   required List<TimetableSlot> slots,
 }) async {
-  final newScopedKey = _buildScopedKey(
+  final user = FirebaseAuth.instance.currentUser;
+  if (user == null) return;
+
+  final normalizedCode = courseCode.trim().toUpperCase();
+  final newCourseId = await _resolveCourseId(
+    uid: user.uid,
     sessionId: sessionId,
     termId: termId,
-    courseCode: courseCode,
+    courseCode: normalizedCode,
   );
-  if (id != newScopedKey) {
+  if (newCourseId == null) return;
+
+  if (id.contains('::')) {
+    final newScopedKey = _buildScopedKey(
+      sessionId: sessionId,
+      termId: termId,
+      courseCode: normalizedCode,
+    );
+    if (id != newScopedKey) {
+      await deleteTimetableEntry(id);
+    }
+  } else if (id != newCourseId) {
     await deleteTimetableEntry(id);
   }
   await upsertTimetableByCourse(
     sessionId: sessionId,
     termId: termId,
-    courseCode: courseCode,
+    courseCode: normalizedCode,
     slots: slots,
   );
 }
@@ -392,9 +465,21 @@ Future<void> deleteTimetableEntry(String id) async {
   final user = FirebaseAuth.instance.currentUser;
   if (user == null) return;
 
-  final snapshot = await _classSlotsCollection(user.uid)
-      .where('timetableScopedKey', isEqualTo: id)
-      .get();
+  QuerySnapshot<Map<String, dynamic>> snapshot;
+  if (id.contains('::')) {
+    snapshot = await _classSlotsCollection(user.uid)
+        .where('timetableScopedKey', isEqualTo: id)
+        .get();
+  } else {
+    snapshot = await _classSlotsCollection(user.uid)
+        .where('courseId', isEqualTo: id)
+        .get();
+    if (snapshot.docs.isEmpty) {
+      snapshot = await _classSlotsCollection(user.uid)
+          .where('timetableScopedKey', isEqualTo: id)
+          .get();
+    }
+  }
   if (snapshot.docs.isEmpty) return;
 
   final batch = FirebaseFirestore.instance.batch();
@@ -416,15 +501,11 @@ Future<void> updateClassSlotSeries({
   required TimetableSlot replacement,
 }) async {
   final normalizedCourseCode = courseCode.trim().toUpperCase();
-  TimetableEntry? entry;
-  for (final item in timetablesNotifier.value) {
-    if (item.sessionId == sessionId &&
-        item.termId == termId &&
-        item.courseCode.toUpperCase() == normalizedCourseCode) {
-      entry = item;
-      break;
-    }
-  }
+  final entry = _findTimetableEntryForCourse(
+    sessionId: sessionId,
+    termId: termId,
+    normalizedCourseCode: normalizedCourseCode,
+  );
   if (entry == null) return;
 
   var replaced = false;
@@ -458,15 +539,11 @@ Future<void> updateClassSlotSeriesById({
   required TimetableSlot replacement,
 }) async {
   final normalizedCourseCode = courseCode.trim().toUpperCase();
-  TimetableEntry? entry;
-  for (final item in timetablesNotifier.value) {
-    if (item.sessionId == sessionId &&
-        item.termId == termId &&
-        item.courseCode.toUpperCase() == normalizedCourseCode) {
-      entry = item;
-      break;
-    }
-  }
+  final entry = _findTimetableEntryForCourse(
+    sessionId: sessionId,
+    termId: termId,
+    normalizedCourseCode: normalizedCourseCode,
+  );
   if (entry == null) return;
 
   var replaced = false;
@@ -496,15 +573,11 @@ Future<void> deleteClassSlotSeries({
   required int sourceEndMinutes,
 }) async {
   final normalizedCourseCode = courseCode.trim().toUpperCase();
-  TimetableEntry? entry;
-  for (final item in timetablesNotifier.value) {
-    if (item.sessionId == sessionId &&
-        item.termId == termId &&
-        item.courseCode.toUpperCase() == normalizedCourseCode) {
-      entry = item;
-      break;
-    }
-  }
+  final entry = _findTimetableEntryForCourse(
+    sessionId: sessionId,
+    termId: termId,
+    normalizedCourseCode: normalizedCourseCode,
+  );
   if (entry == null) return;
 
   final updatedSlots = <TimetableSlot>[];
@@ -538,15 +611,11 @@ Future<void> deleteClassSlotSeriesById({
   required String classSlotId,
 }) async {
   final normalizedCourseCode = courseCode.trim().toUpperCase();
-  TimetableEntry? entry;
-  for (final item in timetablesNotifier.value) {
-    if (item.sessionId == sessionId &&
-        item.termId == termId &&
-        item.courseCode.toUpperCase() == normalizedCourseCode) {
-      entry = item;
-      break;
-    }
-  }
+  final entry = _findTimetableEntryForCourse(
+    sessionId: sessionId,
+    termId: termId,
+    normalizedCourseCode: normalizedCourseCode,
+  );
   if (entry == null) return;
 
   final updatedSlots = <TimetableSlot>[];
@@ -573,12 +642,14 @@ class _EntryBuilder {
     required this.id,
     required this.sessionId,
     required this.termId,
+    this.courseId,
     required this.courseCode,
   });
 
   final String id;
   final String sessionId;
   final String termId;
+  final String? courseId;
   final String courseCode;
   final List<TimetableSlot> slots = <TimetableSlot>[];
 

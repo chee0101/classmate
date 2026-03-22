@@ -6,6 +6,7 @@ import '../../core/services/academic_session_store.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/models/class_type.dart';
 import '../../core/models/timetable_entry.dart';
+import '../../core/utils/course_display.dart';
 import '../../core/utils/date_time_format.dart';
 import '../../core/services/class_slot_store.dart';
 import '../../core/services/course_store.dart';
@@ -20,7 +21,6 @@ import '../../core/widgets/common/animated_segmented_switch.dart';
 import '../../core/widgets/common/label_chip.dart';
 import '../../core/widgets/common/confirm_dialog.dart';
 import '../schedule/class_slot_editor_screen.dart';
-import '../../core/constants/app_colors.dart';
 import '../../core/models/course.dart';
 
 class TimetablesScreen extends StatefulWidget {
@@ -35,11 +35,6 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
   String? _selectedTermId;
 
   _TimetableViewMode _viewMode = _TimetableViewMode.byDay;
-
-  Color _parseCourseColorHex(String hex) {
-    final value = int.tryParse(hex.replaceFirst('#', '0xFF'));
-    return Color(value ?? appPrimarySwatch.value);
-  }
 
   bool _sameTimetableSlot(TimetableSlot a, TimetableSlot b) {
     final aId = (a.classSlotId).trim();
@@ -225,14 +220,13 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
               return ValueListenableBuilder<List<Course>>(
                 valueListenable: coursesNotifier,
                 builder: (context, courses, _) {
-                  final courseColorByCode = <String, Color>{
-                    for (final c in courses.where(
-                      (c) =>
-                          c.sessionId == selectedSession.id &&
-                          c.termId == selectedTerm.id,
-                    ))
-                      c.courseCode: _parseCourseColorHex(c.courseColor),
-                  };
+                  final termCourses = courses
+                      .where(
+                        (c) =>
+                            c.sessionId == selectedSession.id &&
+                            c.termId == selectedTerm.id,
+                      )
+                      .toList(growable: false);
 
                   final filtered = entries
                       .where(
@@ -244,14 +238,16 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
 
                   final dayBuckets = <String, List<_DayCourseSlot>>{};
                   for (final entry in filtered) {
-                    final color = courseColorByCode[entry.courseCode] ??
-                        appPrimarySwatch.shade700;
+                    final color =
+                        displayCourseColorForTimetableEntry(entry, termCourses);
+                    final displayCode =
+                        displayCourseCodeForTimetableEntry(entry, termCourses);
                     for (final slot in entry.slots) {
                       dayBuckets
                           .putIfAbsent(slot.day, () => <_DayCourseSlot>[])
                           .add(
                             _DayCourseSlot(
-                              courseCode: entry.courseCode,
+                              courseCode: displayCode,
                               entry: entry,
                               slot: slot,
                               courseColor: color,
@@ -362,8 +358,10 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
                             if (_viewMode == _TimetableViewMode.byCourse) {
                               final entry = filtered[index];
                               final courseColor =
-                                  courseColorByCode[entry.courseCode] ??
-                                      appPrimarySwatch.shade700;
+                                  displayCourseColorForTimetableEntry(
+                                entry,
+                                termCourses,
+                              );
                               return _TimetableCourseCard(
                                 entry: entry,
                                 courseColor: courseColor,
@@ -377,7 +375,7 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
                                     context,
                                     title: 'Delete schedule',
                                     message:
-                                        'Delete classes for ${entry.courseCode}?',
+                                        'Delete classes for ${displayCourseCodeForTimetableEntry(entry, termCourses)}?',
                                   ).then((confirmed) async {
                                     if (!confirmed) return;
                                     await deleteTimetableEntry(entry.id);

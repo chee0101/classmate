@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../common/empty_state_card.dart';
 import '../../constants/app_spacing.dart';
 import '../../constants/routes.dart';
+import '../../models/course.dart';
 import '../../models/task.dart';
 import '../../../screens/add/add_new_screen.dart' show AddType;
 import 'task_list_item.dart';
@@ -12,9 +13,11 @@ class UpcomingDeadlinesCard extends StatefulWidget {
   const UpcomingDeadlinesCard({
     super.key,
     required this.tasks,
+    this.courses,
   });
 
   final List<Task> tasks;
+  final List<Course>? courses;
 
   @override
   State<UpcomingDeadlinesCard> createState() => _UpcomingDeadlinesCardState();
@@ -94,6 +97,7 @@ class _UpcomingDeadlinesCardState extends State<UpcomingDeadlinesCard> {
                       TaskListItem(
                         task: taskList[i],
                         textTheme: textTheme,
+                        courses: widget.courses,
                       ),
                       if (i < taskList.length - 1) ...[
                         const SizedBox(height: 16),
