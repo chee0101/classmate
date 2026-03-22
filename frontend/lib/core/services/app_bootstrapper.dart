@@ -2,6 +2,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/widgets.dart';
 
 import '../../firebase_options.dart';
+import 'firestore_config.dart';
 import 'academic_event_store.dart';
 import 'academic_session_store.dart';
 import 'class_slot_store.dart';
@@ -45,6 +46,8 @@ class AppBootstrapper {
           options: DefaultFirebaseOptions.currentPlatform,
         );
       }
+      // Must run before any Firestore reads/writes (offline cache + write queue).
+      configureFirestorePersistence();
       _setProgress(0.50);
       await Future<void>.delayed(Duration.zero);
 

@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
@@ -20,6 +23,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _userEmail = '';
   bool _isEditingName = false;
   final TextEditingController _nameController = TextEditingController();
+  StreamSubscription<DocumentSnapshot<Map<String, dynamic>>>? _userDocSubscription;
 
   @override
   void initState() {
@@ -32,10 +36,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ? displayName
         : (email.isEmpty ? 'Student' : email.split('@').first);
     _nameController.text = _userName;
+
+    if (user != null) {
+      _userDocSubscription = FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .snapshots()
+          .listen(_onUserProfileSnapshot);
+    }
+  }
+
+  void _onUserProfileSnapshot(DocumentSnapshot<Map<String, dynamic>> snap) {
+    if (!mounted || _isEditingName) return;
+    final data = snap.data();
+    final fromFirestore = (data?['username'] as String?)?.trim();
+    if (fromFirestore == null || fromFirestore.isEmpty) return;
+    if (fromFirestore == _userName) return;
+    setState(() {
+      _userName = fromFirestore;
+      _nameController.text = _userName;
+    });
   }
 
   @override
   void dispose() {
+    _userDocSubscription?.cancel();
     _nameController.dispose();
     super.dispose();
   }
@@ -68,8 +93,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _userName = nextName;
         _isEditingName = false;
       });
-      await FirebaseAuth.instance.currentUser?.updateDisplayName(nextName);
+      // Firestore queues offline; Auth profile update requires network.
       await UserProfileStore.updateUsernameForCurrentUser(nextName);
+      try {
+        await FirebaseAuth.instance.currentUser?.updateDisplayName(nextName);
+      } catch (_) {
+        // Offline or transient failure — username still syncs via Firestore.
+      }
     } else {
       setState(() {
         _isEditingName = true;
