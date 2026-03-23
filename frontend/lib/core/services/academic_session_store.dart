@@ -187,9 +187,32 @@ Future<void> setCurrentAcademicSession(AcademicSession session) async {
   await batch.commit();
 }
 
-Future<void> addAcademicSession(AcademicSession session) async {
+Future<bool> _hasAnyAcademicBreakEventForSession({
+  required String userUid,
+  required String sessionId,
+}) async {
+  final snap = await FirebaseFirestore.instance
+      .collection('users')
+      .doc(userUid)
+      .collection('events')
+      .where('sessionId', isEqualTo: sessionId)
+      .get();
+
+  for (final doc in snap.docs) {
+    if ((doc.data()['isAcademicBreak'] as bool?) == true) return true;
+  }
+  return false;
+}
+
+Future<void> addAcademicSession(
+  AcademicSession session, {
+  bool? seedAcademicBreakEvents,
+}) async {
   final user = FirebaseAuth.instance.currentUser;
   if (user == null) return;
+
+  final shouldSeed =
+      seedAcademicBreakEvents ?? (session.terms.isEmpty);
 
   final normalizedStart = _startOfDay(session.startDate);
   final normalizedEnd = _endOfDay(session.endDate);
@@ -239,15 +262,33 @@ Future<void> addAcademicSession(AcademicSession session) async {
     'updatedAt': FieldValue.serverTimestamp(),
   });
 
-  await _seedAcademicBreakEventsForSession(
-    userUid: user.uid,
-    session: normalizedSession,
-  );
+  var shouldSeedAcademicBreaks = shouldSeed;
+  if (!shouldSeedAcademicBreaks) {
+    // Don't overwrite PDF-derived academic breaks with the fixed semester pattern.
+    // If no academic breaks exist yet, we seed as a fallback.
+    shouldSeedAcademicBreaks = !await _hasAnyAcademicBreakEventForSession(
+      userUid: user.uid,
+      sessionId: session.id,
+    );
+  }
+
+  if (shouldSeedAcademicBreaks) {
+    await _seedAcademicBreakEventsForSession(
+      userUid: user.uid,
+      session: normalizedSession,
+    );
+  }
 }
 
-Future<void> updateAcademicSession(AcademicSession updatedSession) async {
+Future<void> updateAcademicSession(
+  AcademicSession updatedSession, {
+  bool? seedAcademicBreakEvents,
+}) async {
   final user = FirebaseAuth.instance.currentUser;
   if (user == null) return;
+
+  final shouldSeed =
+      seedAcademicBreakEvents ?? (updatedSession.terms.isEmpty);
 
   final normalizedStart = _startOfDay(updatedSession.startDate);
   final normalizedEnd = _endOfDay(updatedSession.endDate);
@@ -286,10 +327,20 @@ Future<void> updateAcademicSession(AcademicSession updatedSession) async {
     'updatedAt': FieldValue.serverTimestamp(),
   }, SetOptions(merge: true));
 
-  await _seedAcademicBreakEventsForSession(
-    userUid: user.uid,
-    session: normalizedSession,
-  );
+  var shouldSeedAcademicBreaks = shouldSeed;
+  if (!shouldSeedAcademicBreaks) {
+    shouldSeedAcademicBreaks = !await _hasAnyAcademicBreakEventForSession(
+      userUid: user.uid,
+      sessionId: updatedSession.id,
+    );
+  }
+
+  if (shouldSeedAcademicBreaks) {
+    await _seedAcademicBreakEventsForSession(
+      userUid: user.uid,
+      session: normalizedSession,
+    );
+  }
 }
 
 DateTime _clampToTerm(DateTime value, DateTime termStart, DateTime termEnd) {
