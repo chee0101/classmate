@@ -3,12 +3,14 @@ class AcademicSession {
   final String name;
   final DateTime startDate;
   final DateTime endDate;
+  final List<SessionTerm> terms;
 
   const AcademicSession({
     required this.id,
     required this.name,
     required this.startDate,
     required this.endDate,
+    this.terms = const <SessionTerm>[],
   });
 
   factory AcademicSession.fromDates({
@@ -36,7 +38,22 @@ class AcademicSession {
       name: name,
       startDate: normalizedStart,
       endDate: normalizedEnd,
+      terms: const <SessionTerm>[],
     );
   }
+}
+
+class SessionTerm {
+  const SessionTerm({
+    required this.id,
+    required this.label,
+    required this.start,
+    required this.end,
+  });
+
+  final String id;
+  final String label;
+  final DateTime start;
+  final DateTime end;
 }
 

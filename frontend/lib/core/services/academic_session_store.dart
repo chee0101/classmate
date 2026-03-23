@@ -17,6 +17,12 @@ DateTime _startOfDay(DateTime date) =>
 DateTime _endOfDay(DateTime date) =>
     DateTime(date.year, date.month, date.day, 23, 59);
 
+DateTime _clampDate(DateTime value, DateTime min, DateTime max) {
+  if (value.isBefore(min)) return min;
+  if (value.isAfter(max)) return max;
+  return value;
+}
+
 final ValueNotifier<AcademicSession?> currentAcademicSessionNotifier =
     ValueNotifier<AcademicSession?>(null);
 
@@ -96,14 +102,52 @@ AcademicSession _sessionFromDoc(DocumentSnapshot<Map<String, dynamic>> doc) {
       name: name ?? doc.id,
       startDate: startTs == null ? fallback.startDate : _startOfDay(startTs.toDate()),
       endDate: endTs == null ? fallback.endDate : _endOfDay(endTs.toDate()),
+      terms: const <SessionTerm>[],
     );
   }
+  final startDate = _startOfDay(startTs.toDate());
+  final endDate = _endOfDay(endTs.toDate());
   return AcademicSession(
     id: doc.id,
     name: name,
-    startDate: _startOfDay(startTs.toDate()),
-    endDate: _endOfDay(endTs.toDate()),
+    startDate: startDate,
+    endDate: endDate,
+    terms: _readTermsFromDoc(data['terms'], sessionStart: startDate, sessionEnd: endDate),
   );
+}
+
+List<SessionTerm> _readTermsFromDoc(
+  dynamic raw, {
+  required DateTime sessionStart,
+  required DateTime sessionEnd,
+}) {
+  if (raw is! List) return const <SessionTerm>[];
+  final out = <SessionTerm>[];
+  for (final item in raw) {
+    if (item is! Map) continue;
+    final map = Map<String, dynamic>.from(item);
+    final id = (map['id'] as String?)?.trim() ?? '';
+    final label = (map['label'] as String?)?.trim() ?? '';
+    final startTs = map['startDate'] as Timestamp?;
+    final endTs = map['endDate'] as Timestamp?;
+    if (id.isEmpty || label.isEmpty || startTs == null || endTs == null) {
+      continue;
+    }
+    final start = _clampDate(
+      _startOfDay(startTs.toDate()),
+      sessionStart,
+      sessionEnd,
+    );
+    final end = _clampDate(
+      _endOfDay(endTs.toDate()),
+      sessionStart,
+      sessionEnd,
+    );
+    if (end.isBefore(start)) continue;
+    out.add(SessionTerm(id: id, label: label, start: start, end: end));
+  }
+  out.sort((a, b) => a.start.compareTo(b.start));
+  return out;
 }
 
 List<Map<String, dynamic>> _termArrayForSession(AcademicSession session) {
@@ -154,6 +198,25 @@ Future<void> addAcademicSession(AcademicSession session) async {
     name: session.name,
     startDate: normalizedStart,
     endDate: normalizedEnd,
+    terms: session.terms
+        .map(
+          (term) => SessionTerm(
+            id: term.id.trim(),
+            label: term.label.trim(),
+            start: _clampDate(
+              _startOfDay(term.start),
+              normalizedStart,
+              normalizedEnd,
+            ),
+            end: _clampDate(
+              _endOfDay(term.end),
+              normalizedStart,
+              normalizedEnd,
+            ),
+          ),
+        )
+        .where((term) => term.id.isNotEmpty && term.label.isNotEmpty)
+        .toList(growable: false),
   );
   final exists = academicSessionsNotifier.value.any(
     (s) =>
@@ -193,6 +256,25 @@ Future<void> updateAcademicSession(AcademicSession updatedSession) async {
     name: updatedSession.name,
     startDate: normalizedStart,
     endDate: normalizedEnd,
+    terms: updatedSession.terms
+        .map(
+          (term) => SessionTerm(
+            id: term.id.trim(),
+            label: term.label.trim(),
+            start: _clampDate(
+              _startOfDay(term.start),
+              normalizedStart,
+              normalizedEnd,
+            ),
+            end: _clampDate(
+              _endOfDay(term.end),
+              normalizedStart,
+              normalizedEnd,
+            ),
+          ),
+        )
+        .where((term) => term.id.isNotEmpty && term.label.isNotEmpty)
+        .toList(growable: false),
   );
   final isCurrent = currentAcademicSessionNotifier.value?.id == updatedSession.id;
   await _sessionsCollection(user.uid).doc(updatedSession.id).set({

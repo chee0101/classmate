@@ -21,6 +21,21 @@ DateTime _endOfDay(DateTime date) =>
     DateTime(date.year, date.month, date.day, 23, 59, 59, 999);
 
 List<TermWindow> buildTermWindows(AcademicSession session) {
+  if (session.terms.isNotEmpty) {
+    final windows = session.terms
+        .map(
+          (term) => TermWindow(
+            id: term.id,
+            label: term.label,
+            start: _startOfDay(term.start),
+            end: _endOfDay(term.end),
+          ),
+        )
+        .toList(growable: false)
+      ..sort((a, b) => a.start.compareTo(b.start));
+    return windows;
+  }
+
   final start = _startOfDay(session.startDate);
   final sessionEnd = _endOfDay(session.endDate);
 
