@@ -29,6 +29,9 @@ import '../../core/widgets/schedule/class_slot_sheet.dart';
 import '../../core/widgets/schedule/schedule_class_appointment_text.dart';
 import '../../core/widgets/schedule/schedule_overflow_popup_menu.dart';
 import '../../core/widgets/schedule/schedule_appointments_bottom_sheet.dart';
+import '../../core/constants/routes.dart';
+import '../../core/models/task.dart';
+import '../../core/services/task_store.dart';
 import 'schedule_class_editor_screen.dart';
 import '../../core/utils/schedule_event_appointment_actions.dart';
 import '../../core/utils/schedule_week_utils.dart';
@@ -56,554 +59,671 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Schedule'),
-        automaticallyImplyLeading: false,
-      ),
-      body: ValueListenableBuilder<List<AcademicSession>>(
-        valueListenable: academicSessionsNotifier,
-        builder: (context, sessionsList, _) {
-          final activeSession = currentAcademicSessionNotifier.value;
-          final sessions = <AcademicSession>[...sessionsList];
-          if (activeSession != null &&
-              !sessions.any((s) => s.id == activeSession.id)) {
-            sessions.add(activeSession);
-          }
+        appBar: AppBar(
+          title: const Text('Schedule'),
+          automaticallyImplyLeading: false,
+        ),
+        body: ValueListenableBuilder<List<AcademicSession>>(
+          valueListenable: academicSessionsNotifier,
+          builder: (context, sessionsList, _) {
+            final activeSession = currentAcademicSessionNotifier.value;
+            final sessions = <AcademicSession>[...sessionsList];
+            if (activeSession != null &&
+                !sessions.any((s) => s.id == activeSession.id)) {
+              sessions.add(activeSession);
+            }
 
-          if (sessions.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: EmptyStateCard(
-                  onPressed: () {
-                    AcademicSessionSetupBottomSheet.show(context);
-                  },
+            if (sessions.isEmpty) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: EmptyStateCard(
+                    onPressed: () {
+                      AcademicSessionSetupBottomSheet.show(context);
+                    },
+                  ),
                 ),
-              ),
-            );
-          }
+              );
+            }
 
-          final now = DateTime.now();
-          final refs = buildAllSessionTermRefs(sessions);
-          final defaultRef = resolveDefaultSessionTermRef(refs, now);
+            final now = DateTime.now();
+            final refs = buildAllSessionTermRefs(sessions);
+            final defaultRef = resolveDefaultSessionTermRef(refs, now);
 
-          return ValueListenableBuilder<SessionTermSelection?>(
-            valueListenable: selectedSessionTermNotifier,
-            builder: (context, selectedSelection, _) {
-              final selectedSessionId =
-                  selectedSelection?.sessionId ?? defaultRef.session.id;
-              final selectedTermId =
-                  selectedSelection?.termId ?? defaultRef.term.id;
+            return ValueListenableBuilder<SessionTermSelection?>(
+              valueListenable: selectedSessionTermNotifier,
+              builder: (context, selectedSelection, _) {
+                final selectedSessionId =
+                    selectedSelection?.sessionId ?? defaultRef.session.id;
+                final selectedTermId =
+                    selectedSelection?.termId ?? defaultRef.term.id;
 
-              // Resolve exact ref from current selection, falling back to defaultRef.
-              SessionTermRef selectedRef = defaultRef;
-              for (final ref in refs) {
-                if (ref.session.id == selectedSessionId &&
-                    ref.term.id == selectedTermId) {
-                  selectedRef = ref;
-                  break;
+                // Resolve exact ref from current selection, falling back to defaultRef.
+                SessionTermRef selectedRef = defaultRef;
+                for (final ref in refs) {
+                  if (ref.session.id == selectedSessionId &&
+                      ref.term.id == selectedTermId) {
+                    selectedRef = ref;
+                    break;
+                  }
                 }
-              }
 
-              final selectedSession = selectedRef.session;
-              final selectedTerm = selectedRef.term;
-              if (selectedSelection == null ||
-                  selectedSelection.sessionId != selectedSession.id ||
-                  selectedSelection.termId != selectedTerm.id) {
-                setSelectedSessionTerm(
-                  sessionId: selectedSession.id,
-                  termId: selectedTerm.id,
-                );
-              }
+                final selectedSession = selectedRef.session;
+                final selectedTerm = selectedRef.term;
+                if (selectedSelection == null ||
+                    selectedSelection.sessionId != selectedSession.id ||
+                    selectedSelection.termId != selectedTerm.id) {
+                  setSelectedSessionTerm(
+                    sessionId: selectedSession.id,
+                    termId: selectedTerm.id,
+                  );
+                }
 
-              return ValueListenableBuilder<List<TimetableEntry>>(
-                valueListenable: timetablesNotifier,
-                builder: (context, entries, _) {
-                  return ValueListenableBuilder<List<Course>>(
-                    valueListenable: coursesNotifier,
-                    builder: (context, courses, _) {
-                      return ValueListenableBuilder<List<ClassSlotOverride>>(
-                        valueListenable: classSlotOverridesNotifier,
-                        builder: (context, classOverrides, _) {
-                          return ValueListenableBuilder<List<AcademicEvent>>(
-                            valueListenable: academicEventsNotifier,
-                            builder: (context, events, _) {
-                              final filteredEntries = entries
-                                  .where(
-                                    (e) =>
-                                        e.sessionId == selectedSession.id &&
-                                        e.termId == selectedTerm.id,
-                                  )
-                                  .toList(growable: false);
+                return ValueListenableBuilder<List<TimetableEntry>>(
+                  valueListenable: timetablesNotifier,
+                  builder: (context, entries, _) {
+                    return ValueListenableBuilder<List<Course>>(
+                      valueListenable: coursesNotifier,
+                      builder: (context, courses, _) {
+                        return ValueListenableBuilder<List<ClassSlotOverride>>(
+                          valueListenable: classSlotOverridesNotifier,
+                          builder: (context, classOverrides, _) {
+                            return ValueListenableBuilder<List<AcademicEvent>>(
+                              valueListenable: academicEventsNotifier,
+                              builder: (context, events, _) {
+                                final filteredEntries = entries
+                                    .where(
+                                      (e) =>
+                                          e.sessionId == selectedSession.id &&
+                                          e.termId == selectedTerm.id,
+                                    )
+                                    .toList(growable: false);
 
-                              final termCourses = coursesForSessionAndTerm(
-                                sessionId: selectedSession.id,
-                                termId: selectedTerm.id,
-                              );
+                                final termCourses = coursesForSessionAndTerm(
+                                  sessionId: selectedSession.id,
+                                  termId: selectedTerm.id,
+                                );
 
-                              final selectedTermEvents = events
-                                  .where(
-                                    (event) =>
-                                        event.sessionId == selectedSession.id &&
-                                        event.termId == selectedTerm.id,
-                                  )
-                                  .toList(growable: false);
-                              final visibleDay = DateTime(
-                                _visibleDate.year,
-                                _visibleDate.month,
-                                _visibleDate.day,
-                              );
-                          final visibleStartOfDay = startOfDay(visibleDay);
-                          final visibleEndOfDay = endOfDayInclusive(visibleDay);
-                              final eventsOnVisibleDay = selectedTermEvents
-                                  .where(
-                                    (event) =>
-                                        !event.endDateTime
-                                            .isBefore(visibleStartOfDay) &&
-                                        !event.startDateTime
-                                            .isAfter(visibleEndOfDay),
-                                  )
-                                  .toList(growable: false);
+                                final selectedTermEvents = events
+                                    .where(
+                                      (event) =>
+                                          event.sessionId ==
+                                              selectedSession.id &&
+                                          event.termId == selectedTerm.id,
+                                    )
+                                    .toList(growable: false);
+                                final visibleDay = DateTime(
+                                  _visibleDate.year,
+                                  _visibleDate.month,
+                                  _visibleDate.day,
+                                );
+                                final visibleStartOfDay =
+                                    startOfDay(visibleDay);
+                                final visibleEndOfDay =
+                                    endOfDayInclusive(visibleDay);
+                                final eventsOnVisibleDay = selectedTermEvents
+                                    .where(
+                                      (event) =>
+                                          !event.endDateTime
+                                              .isBefore(visibleStartOfDay) &&
+                                          !event.startDateTime
+                                              .isAfter(visibleEndOfDay),
+                                    )
+                                    .toList(growable: false);
 
-                              AcademicEvent? academicBreakEvent;
-                              for (final event in eventsOnVisibleDay) {
-                                if (event.isAcademicBreak) {
-                                  academicBreakEvent = event;
+                                AcademicEvent? academicBreakEvent;
+                                for (final event in eventsOnVisibleDay) {
+                                  if (event.isAcademicBreak) {
+                                    academicBreakEvent = event;
+                                  }
                                 }
-                              }
-                              final isAcademicBreakOnVisibleDay =
-                                  academicBreakEvent != null;
-                              final selectedClassSlotIds = filteredEntries
-                                  .expand((entry) => entry.slots
-                                      .map((slot) => slot.classSlotId))
-                                  .toSet();
-                              final selectedClassOverrides = classOverrides
-                                  .where(
-                                    (item) => selectedClassSlotIds
-                                        .contains(item.classSlotId),
-                                  )
-                                  .toList(growable: false);
-                              final appointments =
-                                  ScheduleAppointmentBuilder.build(
-                                entries: filteredEntries,
-                                courses: termCourses,
-                                events: selectedTermEvents,
-                                classOverrides: selectedClassOverrides,
-                                term: selectedTerm,
-                                forMonthlyAgenda: _showMonthly,
-                                contentFilter: ScheduleContentFilter.both,
-                              );
+                                final isAcademicBreakOnVisibleDay =
+                                    academicBreakEvent != null;
+                                final selectedClassSlotIds = filteredEntries
+                                    .expand((entry) => entry.slots
+                                        .map((slot) => slot.classSlotId))
+                                    .toSet();
+                                final selectedClassOverrides = classOverrides
+                                    .where(
+                                      (item) => selectedClassSlotIds
+                                          .contains(item.classSlotId),
+                                    )
+                                    .toList(growable: false);
+                                final appointments =
+                                    ScheduleAppointmentBuilder.build(
+                                  entries: filteredEntries,
+                                  courses: termCourses,
+                                  events: selectedTermEvents,
+                                  classOverrides: selectedClassOverrides,
+                                  term: selectedTerm,
+                                  forMonthlyAgenda: _showMonthly,
+                                  contentFilter: ScheduleContentFilter.both,
+                                );
 
-                              return Column(
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.fromLTRB(
-                                        AppSpacing.md,
-                                        0,
-                                        AppSpacing.md,
-                                        AppSpacing.sm),
-                                    child: SessionTermContextLabel(
-                                      sessionName: selectedSession.name,
-                                      termLabel: selectedTerm.label,
-                                    ),
-                                  ),
-                                  if (buildWeekBannerText(
-                                              selectedTerm, _visibleDate) !=
-                                          '' &&
-                                      !_showMonthly)
-                                    Padding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                        AppSpacing.md,
-                                        0,
-                                        AppSpacing.md,
-                                        AppSpacing.sm,
-                                      ),
-                                      child: Align(
-                                        alignment: Alignment.centerLeft,
-                                        child: Container(
-                                            width: double.infinity,
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 12,
-                                              vertical: 6,
+                                return ValueListenableBuilder<List<Task>>(
+                                  valueListenable: tasksNotifier,
+                                  builder: (context, tasks, _) {
+                                    final taskById = <String, Task>{
+                                      for (final t in tasks) t.id: t,
+                                    };
+                                    final taskAppointments = tasks
+                                        .where(
+                                      (t) =>
+                                          isInTerm(t.dueDateTime, selectedTerm),
+                                    )
+                                        .map((t) {
+                                      final start = t.dueDateTime;
+                                      final end = start
+                                          .add(const Duration(minutes: 30));
+                                      return Appointment(
+                                        startTime: start,
+                                        endTime: end,
+                                        subject: t.title,
+                                        color: t.courseColor,
+                                        isAllDay: false,
+                                        notes: ScheduleAppointmentMeta.typeTask,
+                                        id: ScheduleAppointmentMeta(
+                                          type:
+                                              ScheduleAppointmentMeta.typeTask,
+                                          taskId: t.id,
+                                        ),
+                                      );
+                                    }).toList(growable: false);
+
+                                    final allAppointments = [
+                                      ...appointments,
+                                      ...taskAppointments,
+                                    ];
+
+                                    return Column(
+                                      children: [
+                                        Padding(
+                                          padding: const EdgeInsets.fromLTRB(
+                                              AppSpacing.md,
+                                              0,
+                                              AppSpacing.md,
+                                              AppSpacing.sm),
+                                          child: SessionTermContextLabel(
+                                            sessionName: selectedSession.name,
+                                            termLabel: selectedTerm.label,
+                                          ),
+                                        ),
+                                        if (buildWeekBannerText(selectedTerm,
+                                                    _visibleDate) !=
+                                                '' &&
+                                            !_showMonthly)
+                                          Padding(
+                                            padding: const EdgeInsets.fromLTRB(
+                                              AppSpacing.md,
+                                              0,
+                                              AppSpacing.md,
+                                              AppSpacing.sm,
                                             ),
-                                            decoration: BoxDecoration(
-                                              color: const Color(0xFFE2E4FD),
+                                            child: Align(
+                                              alignment: Alignment.centerLeft,
+                                              child: Container(
+                                                  width: double.infinity,
+                                                  padding: const EdgeInsets
+                                                      .symmetric(
+                                                    horizontal: 12,
+                                                    vertical: 6,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color:
+                                                        const Color(0xFFE2E4FD),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                            10),
+                                                  ),
+                                                  child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(
+                                                          buildWeekBannerText(
+                                                            selectedTerm,
+                                                            _visibleDate,
+                                                          ),
+                                                          style:
+                                                              Theme.of(context)
+                                                                  .textTheme
+                                                                  .bodyMedium
+                                                                  ?.copyWith(
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w600,
+                                                                  ),
+                                                        ),
+                                                        if (isAcademicBreakOnVisibleDay)
+                                                          Text(
+                                                            'No classes',
+                                                            style: Theme.of(
+                                                                    context)
+                                                                .textTheme
+                                                                .bodySmall
+                                                                ?.copyWith(
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w600,
+                                                                ),
+                                                          ),
+                                                      ])),
+                                            ),
+                                          ),
+                                        Expanded(
+                                          child: Padding(
+                                            padding: const EdgeInsets.fromLTRB(
+                                              AppSpacing.sm,
+                                              0,
+                                              AppSpacing.sm,
+                                              AppSpacing.sm,
+                                            ),
+                                            child: ClipRRect(
                                               borderRadius:
-                                                  BorderRadius.circular(10),
-                                            ),
-                                            child: Column(
-                                                crossAxisAlignment:
-                                                    CrossAxisAlignment.start,
+                                                  BorderRadius.circular(16),
+                                              child: Column(
                                                 children: [
-                                                  Text(
-                                                    buildWeekBannerText(
-                                                      selectedTerm,
-                                                      _visibleDate,
-                                                    ),
-                                                    style: Theme.of(context)
-                                                        .textTheme
-                                                        .bodyMedium
-                                                        ?.copyWith(
-                                                          fontWeight:
-                                                              FontWeight.w600,
-                                                        ),
-                                                  ),
-                                                  if (isAcademicBreakOnVisibleDay)
-                                                    Text(
-                                                      'No classes',
-                                                      style: Theme.of(context)
-                                                          .textTheme
-                                                          .bodySmall
-                                                          ?.copyWith(
-                                                            fontWeight:
-                                                                FontWeight.w600,
-                                                          ),
-                                                    ),
-                                                ])),
-                                      ),
-                                    ),
-                                  Expanded(
-                                    child: Padding(
-                                      padding: const EdgeInsets.fromLTRB(
-                                        AppSpacing.sm,
-                                        0,
-                                        AppSpacing.sm,
-                                        AppSpacing.sm,
-                                      ),
-                                      child: ClipRRect(
-                                        borderRadius: BorderRadius.circular(16),
-                                        child: Column(
-                                          children: [
-                                            Expanded(
-                                              child: SfCalendar(
-                                                controller: _calendarController,
-                                                allowedViews: const [
-                                                  // CalendarView.day,
-                                                  CalendarView.week,
-                                                  CalendarView.month,
-                                                ],
-                                                backgroundColor: Colors.white,
-                                                dataSource: _ScheduleDataSource(
-                                                    appointments),
-                                                firstDayOfWeek: 1,
-                                                headerHeight: 40,
-                                                headerStyle:
-                                                    const CalendarHeaderStyle(
-                                                  backgroundColor:
-                                                      Color(0xFFCBCDFA),
-                                                  textStyle: TextStyle(
-                                                      color: Colors.black),
-                                                ),
-                                                showNavigationArrow: false,
-                                                showDatePickerButton: true,
-                                                viewHeaderStyle:
-                                                    const ViewHeaderStyle(
-                                                  backgroundColor:
-                                                      Color(0xFFE2E4FD),
-                                                ),
-                                                showCurrentTimeIndicator: true,
-                                                selectionDecoration:
-                                                    const BoxDecoration(
-                                                  color: Colors.transparent,
-                                                ),
-                                                onViewChanged: (details) {
-                                                  if (details.visibleDates
-                                                      .isEmpty) return;
-                                                  final middle = details
-                                                      .visibleDates[details
-                                                          .visibleDates
-                                                          .length ~/
-                                                      2];
-                                                  final currentView =
-                                                      _calendarController.view;
-                                                  if (!mounted ||
-                                                      _visibleDate == middle)
-                                                    return;
-                                                  WidgetsBinding.instance
-                                                      .addPostFrameCallback(
-                                                          (_) {
-                                                    if (!mounted ||
-                                                        _visibleDate == middle)
-                                                      return;
-                                                    setState(() {
-                                                      _visibleDate = middle;
-                                                      _showMonthly =
-                                                          currentView ==
-                                                              CalendarView
-                                                                  .month;
-                                                    });
-                                                  });
-                                                },
-                                                monthViewSettings:
-                                                    const MonthViewSettings(
-                                                  appointmentDisplayMode:
-                                                      MonthAppointmentDisplayMode
-                                                          .indicator,
-                                                  showAgenda: true,
-                                                  agendaItemHeight: 44,
-                                                  agendaStyle: AgendaStyle(
-                                                    backgroundColor:
-                                                        Color(0xFFE2E4FD),
-                                                  ),
-                                                ),
-                                                timeSlotViewSettings:
-                                                    const TimeSlotViewSettings(
-                                                  startHour: 0,
-                                                  endHour: 24,
-                                                  timeIntervalHeight: 64,
-                                                ),
-                                                appointmentBuilder: (context,
-                                                    calendarAppointmentDetails) {
-                                                  final appointment =
-                                                      calendarAppointmentDetails
-                                                          .appointments
-                                                          .first as Appointment;
-                                                  if (_showMonthly) {
-                                                    return Listener(
-                                                      behavior: HitTestBehavior
-                                                          .translucent,
-                                                      onPointerDown: (event) {
-                                                        _lastPointerGlobalPosition =
-                                                            event.position;
+                                                  Expanded(
+                                                    child: SfCalendar(
+                                                      controller:
+                                                          _calendarController,
+                                                      allowedViews: const [
+                                                        // CalendarView.day,
+                                                        CalendarView.week,
+                                                        CalendarView.month,
+                                                      ],
+                                                      backgroundColor:
+                                                          Colors.white,
+                                                      dataSource:
+                                                          _ScheduleDataSource(
+                                                              allAppointments),
+                                                      firstDayOfWeek: 1,
+                                                      headerHeight: 40,
+                                                      headerStyle:
+                                                          const CalendarHeaderStyle(
+                                                        backgroundColor:
+                                                            Color(0xFFCBCDFA),
+                                                        textStyle: TextStyle(
+                                                            color:
+                                                                Colors.black),
+                                                      ),
+                                                      showNavigationArrow:
+                                                          false,
+                                                      showDatePickerButton:
+                                                          true,
+                                                      viewHeaderStyle:
+                                                          const ViewHeaderStyle(
+                                                        backgroundColor:
+                                                            Color(0xFFE2E4FD),
+                                                      ),
+                                                      showCurrentTimeIndicator:
+                                                          true,
+                                                      selectionDecoration:
+                                                          const BoxDecoration(
+                                                        color:
+                                                            Colors.transparent,
+                                                      ),
+                                                      onViewChanged: (details) {
+                                                        if (details.visibleDates
+                                                            .isEmpty) return;
+                                                        final middle = details
+                                                                .visibleDates[
+                                                            details.visibleDates
+                                                                    .length ~/
+                                                                2];
+                                                        final currentView =
+                                                            _calendarController
+                                                                .view;
+                                                        if (!mounted ||
+                                                            _visibleDate ==
+                                                                middle) return;
+                                                        WidgetsBinding.instance
+                                                            .addPostFrameCallback(
+                                                                (_) {
+                                                          if (!mounted ||
+                                                              _visibleDate ==
+                                                                  middle)
+                                                            return;
+                                                          setState(() {
+                                                            _visibleDate =
+                                                                middle;
+                                                            _showMonthly =
+                                                                currentView ==
+                                                                    CalendarView
+                                                                        .month;
+                                                          });
+                                                        });
                                                       },
-                                                      child: Container(
-                                                        margin: const EdgeInsets
-                                                            .symmetric(
-                                                          horizontal: 2,
-                                                          vertical: 1,
-                                                        ),
-                                                        padding:
-                                                            const EdgeInsets
-                                                                .symmetric(
-                                                          horizontal: 6,
-                                                          vertical: 3,
-                                                        ),
-                                                        alignment: Alignment
-                                                            .centerLeft,
-                                                        decoration:
-                                                            BoxDecoration(
-                                                          color: appointment
-                                                              .color
-                                                              .withValues(
-                                                                  alpha: 0.14),
-                                                          borderRadius:
-                                                              BorderRadius
-                                                                  .circular(6),
-                                                          border: Border.all(
-                                                            color: appointment
-                                                                .color
-                                                                .withValues(
-                                                                    alpha:
-                                                                        0.45),
-                                                            width: 0.7,
-                                                          ),
-                                                        ),
-                                                        child: Column(
-                                                          crossAxisAlignment:
-                                                              CrossAxisAlignment
-                                                                  .start,
-                                                          mainAxisSize:
-                                                              MainAxisSize.min,
-                                                          children: [
-                                                            Text(
-                                                              appointment
-                                                                  .subject,
-                                                              maxLines: 1,
-                                                              overflow:
-                                                                  TextOverflow
-                                                                      .ellipsis,
-                                                              style:
-                                                                  const TextStyle(
-                                                                fontSize: 11,
-                                                                height: 1.0,
-                                                                fontWeight:
-                                                                    FontWeight
-                                                                        .w700,
-                                                                color: Colors
-                                                                    .black87,
-                                                              ),
-                                                            ),
-                                                            const SizedBox(
-                                                                height: 2),
-                                                            Text(
-                                                              formatMonthlyAgendaSubtitle(
-                                                                appointment,
-                                                              ),
-                                                              maxLines: 1,
-                                                              overflow:
-                                                                  TextOverflow
-                                                                      .ellipsis,
-                                                              style: TextStyle(
-                                                                fontSize: 10,
-                                                                height: 1.0,
-                                                                color: Colors
-                                                                    .grey
-                                                                    .shade700,
-                                                              ),
-                                                            ),
-                                                          ],
+                                                      monthViewSettings:
+                                                          const MonthViewSettings(
+                                                        appointmentDisplayMode:
+                                                            MonthAppointmentDisplayMode
+                                                                .indicator,
+                                                        showAgenda: true,
+                                                        agendaItemHeight: 44,
+                                                        agendaStyle:
+                                                            AgendaStyle(
+                                                          backgroundColor:
+                                                              Color(0xFFE2E4FD),
                                                         ),
                                                       ),
-                                                    );
-                                                  }
-                                                  final maxAppointmentLines =
-                                                      appointment.isAllDay
-                                                          ? 1
-                                                          : 3;
-                                                  final isClassAppointment =
-                                                      appointment.notes ==
-                                                          ScheduleAppointmentMeta
-                                                              .typeClass;
-
-                                                  final isDisabled =
-                                                      isAcademicBreakOnVisibleDay;
-
-                                                  return Listener(
-                                                    behavior: HitTestBehavior
-                                                        .translucent,
-                                                    onPointerDown: (event) {
-                                                      _lastPointerGlobalPosition =
-                                                          event.position;
-                                                    },
-                                                    child: Container(
-                                                      padding:
-                                                          const EdgeInsets.all(
-                                                              3),
-                                                      alignment:
-                                                          Alignment.center,
-                                                      decoration: BoxDecoration(
-                                                        color: appointment.color
-                                                            .withValues(
-                                                                alpha: 0.26),
-                                                        borderRadius:
-                                                            BorderRadius
-                                                                .circular(6),
+                                                      timeSlotViewSettings:
+                                                          const TimeSlotViewSettings(
+                                                        startHour: 0,
+                                                        endHour: 24,
+                                                        timeIntervalHeight: 64,
                                                       ),
-                                                      child: isClassAppointment
-                                                          ? Opacity(
-                                                              opacity:
-                                                                  isDisabled
-                                                                      ? 0.35
-                                                                      : 1.0,
-                                                              child:
-                                                                  ScheduleClassAppointmentText(
-                                                                subject:
+                                                      appointmentBuilder: (context,
+                                                          calendarAppointmentDetails) {
+                                                        final appointment =
+                                                            calendarAppointmentDetails
+                                                                    .appointments
+                                                                    .first
+                                                                as Appointment;
+                                                        if (_showMonthly) {
+                                                          return Listener(
+                                                            behavior:
+                                                                HitTestBehavior
+                                                                    .translucent,
+                                                            onPointerDown:
+                                                                (event) {
+                                                              _lastPointerGlobalPosition =
+                                                                  event
+                                                                      .position;
+                                                            },
+                                                            child: Container(
+                                                              margin:
+                                                                  const EdgeInsets
+                                                                      .symmetric(
+                                                                horizontal: 2,
+                                                                vertical: 1,
+                                                              ),
+                                                              padding:
+                                                                  const EdgeInsets
+                                                                      .symmetric(
+                                                                horizontal: 6,
+                                                                vertical: 3,
+                                                              ),
+                                                              alignment: Alignment
+                                                                  .centerLeft,
+                                                              decoration:
+                                                                  BoxDecoration(
+                                                                color: appointment
+                                                                    .color
+                                                                    .withValues(
+                                                                        alpha:
+                                                                            0.14),
+                                                                borderRadius:
+                                                                    BorderRadius
+                                                                        .circular(
+                                                                            6),
+                                                                border:
+                                                                    Border.all(
+                                                                  color: appointment
+                                                                      .color
+                                                                      .withValues(
+                                                                          alpha:
+                                                                              0.45),
+                                                                  width: 0.7,
+                                                                ),
+                                                              ),
+                                                              child: Column(
+                                                                crossAxisAlignment:
+                                                                    CrossAxisAlignment
+                                                                        .start,
+                                                                mainAxisSize:
+                                                                    MainAxisSize
+                                                                        .min,
+                                                                children: [
+                                                                  Text(
                                                                     appointment
                                                                         .subject,
-                                                                textColor:
-                                                                    appointment
-                                                                        .color,
-                                                                maxLines:
-                                                                    maxAppointmentLines,
-                                                              ),
-                                                            )
-                                                          : Text(
-                                                              appointment
-                                                                  .subject,
-                                                              maxLines:
-                                                                  maxAppointmentLines,
-                                                              textAlign:
-                                                                  TextAlign
-                                                                      .center,
-                                                              overflow:
-                                                                  TextOverflow
-                                                                      .ellipsis,
-                                                              style: Theme.of(
-                                                                      context)
-                                                                  .textTheme
-                                                                  .bodySmall
-                                                                  ?.copyWith(
-                                                                    color: appPrimarySwatch
-                                                                        .shade900,
+                                                                    maxLines: 1,
+                                                                    overflow:
+                                                                        TextOverflow
+                                                                            .ellipsis,
+                                                                    style:
+                                                                        const TextStyle(
+                                                                      fontSize:
+                                                                          11,
+                                                                      height:
+                                                                          1.0,
+                                                                      fontWeight:
+                                                                          FontWeight
+                                                                              .w700,
+                                                                      color: Colors
+                                                                          .black87,
+                                                                    ),
                                                                   ),
+                                                                  const SizedBox(
+                                                                      height:
+                                                                          2),
+                                                                  Text(
+                                                                    formatMonthlyAgendaSubtitle(
+                                                                      appointment,
+                                                                    ),
+                                                                    maxLines: 1,
+                                                                    overflow:
+                                                                        TextOverflow
+                                                                            .ellipsis,
+                                                                    style:
+                                                                        TextStyle(
+                                                                      fontSize:
+                                                                          10,
+                                                                      height:
+                                                                          1.0,
+                                                                      color: Colors
+                                                                          .grey
+                                                                          .shade700,
+                                                                    ),
+                                                                  ),
+                                                                ],
+                                                              ),
                                                             ),
+                                                          );
+                                                        }
+                                                        final maxAppointmentLines =
+                                                            appointment.isAllDay
+                                                                ? 1
+                                                                : 3;
+                                                        final isClassAppointment =
+                                                            appointment.notes ==
+                                                                ScheduleAppointmentMeta
+                                                                    .typeClass;
+                                                        final isTaskAppointment =
+                                                            appointment.notes ==
+                                                                ScheduleAppointmentMeta
+                                                                    .typeTask;
+
+                                                        final isDisabled =
+                                                            isAcademicBreakOnVisibleDay;
+
+                                                        return Listener(
+                                                          behavior:
+                                                              HitTestBehavior
+                                                                  .translucent,
+                                                          onPointerDown:
+                                                              (event) {
+                                                            _lastPointerGlobalPosition =
+                                                                event.position;
+                                                          },
+                                                          child: Container(
+                                                            padding:
+                                                                const EdgeInsets
+                                                                    .all(3),
+                                                            alignment: Alignment
+                                                                .center,
+                                                            decoration:
+                                                                BoxDecoration(
+                                                              color: appointment
+                                                                  .color
+                                                                  .withValues(
+                                                                      alpha:
+                                                                          0.26),
+                                                              borderRadius:
+                                                                  BorderRadius
+                                                                      .circular(
+                                                                          6),
+                                                            ),
+                                                            child:
+                                                                isClassAppointment
+                                                                    ? Opacity(
+                                                                        opacity: isDisabled
+                                                                            ? 0.35
+                                                                            : 1.0,
+                                                                        child:
+                                                                            ScheduleClassAppointmentText(
+                                                                          subject:
+                                                                              appointment.subject,
+                                                                          textColor:
+                                                                              appointment.color,
+                                                                          maxLines:
+                                                                              maxAppointmentLines,
+                                                                        ),
+                                                                      )
+                                                                    : Text(
+                                                                        appointment
+                                                                            .subject,
+                                                                        maxLines:
+                                                                            isTaskAppointment
+                                                                                ? 1
+                                                                                : maxAppointmentLines,
+                                                                        textAlign:
+                                                                            TextAlign.center,
+                                                                        overflow:
+                                                                            TextOverflow.ellipsis,
+                                                                        style: Theme.of(context)
+                                                                            .textTheme
+                                                                            .bodySmall
+                                                                            ?.copyWith(
+                                                                              color: appPrimarySwatch.shade900,
+                                                                            ),
+                                                                      ),
+                                                          ),
+                                                        );
+                                                      },
+                                                      onTap: (details) async {
+                                                        // In monthly view, don't open details when tapping
+                                                        // the grid/date cells. Only event blocks are tappable.
+                                                        if (_showMonthly &&
+                                                            details.targetElement ==
+                                                                CalendarElement
+                                                                    .calendarCell) {
+                                                          return;
+                                                        }
+                                                        final rawAppointments =
+                                                            details
+                                                                .appointments;
+                                                        if (rawAppointments ==
+                                                                null ||
+                                                            rawAppointments
+                                                                .isEmpty ||
+                                                            !mounted) {
+                                                          return;
+                                                        }
+
+                                                        final appointments =
+                                                            rawAppointments
+                                                                .whereType<
+                                                                    Appointment>()
+                                                                .toList(
+                                                                    growable:
+                                                                        false);
+                                                        if (appointments
+                                                            .isEmpty) return;
+
+                                                        // If a task block is tapped, navigate
+                                                        // directly to task details.
+                                                        for (final appt
+                                                            in appointments) {
+                                                          final meta = appt.id;
+                                                          if (meta
+                                                                  is ScheduleAppointmentMeta &&
+                                                              meta.type ==
+                                                                  ScheduleAppointmentMeta
+                                                                      .typeTask &&
+                                                              meta.taskId !=
+                                                                  null) {
+                                                            final task =
+                                                                taskById[meta
+                                                                    .taskId];
+                                                            if (task != null) {
+                                                              Navigator
+                                                                  .pushNamed(
+                                                                context,
+                                                                AppRoutes
+                                                                    .taskDetail,
+                                                                arguments: task,
+                                                              );
+                                                            }
+                                                            return;
+                                                          }
+                                                        }
+
+                                                        // During academic breaks, prevent interaction
+                                                        // with class appointments.
+                                                        final allAreClasses =
+                                                            appointments.every(
+                                                          (appt) => (appt
+                                                                  .notes ==
+                                                              ScheduleAppointmentMeta
+                                                                  .typeClass),
+                                                        );
+                                                        if (isAcademicBreakOnVisibleDay &&
+                                                            allAreClasses) {
+                                                          return;
+                                                        }
+
+                                                        if (appointments
+                                                                    .length ==
+                                                                1 &&
+                                                            isOverflowAppointment(
+                                                              appointments
+                                                                  .first,
+                                                            )) {
+                                                          await _showOverflowPicker(
+                                                            appointments.first,
+                                                            selectedTerm:
+                                                                selectedTerm,
+                                                          );
+                                                          return;
+                                                        }
+
+                                                        final detailAppointments =
+                                                            expandAppointmentsForDetails(
+                                                                appointments);
+                                                        if (detailAppointments
+                                                            .isEmpty) return;
+                                                        _showAppointmentsBottomSheet(
+                                                          detailAppointments,
+                                                          selectedTerm:
+                                                              selectedTerm,
+                                                        );
+                                                      },
                                                     ),
-                                                  );
-                                                },
-                                                onTap: (details) async {
-                                                  // In monthly view, don't open details when tapping
-                                                  // the grid/date cells. Only event blocks are tappable.
-                                                  if (_showMonthly &&
-                                                      details.targetElement ==
-                                                          CalendarElement
-                                                              .calendarCell) {
-                                                    return;
-                                                  }
-                                                  final rawAppointments =
-                                                      details.appointments;
-                                                  if (rawAppointments == null ||
-                                                      rawAppointments.isEmpty ||
-                                                      !mounted) {
-                                                    return;
-                                                  }
-
-                                                  final appointments =
-                                                      rawAppointments
-                                                          .whereType<
-                                                              Appointment>()
-                                                          .toList(
-                                                              growable: false);
-                                                  if (appointments.isEmpty)
-                                                    return;
-
-                                                  // During academic breaks, prevent interaction
-                                                  // with class appointments.
-                                                  final allAreClasses =
-                                                      appointments.every(
-                                                    (appt) => (appt.notes ==
-                                                        ScheduleAppointmentMeta
-                                                            .typeClass),
-                                                  );
-                                                  if (isAcademicBreakOnVisibleDay &&
-                                                      allAreClasses) {
-                                                    return;
-                                                  }
-
-                                                  if (appointments.length ==
-                                                          1 &&
-                                                      isOverflowAppointment(
-                                                        appointments.first,
-                                                      )) {
-                                                    await _showOverflowPicker(
-                                                      appointments.first,
-                                                      selectedTerm:
-                                                          selectedTerm,
-                                                    );
-                                                    return;
-                                                  }
-
-                                                  final detailAppointments =
-                                                      expandAppointmentsForDetails(
-                                                          appointments);
-                                                  if (detailAppointments
-                                                      .isEmpty) return;
-                                                  _showAppointmentsBottomSheet(
-                                                    detailAppointments,
-                                                    selectedTerm: selectedTerm,
-                                                  );
-                                                },
+                                                  ),
+                                                ],
                                               ),
                                             ),
-                                          ],
+                                          ),
                                         ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              );
-                            },
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              );
-            },
-          );
-        },
-      ),
-    );
+                                      ],
+                                    );
+                                  },
+                                );
+                              },
+                            );
+                          },
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            );
+          },
+        ));
   }
 
   void _showAppointmentsBottomSheet(
@@ -888,9 +1008,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       endTime: formatTime12h(appointment.endTime),
       mode: (fullMeta.mode ?? 'Online').trim(),
       classType: classType,
-      venue: (fullMeta.venue ?? '').trim().isEmpty
-          ? null
-          : fullMeta.venue?.trim(),
+      venue:
+          (fullMeta.venue ?? '').trim().isEmpty ? null : fullMeta.venue?.trim(),
     );
   }
 

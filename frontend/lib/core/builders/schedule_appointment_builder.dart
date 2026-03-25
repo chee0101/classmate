@@ -524,12 +524,14 @@ class ScheduleAppointmentMeta {
     this.classSourceStartMinutes,
     this.classSourceEndMinutes,
     this.classType,
+    this.taskId,
   });
 
   static const String typeClass = 'class';
   static const String typeEvent = 'event';
   static const String typeEventOverflow = 'event-overflow';
   static const String typeDenseOverflow = 'dense-overflow';
+  static const String typeTask = 'task';
 
   final String type;
   final List<AcademicEvent> events;
@@ -545,6 +547,7 @@ class ScheduleAppointmentMeta {
   final int? classSourceStartMinutes;
   final int? classSourceEndMinutes;
   final String? classType;
+  final String? taskId;
 }
 
 enum ScheduleContentFilter {
