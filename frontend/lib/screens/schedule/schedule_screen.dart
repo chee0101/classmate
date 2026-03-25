@@ -30,7 +30,6 @@ import '../../core/widgets/schedule/schedule_class_appointment_text.dart';
 import '../../core/widgets/schedule/schedule_overflow_popup_menu.dart';
 import '../../core/widgets/schedule/schedule_appointments_bottom_sheet.dart';
 import 'schedule_class_editor_screen.dart';
-import '../../core/utils/event_time_utils.dart';
 import '../../core/utils/schedule_event_appointment_actions.dart';
 import '../../core/utils/schedule_week_utils.dart';
 
@@ -167,19 +166,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                   .toList(growable: false);
 
                               AcademicEvent? academicBreakEvent;
-                              final hideClassEvents = <AcademicEvent>[];
                               for (final event in eventsOnVisibleDay) {
                                 if (event.isAcademicBreak) {
                                   academicBreakEvent = event;
-                                } else if (event.hideClassesDuringEvent) {
-                                  hideClassEvents.add(event);
                                 }
                               }
                               final isAcademicBreakOnVisibleDay =
                                   academicBreakEvent != null;
-                              final hasHideClassEventsOnVisibleDay =
-                                  !isAcademicBreakOnVisibleDay &&
-                                      hideClassEvents.isNotEmpty;
                               final selectedClassSlotIds = filteredEntries
                                   .expand((entry) => entry.slots
                                       .map((slot) => slot.classSlotId))
@@ -462,21 +455,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                                           ScheduleAppointmentMeta
                                                               .typeClass;
 
-                                                  final isDisabledDueToHideEvent =
-                                                      !isAcademicBreakOnVisibleDay &&
-                                                          hasHideClassEventsOnVisibleDay &&
-                                                          isClassAppointment &&
-                                                          isFullyCoveredByAnyEvent(
-                                                            innerStart:
-                                                                appointment
-                                                                    .startTime,
-                                                            innerEnd:
-                                                                appointment.endTime,
-                                                            events: hideClassEvents,
-                                                          );
-
-                                                  final isDisabled = isAcademicBreakOnVisibleDay ||
-                                                      isDisabledDueToHideEvent;
+                                                  final isDisabled =
+                                                      isAcademicBreakOnVisibleDay;
 
                                                   return Listener(
                                                     behavior: HitTestBehavior
@@ -577,25 +557,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                                   if (isAcademicBreakOnVisibleDay &&
                                                       allAreClasses) {
                                                     return;
-                                                  }
-
-                                                  // During user "hide classes" events, disable
-                                                  // interaction with class blocks (keep them visible).
-                                                  if (!isAcademicBreakOnVisibleDay &&
-                                                      hasHideClassEventsOnVisibleDay &&
-                                                      allAreClasses) {
-                                                    final allAreDisabled =
-                                                        appointments.every(
-                                                      (appt) =>
-                                                          isFullyCoveredByAnyEvent(
-                                                        innerStart:
-                                                            appt.startTime,
-                                                        innerEnd: appt.endTime,
-                                                        events: hideClassEvents,
-                                                      ),
-                                                    );
-
-                                                    if (allAreDisabled) return;
                                                   }
 
                                                   if (appointments.length ==

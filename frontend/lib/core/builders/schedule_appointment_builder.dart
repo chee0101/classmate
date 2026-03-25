@@ -10,6 +10,7 @@ import '../models/course.dart';
 import '../models/timetable_entry.dart';
 import '../utils/course_display.dart';
 import '../utils/date_time_format.dart';
+import '../utils/event_time_utils.dart';
 import '../utils/term_windows.dart';
 
 /// Converts timetable entries + academic events into calendar appointments.
@@ -94,6 +95,25 @@ class ScheduleAppointmentBuilder {
             effectiveEndMinutes % 60,
           );
           if (!end.isAfter(start)) continue;
+
+          final hideClassEventsForSlot = events
+              .where(
+                (e) =>
+                    e.hideClassesDuringEvent &&
+                    !e.isAcademicBreak &&
+                    e.sessionId == slot.sessionId &&
+                    e.termId == slot.termId,
+              )
+              .toList(growable: false);
+          if (hideClassEventsForSlot.isNotEmpty &&
+              isFullyCoveredByAnyEvent(
+                innerStart: start,
+                innerEnd: end,
+                events: hideClassEventsForSlot,
+              )) {
+            continue;
+          }
+
           final modeLower = effectiveMode.toLowerCase();
           final venueLabel = modeLower == 'online'
               ? 'Online'

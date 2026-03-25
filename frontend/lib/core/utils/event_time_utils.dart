@@ -66,14 +66,28 @@ bool isFullyWithinDateTimeRange(
   return !innerStart.isBefore(outerStart) && !innerEnd.isAfter(outerEnd);
 }
 
+DateTime _calendarDay(DateTime d) => DateTime(d.year, d.month, d.day);
+
 /// True when the given DateTime range is fully covered by any event in [events].
+///
+/// For [AcademicEvent.allDay] events, only classes whose **calendar day** falls
+/// within the event's start/end day range are covered (so one all-day block does
+/// not hide classes on every other day in the term).
 bool isFullyCoveredByAnyEvent({
   required DateTime innerStart,
   required DateTime innerEnd,
   required List<AcademicEvent> events,
 }) {
   for (final event in events) {
-    if (event.allDay) return true;
+    if (event.allDay) {
+      final innerDay = _calendarDay(innerStart);
+      final firstDay = _calendarDay(event.startDateTime);
+      final lastDay = _calendarDay(event.endDateTime);
+      if (innerDay.isBefore(firstDay) || innerDay.isAfter(lastDay)) {
+        continue;
+      }
+      return true;
+    }
     if (isFullyWithinDateTimeRange(
       innerStart,
       innerEnd,

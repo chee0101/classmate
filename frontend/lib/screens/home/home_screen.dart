@@ -283,6 +283,47 @@ class _HomeScreenState extends State<HomeScreen> {
                                       .toList(growable: false)
                                     ..sort(_compareTodayScheduleItems);
 
+                                  final hideClassEventsForToday = events
+                                      .where(
+                                        (e) =>
+                                            e.sessionId ==
+                                                selectedSession.id &&
+                                            e.termId == selectedTerm.id &&
+                                            e.hideClassesDuringEvent &&
+                                            !e.isAcademicBreak &&
+                                            !e.endDateTime
+                                                .isBefore(todayStart) &&
+                                            !e.startDateTime
+                                                .isAfter(todayEnd),
+                                      )
+                                      .toList(growable: false);
+                                  final todayClassItemsVisible =
+                                      todayClassItems
+                                          .where(
+                                            (classItem) {
+                                              final innerStart = today.add(
+                                                Duration(
+                                                  minutes:
+                                                      classItem.startMinutes,
+                                                ),
+                                              );
+                                              final innerEnd = today.add(
+                                                Duration(
+                                                  minutes:
+                                                      classItem.endMinutes,
+                                                ),
+                                              );
+                                              return !isFullyCoveredByAnyEvent(
+                                                innerStart: innerStart,
+                                                innerEnd: innerEnd,
+                                                events:
+                                                    hideClassEventsForToday,
+                                              );
+                                            },
+                                          )
+                                          .toList(growable: false)
+                                        ..sort(_compareTodayScheduleItems);
+
                                   // -----------------------------
                                   // 2) Today's event items
                                   // -----------------------------
@@ -511,7 +552,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                     );
                                   }
 
-                                  final scheduleClassItems = todayClassItems
+                                  final scheduleClassItems =
+                                      todayClassItemsVisible
                                       .map((classItem) {
                                     final overlappingEvents =
                                         nonAcademicEventItems.where((e) {
