@@ -25,6 +25,7 @@ import '../../core/models/session_term_ref.dart';
 import '../../core/utils/day_bounds_utils.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
 import '../../core/widgets/common/empty_state_card.dart';
+import '../../core/widgets/home/insight_card.dart';
 import '../../core/widgets/home/session_header.dart';
 import '../../core/widgets/home/today_schedule_card.dart';
 import '../../core/widgets/home/upcoming_events_card.dart';
@@ -389,6 +390,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                               crossAxisAlignment:
                                                   CrossAxisAlignment.start,
                                               children: [
+                                                InsightCard(
+                                                  selectedTerm: selectedTerm,
+                                                  events: events,
+                                                  selectedSessionId:
+                                                      selectedSession.id,
+                                                ),
                                                 TodayScheduleCard(
                                                   items: const [],
                                                   academicBreakTitle:
@@ -453,6 +460,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                               crossAxisAlignment:
                                                   CrossAxisAlignment.start,
                                               children: [
+                                                InsightCard(
+                                                  selectedTerm: selectedTerm,
+                                                  events: events,
+                                                  selectedSessionId:
+                                                      selectedSession.id,
+                                                ),
                                                 TodayScheduleCard(
                                                   items: scheduleItems,
                                                   academicBreakTitle:
@@ -559,6 +572,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                             crossAxisAlignment:
                                                 CrossAxisAlignment.start,
                                             children: [
+                                              InsightCard(
+                                                selectedTerm: selectedTerm,
+                                                events: events,
+                                                selectedSessionId:
+                                                    selectedSession.id,
+                                              ),
                                               TodayScheduleCard(
                                                 items: scheduleItems,
                                                 academicBreakTitle: null,
