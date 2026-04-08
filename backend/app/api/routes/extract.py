@@ -30,12 +30,33 @@ async def _read_upload(file: UploadFile) -> RawDocument:
     )
 
 
+async def _read_uploads(
+    file: UploadFile | None,
+    files: list[UploadFile] | None,
+) -> list[RawDocument]:
+    upload_list: list[UploadFile] = []
+    if file is not None:
+        upload_list.append(file)
+    if files:
+        upload_list.extend(files)
+    if not upload_list:
+        raise HTTPException(status_code=400, detail="No file uploaded")
+    return [await _read_upload(f) for f in upload_list]
+
+
 @router.post("/extract/academic-calendar", response_model=AcademicExtractionEnvelope)
 async def extract_academic_calendar(
-    file: UploadFile = File(..., description="PDF, DOCX, or image (per Docling support)"),
+    file: UploadFile | None = File(
+        None,
+        description="Single PDF/DOCX/image upload (backward compatible).",
+    ),
+    files: list[UploadFile] | None = File(
+        None,
+        description="Multiple screenshots/images/PDFs in order.",
+    ),
 ) -> AcademicExtractionEnvelope:
-    doc = await _read_upload(file)
-    return await run_academic_calendar_pipeline(doc)
+    docs = await _read_uploads(file, files)
+    return await run_academic_calendar_pipeline(docs)
 
 
 @router.post("/extract/timetable", response_model=ExtractionEnvelope)

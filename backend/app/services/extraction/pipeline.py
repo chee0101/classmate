@@ -31,9 +31,34 @@ async def _docling_to_markdown(doc: RawDocument) -> tuple[str, list[str], dict[s
         return "", warnings, timing_ms
 
 
-async def run_academic_calendar_pipeline(doc: RawDocument) -> AcademicExtractionEnvelope:
+async def _doclings_to_markdown(
+    docs: list[RawDocument],
+) -> tuple[str, str, list[str], dict[str, float]]:
     warnings: list[str] = []
-    markdown, conv_warnings, timing_ms = await _docling_to_markdown(doc)
+    timing_ms: dict[str, float] = {}
+    chunks: list[str] = []
+    source_names: list[str] = []
+    total_docling_ms = 0.0
+
+    for idx, doc in enumerate(docs):
+        markdown, conv_warnings, per_timing = await _docling_to_markdown(doc)
+        warnings.extend(conv_warnings)
+        total_docling_ms += per_timing.get("docling_ms", 0.0)
+        source_names.append(doc.filename)
+        if markdown.strip():
+            # Keep page/screenshot boundaries explicit for downstream parsing/debug.
+            chunks.append(f"--- source {idx + 1}: {doc.filename} ---\n{markdown.strip()}")
+
+    timing_ms["docling_ms"] = total_docling_ms
+    timing_ms["input_count"] = float(len(docs))
+    return "\n\n".join(chunks).strip(), ", ".join(source_names), warnings, timing_ms
+
+
+async def run_academic_calendar_pipeline(
+    docs: list[RawDocument],
+) -> AcademicExtractionEnvelope:
+    warnings: list[str] = []
+    markdown, source_filename, conv_warnings, timing_ms = await _doclings_to_markdown(docs)
     warnings.extend(conv_warnings)
     if not markdown:
         extraction = ExtractionResult(
@@ -42,7 +67,7 @@ async def run_academic_calendar_pipeline(doc: RawDocument) -> AcademicExtraction
             notes="Docling conversion failed.",
         )
         return AcademicExtractionEnvelope(
-            source_filename=doc.filename,
+            source_filename=source_filename,
             markdown_from_docling="",
             extraction=AcademicExtractionResult(
                 confidence=extraction.confidence,
@@ -61,7 +86,7 @@ async def run_academic_calendar_pipeline(doc: RawDocument) -> AcademicExtraction
     t_parse0 = time.perf_counter()
     extraction, parse_timing = await classify_and_extract(
         markdown,
-        doc.filename,
+        source_filename,
         gemini_text_bundle=gemini_text_bundle,
     )
     timing_ms["calendar_parse_ms"] = (time.perf_counter() - t_parse0) * 1000.0
@@ -70,7 +95,7 @@ async def run_academic_calendar_pipeline(doc: RawDocument) -> AcademicExtraction
         warnings.append("Could not classify/extract document type.")
 
     return AcademicExtractionEnvelope(
-        source_filename=doc.filename,
+        source_filename=source_filename,
         markdown_from_docling=markdown,
         sliced_text_for_gemini=sliced_text_for_gemini,
         remark_text_for_gemini=remark_text_for_gemini,

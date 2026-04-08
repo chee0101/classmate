@@ -121,16 +121,64 @@ def _prefilter_remark_snippets(text: str) -> str:
     if not text or not text.strip():
         return text
 
-    t = text.replace("，", ",")
+    def _norm_key(s: str) -> str:
+        return re.sub(r"[^a-z0-9.]+", "", s.lower())
 
-    # Match "dd.mm.yyyy," and the multi-date variants used in the calendar:
+    def _dedupe_markdown_table_rows(src: str) -> str:
+        """
+        OCR table output can repeat the same REMARKS cell many times per row.
+        Collapse duplicate cells row-wise before snippet extraction.
+        """
+        out_lines: list[str] = []
+        for raw_ln in src.splitlines():
+            ln = raw_ln.strip()
+            if "|" not in ln:
+                out_lines.append(raw_ln)
+                continue
+
+            cells = [c.strip() for c in raw_ln.split("|")]
+            uniq_cells: list[str] = []
+            seen: set[str] = set()
+            for c in cells:
+                if not c:
+                    continue
+                k = _norm_key(c)
+                if not k or k in seen:
+                    continue
+                seen.add(k)
+                uniq_cells.append(c)
+
+            if not uniq_cells:
+                continue
+            out_lines.append(" | ".join(uniq_cells))
+        return "\n".join(out_lines)
+
+    text = _dedupe_markdown_table_rows(text)
+
+    t = text.replace("，", ",")
+    # OCR normalization for screenshot inputs:
+    # - unify fullwidth punctuation
+    # - normalize dash variants
+    # - insert whitespace around separators for easier regex matching
+    t = t.replace("（", "(").replace("）", ")")
+    t = t.replace("—", "-").replace("–", "-")
+    # Separate glued date tokens: e.g. 26.10.202520.10.2025 -> 26.10.2025 20.10.2025
+    t = re.sub(r"(?<=\d{4})(?=\d{1,2}\.\d{2}\.\d{4})", " ", t)
+    # Separate weekday/title glue after date comma segments.
+    t = re.sub(r"(,\s*[A-Za-z]{3,12})([A-Z][a-z])", r"\1 \2", t)
+    t = re.sub(r"(?<=\d)-(?=[A-Za-z])", " - ", t)
+    t = re.sub(r"(?<=[A-Za-z])-(?=\d)", " - ", t)
+    t = re.sub(r"\s*&\s*", " & ", t)
+
+    # Match date-like starts for remark chunks, including OCR-noisy variants:
     # - 17 & 18.02.2026,
     # - 21.03.2026 & 22.03.2026,
     # - 25.12.2025,
+    # - 29&30.09.2026,
     start_re = re.compile(
-        r"(?P<pair_day_full>(?P<d0>\d{1,2})\s*&\s*(?P<d1p>\d{1,2}\.\d{2}\.\d{4})\s*,)"
-        r"|(?P<pair_full_full>(?P<d0full>\d{1,2}\.\d{2}\.\d{4})\s*&\s*(?P<d1full>\d{1,2}\.\d{2}\.\d{4})\s*,)"
-        r"|(?P<full>\d{1,2}\.\d{2}\.\d{4}\s*,)",
+        r"(?P<pair_day_full>(?P<d0>\d{1,2})\s*&\s*(?P<d1p>\d{1,2}\.\d{2}\.\d{4})(?:\s*,|\s+))"
+        r"|(?P<pair_full_full>(?P<d0full>\d{1,2}\.\d{2}\.\d{4})\s*&\s*(?P<d1full>\d{1,2}\.\d{2}\.\d{4})(?:\s*,|\s+))"
+        r"|(?P<full>\d{1,2}\.\d{2}\.\d{4}(?:\s*,|\s+))",
         flags=re.IGNORECASE,
     )
 
@@ -139,19 +187,53 @@ def _prefilter_remark_snippets(text: str) -> str:
 
     matches = list(start_re.finditer(flat))
     if not matches:
-        # Fallback: keep only lines that look like remarks.
+        # Fallback: keep only lines that look like remark text.
         lines = [ln.strip() for ln in t.splitlines() if ln.strip()]
-        keep = [ln for ln in lines if ("," in ln and " - " in ln and _contains_date_token(ln))]
+        keep = [
+            ln
+            for ln in lines
+            if _contains_date_token(ln)
+            and (" - " in ln or "-" in ln or " & " in ln)
+            and any(ch.isalpha() for ch in ln)
+        ]
         return "\n".join(keep).strip()
 
     snippets: list[str] = []
+    seen_keys: set[str] = set()
+
+    def _compact_chunk(chunk: str) -> str:
+        # Remove markdown table noise and repeated column fragments.
+        parts = [p.strip() for p in chunk.split("|") if p.strip()]
+        out: list[str] = []
+        local_seen: set[str] = set()
+        for p in parts:
+            p_norm = re.sub(r"\s+", " ", p).strip()
+            if not p_norm:
+                continue
+            key = re.sub(r"[^a-z0-9.]+", "", p_norm.lower())
+            if not key or key in local_seen:
+                continue
+            local_seen.add(key)
+            out.append(p_norm)
+        if out:
+            return " | ".join(out)
+        return re.sub(r"\s+", " ", chunk).strip()
+
     for i, m in enumerate(matches):
         s = m.start()
         e = matches[i + 1].start() if i + 1 < len(matches) else len(flat)
-        chunk = flat[s:e].strip()
-        # Keep only chunks that look like "<date>, <weekday> - <title>"
-        if " - " not in chunk:
+        chunk = _compact_chunk(flat[s:e].strip())
+        # Keep chunks that contain a date and title separator in OCR/noisy forms.
+        if not _contains_date_token(chunk):
             continue
+        if " - " not in chunk and "-" not in chunk:
+            continue
+        if not any(ch.isalpha() for ch in chunk):
+            continue
+        dedupe_key = re.sub(r"[^a-z0-9.]+", "", chunk.lower())
+        if not dedupe_key or dedupe_key in seen_keys:
+            continue
+        seen_keys.add(dedupe_key)
         snippets.append(chunk)
 
     return "\n".join(snippets).strip()
@@ -207,6 +289,11 @@ async def extract_holidays_with_gemini(
         "\n"
         "Rules:\n"
         "- Do NOT include dates or weekdays in the title.\n"
+        "- You MAY infer and repair OCR noise/typos if obvious from context (weekday misspellings like 'saturday' instead of 'Saturday',\n"
+        "  glued words, missing separators/spaces).\n"
+        "- You MAY add suitable spacing in event titles when text is glued (e.g. 'ChristmasDay' -> 'Christmas Day',\n"
+        "  'ReplacementleaveforEid al-Fitr' -> 'Replacement leave for Eid al-Fitr').\n"
+        "- Keep the original event meaning; do not translate or paraphrase to a different term.\n"
         "- If multiple dates exist (e.g. '17 & 18.02.2026' or '21.03.2026&22.03.2026'),\n"
         "  convert to a date range using earliest as start_date and latest as end_date.\n"
         "- If single-day event, start_date == end_date.\n"
