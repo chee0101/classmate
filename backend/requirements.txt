@@ -1,0 +1,12 @@
+# Web
+fastapi>=0.115.0,<1.0.0
+uvicorn[standard]>=0.32.0,<1.0.0
+python-multipart>=0.0.12,<1.0.0
+
+# Config & validation
+pydantic>=2.10.0,<3.0.0
+pydantic-settings>=2.6.0,<3.0.0
+
+# Optional later: docling, openai, firebase-admin
+docling
+google-genai
