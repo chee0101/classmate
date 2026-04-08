@@ -1,9 +1,10 @@
-"""Orchestrates Docling markdown → calendar/timetable extraction."""
+"""Orchestrates dedicated extraction pipelines by document type."""
 
 from __future__ import annotations
 
 import time
 
+from app.schemas.extraction import AcademicExtractionEnvelope, AcademicExtractionResult
 from app.schemas.extraction import DocumentKind, ExtractionEnvelope
 from app.schemas.extraction import ExtractionResult
 from app.services.extraction.calendar_parser import classify_and_extract
@@ -17,27 +18,37 @@ from app.services.extraction.docling_service import (
 )
 
 
-async def run_document_pipeline(doc: RawDocument) -> ExtractionEnvelope:
+async def _docling_to_markdown(doc: RawDocument) -> tuple[str, list[str], dict[str, float]]:
     warnings: list[str] = []
-    markdown: str
     timing_ms: dict[str, float] = {}
     try:
         t0 = time.perf_counter()
         outputs = await document_to_outputs(doc)
         timing_ms["docling_ms"] = (time.perf_counter() - t0) * 1000.0
-        markdown = outputs.markdown
+        return outputs.markdown, warnings, timing_ms
     except Exception as e:
         warnings.append(f"Docling conversion failed: {type(e).__name__}: {e}")
+        return "", warnings, timing_ms
+
+
+async def run_academic_calendar_pipeline(doc: RawDocument) -> AcademicExtractionEnvelope:
+    warnings: list[str] = []
+    markdown, conv_warnings, timing_ms = await _docling_to_markdown(doc)
+    warnings.extend(conv_warnings)
+    if not markdown:
         extraction = ExtractionResult(
             kind=DocumentKind.unknown,
             confidence=0.0,
             notes="Docling conversion failed.",
         )
-        return ExtractionEnvelope(
-            document_kind=DocumentKind.unknown,
+        return AcademicExtractionEnvelope(
             source_filename=doc.filename,
             markdown_from_docling="",
-            extraction=extraction,
+            extraction=AcademicExtractionResult(
+                confidence=extraction.confidence,
+                academic_session=extraction.academic_session,
+                notes=extraction.notes,
+            ),
             warnings=warnings,
             timing_ms=timing_ms,
         )
@@ -58,12 +69,51 @@ async def run_document_pipeline(doc: RawDocument) -> ExtractionEnvelope:
     if extraction.kind == DocumentKind.unknown:
         warnings.append("Could not classify/extract document type.")
 
-    return ExtractionEnvelope(
-        document_kind=extraction.kind,
+    return AcademicExtractionEnvelope(
         source_filename=doc.filename,
         markdown_from_docling=markdown,
         sliced_text_for_gemini=sliced_text_for_gemini,
         remark_text_for_gemini=remark_text_for_gemini,
+        extraction=AcademicExtractionResult(
+            confidence=extraction.confidence,
+            academic_session=extraction.academic_session,
+            notes=extraction.notes,
+        ),
+        warnings=warnings,
+        timing_ms=timing_ms,
+    )
+
+
+async def run_timetable_pipeline(doc: RawDocument) -> ExtractionEnvelope:
+    markdown, warnings, timing_ms = await _docling_to_markdown(doc)
+    extraction = ExtractionResult(
+        kind=DocumentKind.unknown,
+        confidence=0.0,
+        notes="Timetable extraction pipeline is not implemented yet.",
+    )
+    warnings.append("Timetable extraction is not implemented yet.")
+    return ExtractionEnvelope(
+        document_kind=DocumentKind.unknown,
+        source_filename=doc.filename,
+        markdown_from_docling=markdown,
+        extraction=extraction,
+        warnings=warnings,
+        timing_ms=timing_ms,
+    )
+
+
+async def run_task_pipeline(doc: RawDocument) -> ExtractionEnvelope:
+    markdown, warnings, timing_ms = await _docling_to_markdown(doc)
+    extraction = ExtractionResult(
+        kind=DocumentKind.unknown,
+        confidence=0.0,
+        notes="Task extraction pipeline is not implemented yet.",
+    )
+    warnings.append("Task extraction is not implemented yet.")
+    return ExtractionEnvelope(
+        document_kind=DocumentKind.unknown,
+        source_filename=doc.filename,
+        markdown_from_docling=markdown,
         extraction=extraction,
         warnings=warnings,
         timing_ms=timing_ms,

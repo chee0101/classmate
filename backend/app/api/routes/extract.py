@@ -1,21 +1,18 @@
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.core.config import get_settings
-from app.schemas.extraction import ExtractionEnvelope
-from app.services.extraction import RawDocument, run_document_pipeline
+from app.schemas.extraction import AcademicExtractionEnvelope, ExtractionEnvelope
+from app.services.extraction import (
+    RawDocument,
+    run_academic_calendar_pipeline,
+    run_task_pipeline,
+    run_timetable_pipeline,
+)
 
 router = APIRouter()
 
 
-@router.post("/extract", response_model=ExtractionEnvelope)
-async def extract_document(
-    file: UploadFile = File(..., description="PDF, DOCX, or image (per Docling support)"),
-) -> ExtractionEnvelope:
-    """
-    Upload a document; receive Docling markdown (when wired) + structured extraction stub.
-
-    Next steps: Firebase Auth verification, session/term hints as query params, course list for resolution.
-    """
+async def _read_upload(file: UploadFile) -> RawDocument:
     settings = get_settings()
     data = await file.read()
     if len(data) > settings.max_upload_bytes:
@@ -26,9 +23,32 @@ async def extract_document(
     if not data:
         raise HTTPException(status_code=400, detail="Empty file")
 
-    doc = RawDocument(
+    return RawDocument(
         filename=file.filename or "upload",
         content_type=file.content_type,
         data=data,
     )
-    return await run_document_pipeline(doc)
+
+
+@router.post("/extract/academic-calendar", response_model=AcademicExtractionEnvelope)
+async def extract_academic_calendar(
+    file: UploadFile = File(..., description="PDF, DOCX, or image (per Docling support)"),
+) -> AcademicExtractionEnvelope:
+    doc = await _read_upload(file)
+    return await run_academic_calendar_pipeline(doc)
+
+
+@router.post("/extract/timetable", response_model=ExtractionEnvelope)
+async def extract_timetable(
+    file: UploadFile = File(..., description="PDF, DOCX, or image (per Docling support)"),
+) -> ExtractionEnvelope:
+    doc = await _read_upload(file)
+    return await run_timetable_pipeline(doc)
+
+
+@router.post("/extract/task", response_model=ExtractionEnvelope)
+async def extract_task(
+    file: UploadFile = File(..., description="PDF, DOCX, or image (per Docling support)"),
+) -> ExtractionEnvelope:
+    doc = await _read_upload(file)
+    return await run_task_pipeline(doc)

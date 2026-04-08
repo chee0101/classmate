@@ -109,3 +109,22 @@ class ExtractionEnvelope(BaseModel):
         default_factory=dict,
         description="Rough stage timings in milliseconds (docling, parse, gemini, etc.)",
     )
+
+
+class AcademicExtractionResult(BaseModel):
+    confidence: float = Field(ge=0.0, le=1.0, default=0.0)
+    academic_session: AcademicSessionExtract | None = None
+    notes: str | None = Field(None, description="Model caveats or missing fields")
+
+
+class AcademicExtractionEnvelope(BaseModel):
+    source_filename: str
+    markdown_from_docling: str = ""
+    sliced_text_for_gemini: str = ""
+    remark_text_for_gemini: str = ""
+    extraction: AcademicExtractionResult | None = None
+    warnings: list[str] = Field(default_factory=list)
+    timing_ms: dict[str, float] = Field(
+        default_factory=dict,
+        description="Rough stage timings in milliseconds (docling, parse, gemini, etc.)",
+    )

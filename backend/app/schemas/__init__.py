@@ -1,4 +1,6 @@
 from app.schemas.extraction import (
+    AcademicExtractionEnvelope,
+    AcademicExtractionResult,
     AcademicSessionExtract,
     AcademicEventExtract,
     AssignmentExtract,
@@ -13,6 +15,8 @@ from app.schemas.extraction import (
 __all__ = [
     "AcademicSessionExtract",
     "AcademicEventExtract",
+    "AcademicExtractionEnvelope",
+    "AcademicExtractionResult",
     "AssignmentExtract",
     "ClassSlotExtract",
     "DocumentKind",
