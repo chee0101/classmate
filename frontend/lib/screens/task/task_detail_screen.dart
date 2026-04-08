@@ -50,6 +50,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
   void _syncFromStore({bool notify = true}) {
     final allTasks = tasksNotifier.value;
+    // Always render parent task details when opened from a subtask context.
+    if (_task.parentTaskId != null) {
+      final parentTask = allTasks.where((task) => task.id == _task.parentTaskId);
+      if (parentTask.isNotEmpty) {
+        _task = parentTask.first;
+      }
+    }
     final matchedTask = allTasks.where((task) => task.id == _task.id);
     if (matchedTask.isNotEmpty) {
       _task = matchedTask.first;
@@ -117,7 +124,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
 
             // Sub Tasks section
             _buildSubtasksSection(textTheme, colorScheme),
-            const SizedBox(height: AppSpacing.xl),
+            const SizedBox(height: AppSpacing.md),
 
             // Mark as completed button
             SizedBox(
@@ -186,12 +193,14 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           children: [
             Text(
               'Sub Tasks',
-              style: textTheme.headlineMedium,
+              style: textTheme.titleMedium,
             ),
             if (_subtasks.isNotEmpty)
               TextButton(
                 onPressed: () async => _handleMarkAllSubtasksCompleted(),
-                child: const Text('Mark all as completed'),
+                child: Text('Mark all as completed', style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                )),
               ),
           ],
         ),

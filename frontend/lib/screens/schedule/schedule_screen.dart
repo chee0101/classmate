@@ -212,9 +212,23 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                           isInTerm(t.dueDateTime, selectedTerm),
                                     )
                                         .map((t) {
-                                      final start = t.dueDateTime;
-                                      final end = start
-                                          .add(const Duration(minutes: 30));
+                                      final due = t.dueDateTime;
+                                      late final DateTime start;
+                                      late final DateTime end;
+
+                                      // Prevent overflow into the next day for deadlines near midnight.
+                                      // If due is at/after 11:00 PM, show the block ending at due.
+                                      if (due.hour >= 23) {
+                                        start = due.subtract(
+                                          const Duration(minutes: 30),
+                                        );
+                                        end = due;
+                                      } else {
+                                        start = due;
+                                        end = due.add(
+                                          const Duration(minutes: 30),
+                                        );
+                                      }
                                       return Appointment(
                                         startTime: start,
                                         endTime: end,
@@ -645,18 +659,27 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                                                       .typeTask &&
                                                               meta.taskId !=
                                                                   null) {
-                                                            final task =
-                                                                taskById[meta
-                                                                    .taskId];
-                                                            if (task != null) {
-                                                              Navigator
-                                                                  .pushNamed(
-                                                                context,
-                                                                AppRoutes
-                                                                    .taskDetail,
-                                                                arguments: task,
-                                                              );
+                                                            final tappedTask =
+                                                                taskById[
+                                                                    meta.taskId];
+                                                            if (tappedTask ==
+                                                                null) {
+                                                              return;
                                                             }
+                                                            final task = tappedTask
+                                                                        .parentTaskId ==
+                                                                    null
+                                                                ? tappedTask
+                                                                : taskById[
+                                                                        tappedTask
+                                                                            .parentTaskId!] ??
+                                                                    tappedTask;
+                                                            Navigator.pushNamed(
+                                                              context,
+                                                              AppRoutes
+                                                                  .taskDetail,
+                                                              arguments: task,
+                                                            );
                                                             return;
                                                           }
                                                         }

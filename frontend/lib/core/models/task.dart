@@ -7,6 +7,8 @@ enum TaskStatus {
 }
 
 class Task {
+  static const Object _unsetDescription = Object();
+
   final String id;
 
   /// Firestore `users/.../courses/{id}` — canonical link for course-linked tasks.
@@ -40,18 +42,21 @@ class Task {
     String? courseCode,
     Color? courseColor,
     String? title,
-    String? description,
+    Object? description = _unsetDescription,
     DateTime? dueDateTime,
     TaskStatus? status,
     String? parentTaskId,
   }) {
+    final resolvedDescription = identical(description, _unsetDescription)
+        ? this.description
+        : description as String?;
     return Task(
       id: id ?? this.id,
       courseId: courseId ?? this.courseId,
       courseCode: courseCode ?? this.courseCode,
       courseColor: courseColor ?? this.courseColor,
       title: title ?? this.title,
-      description: description ?? this.description,
+      description: resolvedDescription,
       dueDateTime: dueDateTime ?? this.dueDateTime,
       status: status ?? this.status,
       parentTaskId: parentTaskId ?? this.parentTaskId,

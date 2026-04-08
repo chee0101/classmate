@@ -69,7 +69,7 @@ class AddNewBottomSheet extends StatelessWidget {
                     Navigator.pop(context);
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Auto Extract flow will be added next.'),
+                        content: Text('Auto Extract'),
                       ),
                     );
                   },

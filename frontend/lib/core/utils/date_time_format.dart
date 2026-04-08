@@ -5,16 +5,19 @@ import '../constants/weekdays.dart';
 /// "Today", "Tomorrow", "2 days ago", or "5 Mar".
 String formatRelativeDueDate(DateTime dt) {
   final now = DateTime.now();
-  final difference = dt.difference(
-    DateTime(now.year, now.month, now.day),
-  );
+  // Compare calendar days (midnight-to-midnight) instead of raw duration.
+  // This avoids edge cases like tasks at 11:59 PM showing as "Today"
+  // right after midnight due to `Duration.inDays` truncation.
+  final todayMidnight = DateTime(now.year, now.month, now.day);
+  final dtMidnight = DateTime(dt.year, dt.month, dt.day);
+  final dayDiff = dtMidnight.difference(todayMidnight).inDays;
 
-  if (difference.inDays == 0) {
+  if (dayDiff == 0) {
     return 'Today';
-  } else if (difference.inDays == 1) {
+  } else if (dayDiff == 1) {
     return 'Tomorrow';
-  } else if (difference.inDays < 0) {
-    final daysAgo = -difference.inDays;
+  } else if (dayDiff < 0) {
+    final daysAgo = -dayDiff;
     return daysAgo == 1 ? 'Yesterday' : '$daysAgo days ago';
   } else {
     return '${dt.day} ${monthShortLabel(dt.month)}';

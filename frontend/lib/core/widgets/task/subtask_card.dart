@@ -77,10 +77,10 @@ class SubtaskCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                const SizedBox(height: AppSpacing.xs),
+                const SizedBox(height: AppSpacing.sm),
                 Text(
                   subtask.title,
-                  style: textTheme.titleLarge,
+                  style: textTheme.titleSmall,
                 ),
                 if (subtask.description != null) ...[
                   const SizedBox(height: 4),
@@ -91,7 +91,7 @@ class SubtaskCard extends StatelessWidget {
                     ),
                   ),
                 ],
-                const SizedBox(height: AppSpacing.xs),
+                const SizedBox(height: AppSpacing.sm),
                 Text(
                   'Due: $dueDateStr',
                   style: textTheme.bodySmall?.copyWith(
