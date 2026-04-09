@@ -1,4 +1,8 @@
+import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 
 import '../../core/constants/app_spacing.dart';
 import '../../core/widgets/common/app_outlined_icon_button.dart';
@@ -16,10 +20,13 @@ class AutoExtractScreen extends StatefulWidget {
 }
 
 class _AutoExtractScreenState extends State<AutoExtractScreen> {
+  static const String _apiBaseUrl = 'http://10.0.2.2:8000';
+
   AutoExtractType _type = AutoExtractType.academicCalendar;
   bool _isAnalyzing = false;
 
   final TextEditingController _remarkFilterController = TextEditingController();
+  List<PlatformFile> _selectedFiles = const [];
 
   @override
   void dispose() {
@@ -57,7 +64,16 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
   }
 
   Future<void> _handleChooseFile() async {
-    await _notImplementedYet('Choose file');
+    final result = await FilePicker.platform.pickFiles(
+      allowMultiple: _type == AutoExtractType.academicCalendar,
+      withData: true,
+      type: FileType.custom,
+      allowedExtensions: const ['pdf', 'docx', 'png', 'jpg', 'jpeg'],
+    );
+    if (result == null || result.files.isEmpty) return;
+    setState(() {
+      _selectedFiles = result.files;
+    });
   }
 
   Future<void> _handleScanFromCamera() async {
@@ -65,12 +81,76 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
   }
 
   Future<void> _handleContinue() async {
+    if (_selectedFiles.isEmpty) {
+      await _notImplementedYet('Please choose a file first');
+      return;
+    }
+
     setState(() => _isAnalyzing = true);
     try {
-      await _notImplementedYet('Auto extraction');
+      final endpoint = switch (_type) {
+        AutoExtractType.academicCalendar => '/api/extract/academic-calendar',
+        AutoExtractType.timetable => '/api/extract/timetable',
+        AutoExtractType.task => '/api/extract/task',
+      };
+      final uri = Uri.parse('$_apiBaseUrl$endpoint');
+      final req = http.MultipartRequest('POST', uri);
+
+      if (_type == AutoExtractType.academicCalendar) {
+        for (final f in _selectedFiles) {
+          req.files.add(await _toMultipartFile('files', f));
+        }
+      } else {
+        req.files.add(await _toMultipartFile('file', _selectedFiles.first));
+      }
+
+      final streamed = await req.send();
+      final res = await http.Response.fromStream(streamed);
+      if (!mounted) return;
+
+      if (res.statusCode < 200 || res.statusCode >= 300) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Upload failed (${res.statusCode}): ${res.body}')),
+        );
+        return;
+      }
+
+      final payload = jsonDecode(res.body);
+      final eventCount = _countEvents(payload);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            eventCount == null
+                ? 'Extraction completed successfully.'
+                : 'Extraction completed. Found $eventCount events.',
+          ),
+        ),
+      );
     } finally {
       if (mounted) setState(() => _isAnalyzing = false);
     }
+  }
+
+  Future<http.MultipartFile> _toMultipartFile(String field, PlatformFile file) async {
+    if (file.path != null) {
+      return http.MultipartFile.fromPath(field, file.path!, filename: file.name);
+    }
+    final bytes = file.bytes;
+    if (bytes == null) {
+      throw StateError('Cannot read file bytes for ${file.name}.');
+    }
+    return http.MultipartFile.fromBytes(field, bytes, filename: file.name);
+  }
+
+  int? _countEvents(dynamic payload) {
+    if (payload is! Map<String, dynamic>) return null;
+    final extraction = payload['extraction'];
+    if (extraction is! Map<String, dynamic>) return null;
+    final academicSession = extraction['academic_session'];
+    if (academicSession is! Map<String, dynamic>) return null;
+    final events = academicSession['events'];
+    if (events is List) return events.length;
+    return null;
   }
 
   @override
@@ -127,6 +207,13 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
                     'Max file size: 10MB',
                     style: textTheme.bodySmall?.copyWith(color: Colors.black45),
                   ),
+                  if (_selectedFiles.isNotEmpty) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      'Selected file(s): ${_selectedFiles.map((f) => f.name).join(', ')}',
+                      style: textTheme.bodySmall?.copyWith(color: Colors.black54),
+                    ),
+                  ],
                 ],
               ),
             ),
