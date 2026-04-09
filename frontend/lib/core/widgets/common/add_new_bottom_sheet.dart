@@ -67,11 +67,7 @@ class AddNewBottomSheet extends StatelessWidget {
                   subtitle: 'Auto-fill from documents',
                   onTap: () {
                     Navigator.pop(context);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Auto Extract'),
-                      ),
-                    );
+                    Navigator.pushNamed(context, AppRoutes.autoExtract);
                   },
                 ),
               ),

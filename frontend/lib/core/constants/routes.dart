@@ -7,6 +7,7 @@ class AppRoutes {
   static const String changePassword = '/change-password';
   static const String taskDetail = '/task-detail';
   static const String addNew = '/add-new';
+  static const String autoExtract = '/auto-extract';
   static const String academicSessions = '/academic-sessions';
   static const String courses = '/courses';
   static const String timetables = '/timetables';

@@ -13,6 +13,7 @@ import 'screens/task/task_detail_screen.dart';
 import 'screens/profile/academic_sessions_screen.dart';
 import 'screens/profile/courses_screen.dart';
 import 'screens/profile/timetables_screen.dart';
+import 'screens/extract/auto_extract_screen.dart';
 import 'core/models/task.dart';
 import 'splash_screen.dart';
 
@@ -229,6 +230,7 @@ class MyApp extends StatelessWidget {
           final initialType = args is AddType ? args : null;
           return AddNewScreen(initialType: initialType);
         },
+        AppRoutes.autoExtract: (context) => const AutoExtractScreen(),
         AppRoutes.taskDetail: (context) {
           final task = ModalRoute.of(context)!.settings.arguments as Task;
           return TaskDetailScreen(task: task);

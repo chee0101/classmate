@@ -10,6 +10,7 @@ import '../../core/widgets/task/task_card.dart';
 import '../../core/widgets/task/subtask_card.dart';
 import '../../core/widgets/task/task_edit_bottom_sheet.dart';
 import '../../core/widgets/common/confirm_dialog.dart';
+import '../../core/widgets/common/app_outlined_icon_button.dart';
 
 /// Task detail screen showing full task info, subtasks, and actions.
 class TaskDetailScreen extends StatefulWidget {
@@ -234,16 +235,10 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         const SizedBox(height: AppSpacing.sm),
         SizedBox(
           width: double.infinity,
-          child: OutlinedButton.icon(
+          child: AppOutlinedIconButton(
             onPressed: _handleAddSubtask,
             icon: const Icon(Icons.add),
             label: const Text('Add sub task'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: colorScheme.primary,
-              side: BorderSide(
-                color: colorScheme.primary.withValues(alpha: 0.3),
-              ),
-            ),
           ),
         ),
       ],
