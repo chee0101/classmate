@@ -47,6 +47,30 @@ int _compareTodayScheduleItems(TodayScheduleItem a, TodayScheduleItem b) {
   return a.endMinutes.compareTo(b.endMinutes);
 }
 
+/// Below Today's schedule: order [UpcomingDeadlinesCard] vs [UpcomingEventsCard].
+/// - Both empty: deadlines first, then events.
+/// - Both have items: deadlines first, then events.
+/// - Only one has items: that card first, then the other (empty state).
+List<Widget> _upcomingDeadlinesAndEventsOrdered({
+  required bool deadlinesEmpty,
+  required bool eventsEmpty,
+  required Widget deadlinesCard,
+  required Widget eventsCard,
+}) {
+  if (deadlinesEmpty && !eventsEmpty) {
+    return [
+      eventsCard,
+      const SizedBox(height: AppSpacing.md),
+      deadlinesCard,
+    ];
+  }
+  return [
+    deadlinesCard,
+    const SizedBox(height: AppSpacing.md),
+    eventsCard,
+  ];
+}
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -443,15 +467,22 @@ class _HomeScreenState extends State<HomeScreen> {
                                                       academicBreakTitle,
                                                   showAcademicBreakChip: false,
                                                 ),
-                                                const SizedBox(height: AppSpacing.md),
-                                                UpcomingEventsCard(
-                                                  events: upcomingEvents,
-                                                  selectedTerm: selectedTerm,
-                                                ),
-                                                const SizedBox(height: AppSpacing.md),
-                                                UpcomingDeadlinesCard(
-                                                  tasks: upcomingTasks,
-                                                  courses: courses,
+                                                const SizedBox(
+                                                    height: AppSpacing.md),
+                                                ..._upcomingDeadlinesAndEventsOrdered(
+                                                  deadlinesEmpty:
+                                                      upcomingTasks.isEmpty,
+                                                  eventsEmpty:
+                                                      upcomingEvents.isEmpty,
+                                                  deadlinesCard:
+                                                      UpcomingDeadlinesCard(
+                                                    tasks: upcomingTasks,
+                                                    courses: courses,
+                                                  ),
+                                                  eventsCard: UpcomingEventsCard(
+                                                    events: upcomingEvents,
+                                                    selectedTerm: selectedTerm,
+                                                  ),
                                                 ),
                                               ],
                                             ),
@@ -513,15 +544,22 @@ class _HomeScreenState extends State<HomeScreen> {
                                                       academicBreakTitle,
                                                   showAcademicBreakChip: true,
                                                 ),
-                                                const SizedBox(height: AppSpacing.md),
-                                                UpcomingEventsCard(
-                                                  events: upcomingEvents,
-                                                  selectedTerm: selectedTerm,
-                                                ),
-                                                const SizedBox(height: AppSpacing.md),
-                                                UpcomingDeadlinesCard(
-                                                  tasks: upcomingTasks,
-                                                  courses: courses,
+                                                const SizedBox(
+                                                    height: AppSpacing.md),
+                                                ..._upcomingDeadlinesAndEventsOrdered(
+                                                  deadlinesEmpty:
+                                                      upcomingTasks.isEmpty,
+                                                  eventsEmpty:
+                                                      upcomingEvents.isEmpty,
+                                                  deadlinesCard:
+                                                      UpcomingDeadlinesCard(
+                                                    tasks: upcomingTasks,
+                                                    courses: courses,
+                                                  ),
+                                                  eventsCard: UpcomingEventsCard(
+                                                    events: upcomingEvents,
+                                                    selectedTerm: selectedTerm,
+                                                  ),
                                                 ),
                                               ],
                                             ),
@@ -627,15 +665,20 @@ class _HomeScreenState extends State<HomeScreen> {
                                               ),
                                               const SizedBox(
                                                   height: AppSpacing.md),
-                                              UpcomingEventsCard(
-                                                events: upcomingEvents,
-                                                selectedTerm: selectedTerm,
-                                              ),
-                                              const SizedBox(
-                                                  height: AppSpacing.md),
-                                              UpcomingDeadlinesCard(
-                                                tasks: upcomingTasks,
-                                                courses: courses,
+                                              ..._upcomingDeadlinesAndEventsOrdered(
+                                                deadlinesEmpty:
+                                                    upcomingTasks.isEmpty,
+                                                eventsEmpty:
+                                                    upcomingEvents.isEmpty,
+                                                deadlinesCard:
+                                                    UpcomingDeadlinesCard(
+                                                  tasks: upcomingTasks,
+                                                  courses: courses,
+                                                ),
+                                                eventsCard: UpcomingEventsCard(
+                                                  events: upcomingEvents,
+                                                  selectedTerm: selectedTerm,
+                                                ),
                                               ),
                                             ],
                                           ),
