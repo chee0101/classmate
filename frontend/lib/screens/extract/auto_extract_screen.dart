@@ -1,10 +1,10 @@
-import 'dart:convert';
+import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 
 import '../../core/constants/app_spacing.dart';
+import '../../core/services/extraction_job_store.dart';
 import '../../core/widgets/common/app_outlined_icon_button.dart';
 import '../../core/widgets/common/animated_segmented_switch.dart';
 import '../../core/widgets/common/form_fields.dart';
@@ -86,71 +86,34 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
       return;
     }
 
-    setState(() => _isAnalyzing = true);
-    try {
-      final endpoint = switch (_type) {
-        AutoExtractType.academicCalendar => '/api/extract/academic-calendar',
-        AutoExtractType.timetable => '/api/extract/timetable',
-        AutoExtractType.task => '/api/extract/task',
-      };
-      final uri = Uri.parse('$_apiBaseUrl$endpoint');
-      final req = http.MultipartRequest('POST', uri);
-
-      if (_type == AutoExtractType.academicCalendar) {
-        for (final f in _selectedFiles) {
-          req.files.add(await _toMultipartFile('files', f));
-        }
-      } else {
-        req.files.add(await _toMultipartFile('file', _selectedFiles.first));
-      }
-
-      final streamed = await req.send();
-      final res = await http.Response.fromStream(streamed);
-      if (!mounted) return;
-
-      if (res.statusCode < 200 || res.statusCode >= 300) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Upload failed (${res.statusCode}): ${res.body}')),
-        );
-        return;
-      }
-
-      final payload = jsonDecode(res.body);
-      final eventCount = _countEvents(payload);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            eventCount == null
-                ? 'Extraction completed successfully.'
-                : 'Extraction completed. Found $eventCount events.',
-          ),
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _isAnalyzing = false);
+    if (hasRunningExtractionJob) {
+      await _notImplementedYet('Another extraction is already running');
+      return;
     }
-  }
 
-  Future<http.MultipartFile> _toMultipartFile(String field, PlatformFile file) async {
-    if (file.path != null) {
-      return http.MultipartFile.fromPath(field, file.path!, filename: file.name);
-    }
-    final bytes = file.bytes;
-    if (bytes == null) {
-      throw StateError('Cannot read file bytes for ${file.name}.');
-    }
-    return http.MultipartFile.fromBytes(field, bytes, filename: file.name);
-  }
+    final endpoint = switch (_type) {
+      AutoExtractType.academicCalendar => '/api/extract/academic-calendar',
+      AutoExtractType.timetable => '/api/extract/timetable',
+      AutoExtractType.task => '/api/extract/task',
+    };
+    final typeLabel = switch (_type) {
+      AutoExtractType.academicCalendar => 'Academic calendar',
+      AutoExtractType.timetable => 'Timetable',
+      AutoExtractType.task => 'Task',
+    };
 
-  int? _countEvents(dynamic payload) {
-    if (payload is! Map<String, dynamic>) return null;
-    final extraction = payload['extraction'];
-    if (extraction is! Map<String, dynamic>) return null;
-    final academicSession = extraction['academic_session'];
-    if (academicSession is! Map<String, dynamic>) return null;
-    final events = academicSession['events'];
-    if (events is List) return events.length;
-    return null;
+    unawaited(
+      startExtractionJob(
+        apiBaseUrl: _apiBaseUrl,
+        endpoint: endpoint,
+        typeLabel: typeLabel,
+        files: _selectedFiles,
+        useMultiFilesField: _type == AutoExtractType.academicCalendar,
+      ),
+    );
+
+    if (!mounted) return;
+    Navigator.of(context).maybePop();
   }
 
   @override

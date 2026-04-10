@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/common/app_bottom_nav.dart';
+import '../widgets/common/extraction_progress_floating_card.dart';
 import '../../screens/home/home_screen.dart';
 import '../../screens/schedule/schedule_screen.dart';
 import '../../screens/task/task_screen.dart';
@@ -39,9 +40,19 @@ class _MainScaffoldState extends State<MainScaffold> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _screenIndex,
-        children: _screens,
+      body: Stack(
+        children: [
+          IndexedStack(
+            index: _screenIndex,
+            children: _screens,
+          ),
+          const Positioned(
+            left: 0,
+            right: 0,
+            bottom: 8,
+            child: ExtractionProgressFloatingCard(),
+          ),
+        ],
       ),
       bottomNavigationBar: AppBottomNav(
         currentIndex: _screenIndex,
