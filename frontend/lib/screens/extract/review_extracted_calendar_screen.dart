@@ -17,6 +17,7 @@ import '../../core/widgets/common/app_outlined_icon_button.dart';
 import '../../core/widgets/common/confirm_dialog.dart';
 import '../../core/widgets/common/form_fields.dart';
 import '../../core/widgets/common/white_card.dart';
+import 'widgets/session_conflict_sheet.dart';
 
 /// Review flow after academic calendar extraction: structure (2 pages) + holidays.
 enum _ExactSessionAction { replace, mergeIntoExisting, addNew, cancel }
@@ -144,13 +145,13 @@ class _ReviewExtractedCalendarScreenState
   Future<_ExactSessionAction> _askExactSessionAction(
     AcademicSession existing,
   ) async {
-    final result = await showModalBottomSheet<_ExactSessionAction>(
+    final result = await showModalBottomSheet<SessionConflictAction>(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (sheetContext) => _SessionConflictSheet(
+      builder: (sheetContext) => SessionConflictSheet(
         sessionName: existing.name,
         sessionRangeText: formatDateRangeDdMmYyyy(
           existing.startDate,
@@ -159,9 +160,9 @@ class _ReviewExtractedCalendarScreenState
       ),
     );
     return switch (result) {
-      _ExactSessionAction.replace => _ExactSessionAction.replace,
-      _ExactSessionAction.mergeIntoExisting => _ExactSessionAction.mergeIntoExisting,
-      _ExactSessionAction.addNew => _ExactSessionAction.addNew,
+      SessionConflictAction.replace => _ExactSessionAction.replace,
+      SessionConflictAction.merge => _ExactSessionAction.mergeIntoExisting,
+      SessionConflictAction.addNew => _ExactSessionAction.addNew,
       _ => _ExactSessionAction.cancel,
     };
   }
@@ -744,141 +745,6 @@ class _ReviewExtractedCalendarScreenState
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _SessionConflictSheet extends StatelessWidget {
-  const _SessionConflictSheet({
-    required this.sessionName,
-    required this.sessionRangeText,
-  });
-
-  final String sessionName;
-  final String sessionRangeText;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    return SafeArea(
-      top: false,
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Session already exists',
-              style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'A session with the same dates was found:',
-              style: textTheme.bodyMedium?.copyWith(
-                color: appPrimarySwatch.shade700,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              '$sessionName ($sessionRangeText)',
-              style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            _ConflictOptionCard(
-              title: 'Merge with existing',
-              subtitle: 'Combine extracted holidays with current session',
-              emphasized: true,
-              onTap: () => Navigator.of(context).pop(
-                _ExactSessionAction.mergeIntoExisting,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            _ConflictOptionCard(
-              title: 'Add as new session',
-              subtitle: 'Create a separate session with same dates',
-              onTap: () => Navigator.of(context).pop(_ExactSessionAction.addNew),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            _ConflictOptionCard(
-              title: 'Replace existing session',
-              subtitle: 'This will overwrite all existing data',
-              warning: true,
-              onTap: () => Navigator.of(context).pop(_ExactSessionAction.replace),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            SizedBox(
-              width: double.infinity,
-              child: TextButton(
-                onPressed: () => Navigator.of(context).pop(_ExactSessionAction.cancel),
-                child: const Text('Cancel'),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ConflictOptionCard extends StatelessWidget {
-  const _ConflictOptionCard({
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-    this.emphasized = false,
-    this.warning = false,
-  });
-
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-  final bool emphasized;
-  final bool warning;
-
-  @override
-  Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    final bgColor = emphasized ? appPrimarySwatch.shade700 : Colors.white;
-    final borderColor = emphasized ? appPrimarySwatch.shade700 : Colors.grey.shade300;
-    final titleColor = emphasized
-        ? Colors.white
-        : warning
-            ? Colors.red.shade700
-            : textTheme.bodyLarge?.color;
-    final subtitleColor = emphasized ? Colors.white70 : Colors.grey.shade700;
-
-    return Material(
-      color: bgColor,
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(14),
-        child: Container(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: borderColor),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                warning ? '⚠ $title' : title,
-                style: textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  color: titleColor,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                subtitle,
-                style: textTheme.bodyMedium?.copyWith(color: subtitleColor),
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
