@@ -144,24 +144,25 @@ class _ReviewExtractedCalendarScreenState
   Future<_ExactSessionAction> _askExactSessionAction(
     AcademicSession existing,
   ) async {
-    final result = await showFourOptionDialog(
-      context,
-      title: 'Session already exists',
-      message:
-          'A session with the same start and end dates already exists: '
-          '"${existing.name}" '
-          '(${formatDateDdMmYyyy(existing.startDate)} – ${formatDateDdMmYyyy(existing.endDate)}).\n\n'
-          'Choose how to save extracted events.',
-      cancelText: 'Cancel',
-      tertiaryText: 'Add new',
-      secondaryText: 'Merge',
-      primaryText: 'Replace',
+    final result = await showModalBottomSheet<_ExactSessionAction>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => _SessionConflictSheet(
+        sessionName: existing.name,
+        sessionRangeText: formatDateRangeDdMmYyyy(
+          existing.startDate,
+          existing.endDate,
+        ),
+      ),
     );
     return switch (result) {
-      FourOptionDialogResult.cancel => _ExactSessionAction.cancel,
-      FourOptionDialogResult.tertiary => _ExactSessionAction.addNew,
-      FourOptionDialogResult.secondary => _ExactSessionAction.mergeIntoExisting,
-      FourOptionDialogResult.primary => _ExactSessionAction.replace,
+      _ExactSessionAction.replace => _ExactSessionAction.replace,
+      _ExactSessionAction.mergeIntoExisting => _ExactSessionAction.mergeIntoExisting,
+      _ExactSessionAction.addNew => _ExactSessionAction.addNew,
+      _ => _ExactSessionAction.cancel,
     };
   }
 
@@ -170,7 +171,7 @@ class _ReviewExtractedCalendarScreenState
         .take(3)
         .map(
           (s) =>
-              '- ${s.name} (${formatDateDdMmYyyy(s.startDate)} – ${formatDateDdMmYyyy(s.endDate)})',
+              '- ${s.name} (${formatDateRangeDdMmYyyy(s.startDate, s.endDate)})',
         )
         .join('\n');
     final hasMore = overlaps.length > 3;
@@ -232,24 +233,26 @@ class _ReviewExtractedCalendarScreenState
     if (_parsed == null) return;
     final first = _sessionPickerFirstDate();
     final last = _sessionPickerLastDate();
-
-    final startPick = await showAppDatePicker(
+    final result = await showModalBottomSheet<_EditAcademicPeriodResult>(
       context: context,
-      initialDate: startOfDay(term.start),
-      firstDate: first,
-      lastDate: last,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (sheetContext) => _EditAcademicPeriodSheet(
+        headerTitle: 'Edit semester',
+        allowEditTitle: false,
+        allowDelete: false,
+        initialTitle: term.label,
+        sessionFirst: first,
+        sessionLast: last,
+        initialStart: term.start,
+        initialEnd: term.end,
+      ),
     );
-    if (startPick == null || !mounted) return;
-    final newStart = startOfDay(startPick);
-
-    final endPick = await showAppDatePicker(
-      context: context,
-      initialDate: term.end.isBefore(newStart) ? newStart : term.end,
-      firstDate: newStart,
-      lastDate: last,
-    );
-    if (endPick == null || !mounted) return;
-    final newEnd = endOfDayInclusive(endPick);
+    if (result == null || !mounted) return;
+    final newStart = startOfDay(result.start);
+    final newEnd = endOfDayInclusive(result.end);
 
     setState(() {
       _terms = _terms
@@ -265,6 +268,21 @@ class _ReviewExtractedCalendarScreenState
           )
           .toList(growable: false);
     });
+  }
+
+  bool _isBreakWithinTerm(ParsedExtractedEvent event, SessionTerm term) {
+    final eventStart = startOfDay(event.startDateTime);
+    final eventEnd = endOfDayInclusive(event.endDateTime);
+    return !eventStart.isBefore(startOfDay(term.start)) &&
+        !eventEnd.isAfter(endOfDayInclusive(term.end));
+  }
+
+  List<ParsedExtractedEvent> _breaksOutsideTerm(String termId) {
+    final term = _termById(termId);
+    if (term == null) return const <ParsedExtractedEvent>[];
+    return _breaksFor(termId).where((e) => !_isBreakWithinTerm(e, term)).toList(
+          growable: false,
+        );
   }
 
   Future<void> _editParsedEventPeriod(
@@ -284,6 +302,7 @@ class _ReviewExtractedCalendarScreenState
       builder: (sheetContext) => _EditAcademicPeriodSheet(
         headerTitle: allowEditTitle ? 'Edit holiday' : 'Edit academic break',
         allowEditTitle: allowEditTitle,
+        allowDelete: allowEditTitle,
         initialTitle: e.title,
         sessionFirst: first,
         sessionLast: last,
@@ -293,6 +312,17 @@ class _ReviewExtractedCalendarScreenState
     );
 
     if (result == null || !mounted) return;
+    if (result.deleteRequested) {
+      final confirmed = await showConfirmDeleteDialog(
+        context,
+        title: 'Delete holiday?',
+        message: 'This holiday will be removed from the extracted list.',
+        confirmText: 'Delete',
+      );
+      if (!mounted || !confirmed) return;
+      _removeHoliday(e);
+      return;
+    }
     setState(() {
       if (allowEditTitle) {
         final t = result.title.trim();
@@ -324,6 +354,7 @@ class _ReviewExtractedCalendarScreenState
       builder: (sheetContext) => _EditAcademicPeriodSheet(
         headerTitle: 'Add holiday',
         allowEditTitle: true,
+        allowDelete: false,
         initialTitle: '',
         sessionFirst: first,
         sessionLast: last,
@@ -368,10 +399,21 @@ class _ReviewExtractedCalendarScreenState
       final exactMatch = _findExactDateMatch(session);
       var saveMode = _SaveMode.addNew;
       AcademicSession targetSession = session;
+      var skipOverlapWarning = false;
       if (exactMatch != null) {
         final action = await _askExactSessionAction(exactMatch);
         if (!mounted || action == _ExactSessionAction.cancel) return;
         if (action == _ExactSessionAction.replace) {
+          final confirmReplace = await showConfirmDialog(
+            context,
+            title: 'Replace existing session?',
+            message:
+                'This will overwrite all current data and cannot be undone.',
+            cancelText: 'Cancel',
+            confirmText: 'Replace',
+            destructive: true,
+          );
+          if (!mounted || !confirmReplace) return;
           saveMode = _SaveMode.replace;
           targetSession = AcademicSession(
             id: exactMatch.id,
@@ -383,16 +425,21 @@ class _ReviewExtractedCalendarScreenState
         } else if (action == _ExactSessionAction.mergeIntoExisting) {
           saveMode = _SaveMode.merge;
           targetSession = exactMatch;
+          skipOverlapWarning = true;
+        } else if (action == _ExactSessionAction.addNew) {
+          skipOverlapWarning = true;
         }
       }
 
-      final overlaps = _findOverlappingSessions(
-        targetSession,
-        excludeSessionId: saveMode == _SaveMode.replace ? targetSession.id : null,
-      );
-      if (overlaps.isNotEmpty) {
-        final proceed = await _confirmOverlapWarning(overlaps);
-        if (!mounted || !proceed) return;
+      if (!skipOverlapWarning) {
+        final overlaps = _findOverlappingSessions(
+          targetSession,
+          excludeSessionId: saveMode == _SaveMode.replace ? targetSession.id : null,
+        );
+        if (overlaps.isNotEmpty) {
+          final proceed = await _confirmOverlapWarning(overlaps);
+          if (!mounted || !proceed) return;
+        }
       }
 
       if (saveMode == _SaveMode.replace) {
@@ -512,6 +559,15 @@ class _ReviewExtractedCalendarScreenState
 
     final textTheme = Theme.of(context).textTheme;
     final holidayCount = _holidays.length;
+    final sem1InvalidBreaks = _breaksOutsideTerm('sem1');
+    final sem2InvalidBreaks = _breaksOutsideTerm('sem2');
+    final currentInvalidBreaks = switch (_pageIndex) {
+      0 => sem1InvalidBreaks,
+      1 => sem2InvalidBreaks,
+      _ => const <ParsedExtractedEvent>[],
+    };
+    final canProceed = !_saving &&
+        (_pageIndex >= 2 || currentInvalidBreaks.isEmpty);
     final pageTitle = switch (_pageIndex) {
       0 => 'Semester 1',
       1 => 'Semester 2',
@@ -583,6 +639,9 @@ class _ReviewExtractedCalendarScreenState
           Expanded(
             child: PageView(
               controller: _pageController,
+              physics: canProceed
+                  ? const PageScrollPhysics()
+                  : const NeverScrollableScrollPhysics(),
               onPageChanged: (i) => setState(() => _pageIndex = i),
               children: [
                 _SemesterStructurePage(
@@ -603,7 +662,6 @@ class _ReviewExtractedCalendarScreenState
                   holidays: _holidays,
                   onEdit: (e) =>
                       _editParsedEventPeriod(e, allowEditTitle: true),
-                  onDelete: _removeHoliday,
                   onAdd: _addHoliday,
                 ),
               ],
@@ -636,10 +694,22 @@ class _ReviewExtractedCalendarScreenState
                   }),
                 ),
                 const SizedBox(height: AppSpacing.md),
+                if (_pageIndex < 2 && currentInvalidBreaks.isNotEmpty) ...[
+                  Text(
+                    'Some academic breaks are outside this semester range. '
+                    'Please edit semester/break dates before continuing.',
+                    textAlign: TextAlign.center,
+                    style: textTheme.bodySmall?.copyWith(
+                      color: Colors.red.shade700,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                ],
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: _saving
+                    onPressed: !canProceed
                         ? null
                         : () {
                             if (_pageIndex < 2) {
@@ -666,7 +736,7 @@ class _ReviewExtractedCalendarScreenState
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : Text(
-                            _pageIndex < 2 ? 'Next' : 'Save calendar',
+                            _pageIndex < 2 ? 'Next' : 'Confirm & Save',
                           ),
                   ),
                 ),
@@ -674,6 +744,141 @@ class _ReviewExtractedCalendarScreenState
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SessionConflictSheet extends StatelessWidget {
+  const _SessionConflictSheet({
+    required this.sessionName,
+    required this.sessionRangeText,
+  });
+
+  final String sessionName;
+  final String sessionRangeText;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.all(AppSpacing.lg),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Session already exists',
+              style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'A session with the same dates was found:',
+              style: textTheme.bodyMedium?.copyWith(
+                color: appPrimarySwatch.shade700,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              '$sessionName ($sessionRangeText)',
+              style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            _ConflictOptionCard(
+              title: 'Merge with existing',
+              subtitle: 'Combine extracted holidays with current session',
+              emphasized: true,
+              onTap: () => Navigator.of(context).pop(
+                _ExactSessionAction.mergeIntoExisting,
+              ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _ConflictOptionCard(
+              title: 'Add as new session',
+              subtitle: 'Create a separate session with same dates',
+              onTap: () => Navigator.of(context).pop(_ExactSessionAction.addNew),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _ConflictOptionCard(
+              title: 'Replace existing session',
+              subtitle: 'This will overwrite all existing data',
+              warning: true,
+              onTap: () => Navigator.of(context).pop(_ExactSessionAction.replace),
+            ),
+            const SizedBox(height: AppSpacing.md),
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.of(context).pop(_ExactSessionAction.cancel),
+                child: const Text('Cancel'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ConflictOptionCard extends StatelessWidget {
+  const _ConflictOptionCard({
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.emphasized = false,
+    this.warning = false,
+  });
+
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final bool emphasized;
+  final bool warning;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final bgColor = emphasized ? appPrimarySwatch.shade700 : Colors.white;
+    final borderColor = emphasized ? appPrimarySwatch.shade700 : Colors.grey.shade300;
+    final titleColor = emphasized
+        ? Colors.white
+        : warning
+            ? Colors.red.shade700
+            : textTheme.bodyLarge?.color;
+    final subtitleColor = emphasized ? Colors.white70 : Colors.grey.shade700;
+
+    return Material(
+      color: bgColor,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: borderColor),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                warning ? '⚠ $title' : title,
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: titleColor,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                subtitle,
+                style: textTheme.bodyMedium?.copyWith(color: subtitleColor),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -711,20 +916,16 @@ class _SemesterStructurePage extends StatelessWidget {
               ),
             )
           else
-            _PeriodTile(
-              label: term!.label,
-              rangeText:
-                  '${formatDateDdMmYyyy(term!.start)} – ${formatDateDdMmYyyy(term!.end)}',
-              onTap: () => onEditTerm(term!),
+            _SemesterTermCard(
+              term: term!,
+              onEdit: () => onEditTerm(term!),
             ),
           ...breaks.map(
             (e) => Padding(
               padding: const EdgeInsets.only(top: AppSpacing.sm),
-              child: _PeriodTile(
-                label: e.title,
-                rangeText:
-                    '${formatDateDdMmYyyy(e.startDateTime)} – ${formatDateDdMmYyyy(e.endDateTime)}',
-                onTap: () => onEditBreak(e),
+              child: _AcademicBreakTile(
+                event: e,
+                onEdit: () => onEditBreak(e),
               ),
             ),
           ),
@@ -734,52 +935,154 @@ class _SemesterStructurePage extends StatelessWidget {
   }
 }
 
-class _PeriodTile extends StatelessWidget {
-  const _PeriodTile({
-    required this.label,
-    required this.rangeText,
-    required this.onTap,
+class _SemesterTermCard extends StatelessWidget {
+  const _SemesterTermCard({
+    required this.term,
+    required this.onEdit,
   });
 
-  final String label;
-  final String rangeText;
-  final VoidCallback onTap;
+  final SessionTerm term;
+  final VoidCallback onEdit;
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(20);
-    return WhiteCard(
-      padding: EdgeInsets.zero,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: radius,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.md,
-              vertical: AppSpacing.md,
+    final textTheme = Theme.of(context).textTheme;
+    final durationDays = term.end.difference(term.start).inDays + 1;
+    final totalWeeks = (durationDays / 7).ceil();
+    final headerBg = appPrimarySwatch.shade100;
+    final borderColor = appPrimarySwatch.shade200;
+    final headingColor = appPrimarySwatch.shade900;
+    final bodyPrimary = appPrimarySwatch.shade700;
+    final iconColor = appPrimarySwatch.shade700;
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              color: headerBg,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: 0,
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      term.label,
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: headingColor,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.edit, size: 18),
+                    splashRadius: 18,
+                    color: iconColor,
+                    tooltip: 'Edit semester dates',
+                    onPressed: onEdit,
+                  ),
+                ],
+              ),
             ),
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.sm,
+                AppSpacing.md,
+                AppSpacing.md,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    formatDateRangeDdMmYyyy(term.start, term.end),
+                    style: textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: bodyPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '($totalWeeks weeks total)',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AcademicBreakTile extends StatelessWidget {
+  const _AcademicBreakTile({
+    required this.event,
+    required this.onEdit,
+  });
+
+  final ParsedExtractedEvent event;
+  final VoidCallback onEdit;
+
+  IconData _iconForBreak(String title) {
+    final normalized = title.toLowerCase();
+    if (normalized.contains('exam')) return Icons.edit_calendar_outlined;
+    if (normalized.contains('revision')) return Icons.menu_book_outlined;
+    if (normalized.contains('mid')) return Icons.park_outlined;
+    if (normalized.contains('break')) return Icons.beach_access_outlined;
+    return Icons.event_note_outlined;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return WhiteCard(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.md,
+        vertical: AppSpacing.sm,
+      ),
+      child: Row(
+        children: [
+          Icon(_iconForBreak(event.title), size: 20, color: const Color(0xFF4F4A68)),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  label,
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+                  event.title,
+                  style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(height: 4),
+                const SizedBox(height: 2),
                 Text(
-                  rangeText,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.grey.shade700,
-                      ),
+                  formatDateRangeDdMmYyyy(
+                    event.startDateTime,
+                    event.endDateTime,
+                  ),
+                  style: textTheme.bodySmall?.copyWith(color: Colors.grey.shade700),
                 ),
               ],
             ),
           ),
-        ),
+          IconButton(
+            icon: const Icon(Icons.edit, size: 18),
+            splashRadius: 20,
+            color: const Color(0xFF4F4A68),
+            tooltip: 'Edit break dates',
+            onPressed: onEdit,
+          ),
+        ],
       ),
     );
   }
@@ -789,13 +1092,11 @@ class _HolidaysPage extends StatelessWidget {
   const _HolidaysPage({
     required this.holidays,
     required this.onEdit,
-    required this.onDelete,
     required this.onAdd,
   });
 
   final List<ParsedExtractedEvent> holidays;
   final void Function(ParsedExtractedEvent e) onEdit;
-  final void Function(ParsedExtractedEvent e) onDelete;
   final Future<void> Function() onAdd;
 
   @override
@@ -836,7 +1137,10 @@ class _HolidaysPage extends StatelessWidget {
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '${formatDateDdMmYyyy(e.startDateTime)} – ${formatDateDdMmYyyy(e.endDateTime)}',
+                                formatDateRangeDdMmYyyy(
+                                  e.startDateTime,
+                                  e.endDateTime,
+                                ),
                                 style: textTheme.bodySmall?.copyWith(
                                   color: Colors.grey.shade700,
                                 ),
@@ -848,9 +1152,9 @@ class _HolidaysPage extends StatelessWidget {
                     ),
                     Center(
                       child: IconButton(
-                        icon: Icon(Icons.close, color: Colors.red.shade700),
-                        onPressed: () => onDelete(e),
-                        tooltip: 'Remove',
+                        icon: const Icon(Icons.chevron_right_rounded),
+                        onPressed: () => onEdit(e),
+                        tooltip: 'Open',
                       ),
                     ),
                   ],
@@ -874,17 +1178,20 @@ class _EditAcademicPeriodResult {
     required this.title,
     required this.start,
     required this.end,
+    this.deleteRequested = false,
   });
 
   final String title;
   final DateTime start;
   final DateTime end;
+  final bool deleteRequested;
 }
 
 class _EditAcademicPeriodSheet extends StatefulWidget {
   const _EditAcademicPeriodSheet({
     required this.headerTitle,
     required this.allowEditTitle,
+    required this.allowDelete,
     required this.initialTitle,
     required this.sessionFirst,
     required this.sessionLast,
@@ -894,6 +1201,7 @@ class _EditAcademicPeriodSheet extends StatefulWidget {
 
   final String headerTitle;
   final bool allowEditTitle;
+  final bool allowDelete;
   final String initialTitle;
   final DateTime sessionFirst;
   final DateTime sessionLast;
@@ -966,6 +1274,18 @@ class _EditAcademicPeriodSheetState extends State<_EditAcademicPeriodSheet> {
     );
   }
 
+  void _requestDelete() {
+    Navigator.pop(
+      context,
+      _EditAcademicPeriodResult(
+        title: _titleCtrl.text,
+        start: _start,
+        end: _end,
+        deleteRequested: true,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -979,9 +1299,21 @@ class _EditAcademicPeriodSheetState extends State<_EditAcademicPeriodSheet> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Text(
-                widget.headerTitle,
-                style: Theme.of(context).textTheme.titleLarge,
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.headerTitle,
+                      style: Theme.of(context).textTheme.titleLarge,
+                    ),
+                  ),
+                  if (widget.allowDelete)
+                    IconButton(
+                      onPressed: _requestDelete,
+                      icon: Icon(Icons.delete, color: Colors.red.shade700),
+                      tooltip: 'Delete holiday',
+                    ),
+                ],
               ),
               const SizedBox(height: AppSpacing.md),
               LabeledTextField(
