@@ -1,6 +1,7 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'dart:convert';
 
 enum ExtractionJobStatus { queued, running, success, failed }
 
@@ -96,8 +97,9 @@ Future<void> startExtractionJob({
     message: 'Queued',
   );
 
-  final uri = Uri.parse('$apiBaseUrl$endpoint');
-  final req = http.MultipartRequest('POST', uri);
+  final kind = endpoint.split('/').last;
+  final submitUri = Uri.parse('$apiBaseUrl/api/extract/submit/$kind');
+  final req = http.MultipartRequest('POST', submitUri);
   final fileField = useMultiFilesField ? 'files' : 'file';
 
   for (final file in files) {
@@ -110,29 +112,75 @@ Future<void> startExtractionJob({
   );
 
   try {
-    final streamed = await client.send(req);
-    final res = await http.Response.fromStream(streamed);
+    final submitStreamed = await client.send(req);
+    final submitRes = await http.Response.fromStream(submitStreamed);
     if (_extractionCancelled) {
       return;
     }
-    final now = DateTime.now();
-    if (res.statusCode >= 200 && res.statusCode < 300) {
+    if (submitRes.statusCode < 200 || submitRes.statusCode >= 300) {
       extractionJobNotifier.value = extractionJobNotifier.value?.copyWith(
-        status: ExtractionJobStatus.success,
-        finishedAt: now,
-        statusCode: res.statusCode,
-        message: 'Completed',
-        responseBody: res.body,
+        status: ExtractionJobStatus.failed,
+        finishedAt: DateTime.now(),
+        statusCode: submitRes.statusCode,
+        message: 'Failed (${submitRes.statusCode})',
+        responseBody: submitRes.body,
       );
       return;
     }
-    extractionJobNotifier.value = extractionJobNotifier.value?.copyWith(
-      status: ExtractionJobStatus.failed,
-      finishedAt: now,
-      statusCode: res.statusCode,
-      message: 'Failed (${res.statusCode})',
-      responseBody: res.body,
-    );
+    final submitJson = jsonDecode(submitRes.body) as Map<String, dynamic>;
+    final jobId = (submitJson['job_id'] as String?)?.trim();
+    if (jobId == null || jobId.isEmpty) {
+      extractionJobNotifier.value = extractionJobNotifier.value?.copyWith(
+        status: ExtractionJobStatus.failed,
+        finishedAt: DateTime.now(),
+        message: 'Failed (missing job id)',
+        responseBody: submitRes.body,
+      );
+      return;
+    }
+    while (!_extractionCancelled) {
+      final pollUri = Uri.parse('$apiBaseUrl/api/extract/job/$jobId');
+      final pollRes = await client.get(pollUri);
+      if (_extractionCancelled) return;
+      if (pollRes.statusCode < 200 || pollRes.statusCode >= 300) {
+        extractionJobNotifier.value = extractionJobNotifier.value?.copyWith(
+          status: ExtractionJobStatus.failed,
+          finishedAt: DateTime.now(),
+          statusCode: pollRes.statusCode,
+          message: 'Failed polling (${pollRes.statusCode})',
+          responseBody: pollRes.body,
+        );
+        return;
+      }
+      final pollJson = jsonDecode(pollRes.body) as Map<String, dynamic>;
+      final status = (pollJson['status'] as String?)?.trim().toLowerCase() ?? '';
+      if (status == 'queued' || status == 'running') {
+        await Future<void>.delayed(const Duration(seconds: 2));
+        continue;
+      }
+      final now = DateTime.now();
+      if (status == 'success') {
+        final resultObj = pollJson['result'];
+        final resultBody = resultObj == null ? '' : jsonEncode(resultObj);
+        extractionJobNotifier.value = extractionJobNotifier.value?.copyWith(
+          status: ExtractionJobStatus.success,
+          finishedAt: now,
+          statusCode: 200,
+          message: 'Completed',
+          responseBody: resultBody,
+        );
+        return;
+      }
+      final error = (pollJson['error'] as String?) ?? 'Unknown job error';
+      extractionJobNotifier.value = extractionJobNotifier.value?.copyWith(
+        status: ExtractionJobStatus.failed,
+        finishedAt: now,
+        statusCode: 500,
+        message: error,
+        responseBody: error,
+      );
+      return;
+    }
   } catch (e) {
     if (_extractionCancelled) {
       return;

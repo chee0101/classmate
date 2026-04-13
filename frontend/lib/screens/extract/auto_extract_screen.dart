@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../../core/constants/app_spacing.dart';
 import '../../core/services/extraction_job_store.dart';
@@ -31,6 +33,7 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
 
   AutoExtractType _type = AutoExtractType.academicCalendar;
   bool _isAnalyzing = false;
+  final ImagePicker _imagePicker = ImagePicker();
 
   final TextEditingController _remarkFilterController = TextEditingController();
   List<PlatformFile> _selectedFiles = const [];
@@ -84,7 +87,42 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
   }
 
   Future<void> _handleScanFromCamera() async {
-    await _notImplementedYet('Scan from camera');
+    try {
+      final captured = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 90,
+      );
+      if (captured == null) return;
+
+      final bytes = await captured.readAsBytes();
+      final fileName = captured.name.trim().isEmpty
+          ? 'camera_${DateTime.now().millisecondsSinceEpoch}.jpg'
+          : captured.name;
+      final platformFile = PlatformFile(
+        name: fileName,
+        size: bytes.length,
+        bytes: bytes,
+        path: captured.path,
+      );
+
+      setState(() {
+        if (_type == AutoExtractType.academicCalendar) {
+          _selectedFiles = [..._selectedFiles, platformFile];
+        } else {
+          _selectedFiles = [platformFile];
+        }
+      });
+    } on FileSystemException catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not read the captured photo.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Camera capture failed. Please try again.')),
+      );
+    }
   }
 
   Future<void> _handleContinue() async {
