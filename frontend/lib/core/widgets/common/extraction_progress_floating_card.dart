@@ -1,8 +1,43 @@
 import 'package:flutter/material.dart';
 
 import '../../constants/app_spacing.dart';
+import '../../constants/routes.dart';
 import '../../services/extraction_job_store.dart';
 import 'confirm_dialog.dart';
+
+String _friendlyExtractionErrorMessage(ExtractionJobState job) {
+  final raw = (job.message ?? '').trim();
+  final body = (job.responseBody ?? '').trim();
+  final combined = '$raw\n$body'.toLowerCase();
+
+  if (combined.contains('std::bad_alloc') ||
+      combined.contains('out of memory') ||
+      combined.contains('memory')) {
+    return 'The file is too large or complex to process right now. '
+        'Try a smaller file, lower-quality PDF/image, or fewer pages.';
+  }
+  if (combined.contains('413') || combined.contains('exceeds max size')) {
+    return 'This file is too large to upload. Please choose a smaller file.';
+  }
+  if (combined.contains('timeout') ||
+      combined.contains('timed out') ||
+      combined.contains('connection')) {
+    return 'Connection issue while extracting. Please check internet and try again.';
+  }
+  if (combined.contains('500') ||
+      combined.contains('internal server error') ||
+      combined.contains('preprocess failed')) {
+    return 'We could not process this file. Please try again with a clearer file.';
+  }
+  if (combined.contains('400') ||
+      combined.contains('no file uploaded') ||
+      combined.contains('empty file')) {
+    return 'The selected file could not be read. Please choose another file.';
+  }
+
+  return 'Extraction failed. Please try again. '
+      '${raw.isNotEmpty ? '($raw)' : ''}'.trim();
+}
 
 class ExtractionProgressFloatingCard extends StatelessWidget {
   const ExtractionProgressFloatingCard({super.key});
@@ -16,9 +51,18 @@ class ExtractionProgressFloatingCard extends StatelessWidget {
 
         final colorScheme = Theme.of(context).colorScheme;
         final isRunning = job.isRunning;
-        final titleText = isRunning ? 'Extracting...' : 'Extraction Complete';
-        final subtitleText =
-            isRunning ? 'May take a few minutes...' : 'Tap for review';
+        final titleText = switch (job.status) {
+          ExtractionJobStatus.queued || ExtractionJobStatus.running =>
+            'Extracting...',
+          ExtractionJobStatus.success => 'Extraction Complete',
+          ExtractionJobStatus.failed => 'Extraction Failed',
+        };
+        final subtitleText = switch (job.status) {
+          ExtractionJobStatus.queued || ExtractionJobStatus.running =>
+            'May take a few minutes...',
+          ExtractionJobStatus.success => 'Tap for review',
+          ExtractionJobStatus.failed => _friendlyExtractionErrorMessage(job),
+        };
         final icon = switch (job.status) {
           ExtractionJobStatus.queued || ExtractionJobStatus.running => const SizedBox(
               width: 18,
@@ -87,17 +131,44 @@ class ExtractionProgressFloatingCard extends StatelessWidget {
                     },
                     child: const Text('Cancel'),
                   ),
-                if (!isRunning)
+                if (job.status == ExtractionJobStatus.success)
                   IconButton(
                     tooltip: 'Review extracted data',
                     onPressed: () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Open Review Screen to review before saving'),
-                        ),
+                      final body = job.responseBody;
+                      if (body == null || body.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('No extraction data to review.'),
+                          ),
+                        );
+                        return;
+                      }
+                      if (job.typeLabel != 'Academic calendar') {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Review for “${job.typeLabel}” is not available yet.',
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+                      if (job.status != ExtractionJobStatus.success) {
+                        return;
+                      }
+                      Navigator.of(context).pushNamed(
+                        AppRoutes.reviewExtractedCalendar,
+                        arguments: body,
                       );
                     },
                     icon: const Icon(Icons.arrow_forward_ios_rounded),
+                  ),
+                if (job.status == ExtractionJobStatus.failed)
+                  IconButton(
+                    tooltip: 'Dismiss',
+                    onPressed: dismissExtractionJobCard,
+                    icon: const Icon(Icons.close),
                   ),
               ],
             ),

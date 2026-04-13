@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import '../../core/constants/app_spacing.dart';
 import '../../core/services/extraction_job_store.dart';
@@ -20,7 +21,13 @@ class AutoExtractScreen extends StatefulWidget {
 }
 
 class _AutoExtractScreenState extends State<AutoExtractScreen> {
-  static const String _apiBaseUrl = 'http://10.0.2.2:8000';
+  // Preferred: .env -> API_BASE_URL=http://your-ip:8000
+  // Fallback: flutter run --dart-define=API_BASE_URL=http://your-ip:8000
+  String get _apiBaseUrl {
+    final fromEnv = (dotenv.env['API_BASE_URL'] ?? '').trim();
+    if (fromEnv.isNotEmpty) return fromEnv;
+    return const String.fromEnvironment('API_BASE_URL').trim();
+  }
 
   AutoExtractType _type = AutoExtractType.academicCalendar;
   bool _isAnalyzing = false;
@@ -81,6 +88,13 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
   }
 
   Future<void> _handleContinue() async {
+    if (_apiBaseUrl.trim().isEmpty) {
+      await _notImplementedYet(
+        'Missing API_BASE_URL. Run with --dart-define=API_BASE_URL=http://your-ip:8000',
+      );
+      return;
+    }
+
     if (_selectedFiles.isEmpty) {
       await _notImplementedYet('Please choose a file first');
       return;

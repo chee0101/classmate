@@ -393,7 +393,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
     }
 
     final event = AcademicEvent(
-      id: DateTime.now().microsecondsSinceEpoch.toString(),
+      id: '',
       sessionId: sessionId,
       termId: termId,
       title: eventTitle,

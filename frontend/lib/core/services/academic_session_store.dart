@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 
 import '../models/academic_session.dart';
 import '../models/academic_event.dart';
+import 'academic_event_store.dart';
 import 'session_term_selection_store.dart';
 import '../utils/term_windows.dart';
 import 'cascade_cleanup.dart';
@@ -190,6 +191,7 @@ Future<void> setCurrentAcademicSession(AcademicSession session) async {
 Future<void> addAcademicSession(
   AcademicSession session, {
   bool? seedAcademicBreakEvents,
+  bool allowDuplicateSignature = false,
 }) async {
   final user = FirebaseAuth.instance.currentUser;
   if (user == null) return;
@@ -229,7 +231,7 @@ Future<void> addAcademicSession(
         s.startDate == normalizedStart &&
         s.endDate == normalizedEnd,
   );
-  if (exists) return;
+  if (exists && !allowDuplicateSignature) return;
 
   final isFirstSession = academicSessionsNotifier.value.isEmpty;
   // Use the provided client-side id as the Firestore document id so that
@@ -462,10 +464,7 @@ Future<void> _seedAcademicBreakEventsForSession({
       continue;
     }
 
-    final safeStartKey =
-        '${breakEvent.startDateTime.year}-${breakEvent.startDateTime.month.toString().padLeft(2, '0')}-${breakEvent.startDateTime.day.toString().padLeft(2, '0')}';
-    final docId =
-        'academic_break_${breakEvent.termId}_${breakEvent.title.replaceAll(RegExp(r'\\s+'), '_').toLowerCase()}_$safeStartKey';
+    final docId = buildAcademicEventDocId(breakEvent);
     batch.set(
       eventCollection.doc(docId),
       {

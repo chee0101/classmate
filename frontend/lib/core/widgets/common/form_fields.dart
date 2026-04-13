@@ -13,6 +13,8 @@ class LabeledTextField extends StatelessWidget {
     this.keyboardType,
     this.obscureText = false,
     this.suffixIcon,
+    this.enabled = true,
+    this.readOnly = false,
   });
 
   final String label;
@@ -25,6 +27,8 @@ class LabeledTextField extends StatelessWidget {
   final TextInputType? keyboardType;
   final bool obscureText;
   final Widget? suffixIcon;
+  final bool enabled;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -39,12 +43,18 @@ class LabeledTextField extends StatelessWidget {
           maxLines: maxLines,
           keyboardType: keyboardType,
           obscureText: obscureText,
+          enabled: enabled,
+          readOnly: readOnly,
           onChanged: onChanged,
           decoration: InputDecoration(
             hintText: hintText,
             suffixIcon: suffixIcon,
+            filled: true,
+            fillColor: enabled ? Colors.white : Colors.grey.shade100,
           ),
-          style: Theme.of(context).textTheme.bodyMedium,
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            color: enabled ? Colors.black87 : Colors.grey.shade600,
+          ),
         ),
         if (errorText != null) ...[
           const SizedBox(height: 4),
