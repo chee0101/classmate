@@ -63,6 +63,24 @@ class AssignmentExtract(BaseModel):
     course_id: str | None = None
 
 
+class TaskSubtaskExtract(BaseModel):
+    title: str
+    due_datetime: datetime | None = None
+    is_completed: bool = False
+
+
+class TaskExtract(BaseModel):
+    """Extended task payload supporting parent task + subtasks + candidate codes."""
+
+    title: str
+    description: str | None = None
+    due_datetime: datetime | None = None
+    course_code: str = "UNKNOWN"
+    course_code_candidates: list[str] = Field(default_factory=list)
+    course_id: str | None = None
+    subtasks: list[TaskSubtaskExtract] = Field(default_factory=list)
+
+
 # Mirrors Dart ClassType.name / Firestore classType string
 ClassTypeName = Literal["lecture", "tutorial", "lab", "other"]
 
@@ -91,6 +109,7 @@ class ExtractionResult(BaseModel):
     confidence: float = Field(ge=0.0, le=1.0, default=0.0)
     academic_session: AcademicSessionExtract | None = None
     assignment: AssignmentExtract | None = None
+    tasks: list[TaskExtract] = Field(default_factory=list)
     timetable: TimetableExtract | None = None
     notes: str | None = Field(None, description="Model caveats or missing fields")
 

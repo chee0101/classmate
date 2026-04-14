@@ -62,7 +62,7 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
       case AutoExtractType.timetable:
         return 'Upload your timetable document or screenshots.';
       case AutoExtractType.task:
-        return 'Upload a document to extract tasks/assignments.';
+        return 'Upload task documents or screenshots.';
     }
   }
 
@@ -75,7 +75,7 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
 
   Future<void> _handleChooseFile() async {
     final result = await FilePicker.platform.pickFiles(
-      allowMultiple: _type == AutoExtractType.academicCalendar,
+      allowMultiple: _type != AutoExtractType.timetable,
       withData: true,
       type: FileType.custom,
       allowedExtensions: const ['pdf', 'docx', 'png', 'jpg', 'jpeg'],
@@ -106,7 +106,7 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
       );
 
       setState(() {
-        if (_type == AutoExtractType.academicCalendar) {
+        if (_type != AutoExtractType.timetable) {
           _selectedFiles = [..._selectedFiles, platformFile];
         } else {
           _selectedFiles = [platformFile];
@@ -160,7 +160,7 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
         endpoint: endpoint,
         typeLabel: typeLabel,
         files: _selectedFiles,
-        useMultiFilesField: _type == AutoExtractType.academicCalendar,
+        useMultiFilesField: _type != AutoExtractType.timetable,
       ),
     );
 

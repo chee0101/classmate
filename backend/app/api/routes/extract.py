@@ -35,7 +35,7 @@ async def _run_job(job_id: str, kind: str, docs: list[RawDocument]) -> None:
         elif kind == "timetable":
             result = await run_timetable_pipeline(docs[0])
         elif kind == "task":
-            result = await run_task_pipeline(docs[0])
+            result = await run_task_pipeline(docs)
         else:
             raise ValueError(f"Unsupported extraction kind: {kind}")
         job["status"] = "success"
@@ -104,10 +104,17 @@ async def extract_timetable(
 
 @router.post("/extract/task", response_model=ExtractionEnvelope)
 async def extract_task(
-    file: UploadFile = File(..., description="PDF, DOCX, or image (per Docling support)"),
+    file: UploadFile | None = File(
+        None,
+        description="Single PDF/DOCX/image upload (backward compatible).",
+    ),
+    files: list[UploadFile] | None = File(
+        None,
+        description="Multiple screenshots/images/PDFs in order.",
+    ),
 ) -> ExtractionEnvelope:
-    doc = await _read_upload(file)
-    return await run_task_pipeline(doc)
+    docs = await _read_uploads(file, files)
+    return await run_task_pipeline(docs)
 
 
 @router.post("/extract/submit/{kind}")
@@ -127,7 +134,7 @@ async def submit_extraction_job(
         raise HTTPException(status_code=400, detail="Unsupported extraction kind")
 
     docs = await _read_uploads(file, files)
-    if normalized_kind in {"timetable", "task"} and len(docs) != 1:
+    if normalized_kind == "timetable" and len(docs) != 1:
         raise HTTPException(
             status_code=400,
             detail=f"{normalized_kind} extraction expects exactly one file",

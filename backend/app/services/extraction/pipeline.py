@@ -4,11 +4,17 @@ from __future__ import annotations
 
 import time
 
-from app.schemas.extraction import AcademicExtractionEnvelope, AcademicExtractionResult
+from app.schemas.extraction import (
+    AcademicExtractionEnvelope,
+    AcademicExtractionResult,
+)
 from app.schemas.extraction import DocumentKind, ExtractionEnvelope
 from app.schemas.extraction import ExtractionResult
 from app.services.extraction.calendar_parser import classify_and_extract
-from app.services.extraction.gemini_extractor import slice_english_calendar_section_with_debug
+from app.services.extraction.gemini_extractor import (
+    extract_task_with_gemini,
+    slice_english_calendar_section_with_debug,
+)
 from app.services.extraction.docling_service import (
     RawDocument,
     document_to_outputs,
@@ -124,17 +130,52 @@ async def run_timetable_pipeline(doc: RawDocument) -> ExtractionEnvelope:
     )
 
 
-async def run_task_pipeline(doc: RawDocument) -> ExtractionEnvelope:
-    markdown, warnings, timing_ms = await _docling_to_markdown(doc)
-    extraction = ExtractionResult(
-        kind=DocumentKind.unknown,
-        confidence=0.0,
-        notes="Task extraction pipeline is not implemented yet.",
-    )
-    warnings.append("Task extraction is not implemented yet.")
+async def run_task_pipeline(docs: list[RawDocument]) -> ExtractionEnvelope:
+    markdown, source_filename, warnings, timing_ms = await _doclings_to_markdown(docs)
+    if not markdown.strip():
+        extraction = ExtractionResult(
+            kind=DocumentKind.unknown,
+            confidence=0.0,
+            notes="Docling conversion failed for task extraction.",
+        )
+        warnings.append("Task extraction failed: empty Docling output.")
+        return ExtractionEnvelope(
+            document_kind=DocumentKind.unknown,
+            source_filename=source_filename,
+            markdown_from_docling=markdown,
+            extraction=extraction,
+            warnings=warnings,
+            timing_ms=timing_ms,
+        )
+
+    tasks, gemini_ms, status, error, model_used = await extract_task_with_gemini(markdown)
+    timing_ms["gemini_ms"] = gemini_ms
+    if not tasks:
+        extraction = ExtractionResult(
+            kind=DocumentKind.unknown,
+            confidence=0.0,
+            notes=(
+                "Task extraction did not return any valid task; "
+                f"gemini_status={status!r}; model={model_used!r}; error={error!r}"
+            ),
+        )
+        warnings.append("Task extraction returned no tasks.")
+        document_kind = DocumentKind.unknown
+    else:
+        extraction = ExtractionResult(
+            kind=DocumentKind.assignment,
+            confidence=0.75,
+            assignment=None,
+            tasks=tasks,
+            notes=(
+                f"gemini_status={status!r}; model={model_used!r}; error={error!r}; task_count={len(tasks)}"
+            ),
+        )
+        document_kind = DocumentKind.assignment
+
     return ExtractionEnvelope(
-        document_kind=DocumentKind.unknown,
-        source_filename=doc.filename,
+        document_kind=document_kind,
+        source_filename=source_filename,
         markdown_from_docling=markdown,
         extraction=extraction,
         warnings=warnings,
