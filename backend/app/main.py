@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.routes import extract, health
-from app.core.config import get_settings
+from app.core.config import get_settings, reload_settings
 
 
 def _cors_allow_origins(cors_origins: str) -> list[str]:
@@ -17,7 +17,8 @@ def _cors_allow_origins(cors_origins: str) -> list[str]:
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    # Startup: DB pools, Docling models, etc.
+    # Clear cached Settings so backend/.env is re-read (cwd-independent path in config.py).
+    reload_settings()
     yield
     # Shutdown
 

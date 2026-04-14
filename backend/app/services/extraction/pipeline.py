@@ -8,10 +8,7 @@ from app.schemas.extraction import AcademicExtractionEnvelope, AcademicExtractio
 from app.schemas.extraction import DocumentKind, ExtractionEnvelope
 from app.schemas.extraction import ExtractionResult
 from app.services.extraction.calendar_parser import classify_and_extract
-from app.services.extraction.gemini_extractor import (
-    _slice_english_calendar_section_with_debug,
-    build_remark_text_for_debug,
-)
+from app.services.extraction.gemini_extractor import slice_english_calendar_section_with_debug
 from app.services.extraction.docling_service import (
     RawDocument,
     document_to_outputs,
@@ -78,9 +75,9 @@ async def run_academic_calendar_pipeline(
             timing_ms=timing_ms,
         )
 
-    gemini_text_bundle = markdown
-    sliced_text_for_gemini, slice_debug = _slice_english_calendar_section_with_debug(gemini_text_bundle)
-    remark_text_for_gemini = build_remark_text_for_debug(gemini_text_bundle)
+    sliced_text_for_gemini, slice_debug = slice_english_calendar_section_with_debug(markdown)
+    gemini_text_bundle = sliced_text_for_gemini
+    remark_text_for_gemini = sliced_text_for_gemini
     timing_ms["slice_header_match_count"] = float(slice_debug["slice_header_match_count"])
     timing_ms["slice_start_index"] = float(slice_debug["slice_start_index"])
     t_parse0 = time.perf_counter()

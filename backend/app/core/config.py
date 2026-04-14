@@ -1,13 +1,19 @@
 from functools import lru_cache
+from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Resolve backend/.env regardless of uvicorn cwd (fixes GEMINI_API_KEY not loading from repo root).
+_BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent
+_BACKEND_ENV = _BACKEND_ROOT / ".env"
 
 
 class Settings(BaseSettings):
     """Environment-driven configuration."""
 
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=str(_BACKEND_ENV) if _BACKEND_ENV.is_file() else ".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -22,12 +28,26 @@ class Settings(BaseSettings):
     # Comma-separated origins, or "*" for any (dev only)
     cors_origins: str = "*"
 
-    # Gemini extraction settings
+    # Gemini: full academic-calendar JSON extraction when a key is set (see .env.example).
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-3.1-flash-lite-preview"
-    use_gemini_holiday_extraction: bool = False
+    use_gemini_holiday_extraction: bool = True
+
+    @field_validator("gemini_api_key", mode="before")
+    @classmethod
+    def _strip_gemini_key(cls, v: object) -> object:
+        if isinstance(v, str):
+            s = v.strip()
+            return s if s else None
+        return v
 
 
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
+
+
+def reload_settings() -> Settings:
+    """Reload .env into Settings (call after editing backend/.env during development)."""
+    get_settings.cache_clear()
+    return get_settings()
