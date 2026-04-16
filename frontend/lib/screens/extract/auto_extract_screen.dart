@@ -8,7 +8,9 @@ import 'package:image_picker/image_picker.dart';
 
 import '../../core/constants/app_spacing.dart';
 import '../../core/models/academic_session.dart';
+import '../../core/models/course.dart';
 import '../../core/services/academic_session_store.dart';
+import '../../core/services/course_store.dart';
 import '../../core/services/extraction_job_store.dart';
 import '../../core/services/session_term_selection_store.dart';
 import '../../core/utils/session_term_resolver.dart';
@@ -39,6 +41,9 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
   AutoExtractType _type = AutoExtractType.academicCalendar;
   bool _isAnalyzing = false;
   final ImagePicker _imagePicker = ImagePicker();
+
+  // Optional: if user picks one course, we auto-fill empty extracted course codes.
+  String? _taskAssignedCourseCode;
 
   final TextEditingController _remarkFilterController = TextEditingController();
   List<PlatformFile> _selectedFiles = const [];
@@ -166,6 +171,9 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
         typeLabel: typeLabel,
         files: _selectedFiles,
         useMultiFilesField: _type != AutoExtractType.timetable,
+        assignedCourseCode: _type == AutoExtractType.task
+            ? _taskAssignedCourseCode
+            : null,
       ),
     );
 
@@ -258,14 +266,80 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
                             });
                           }
 
-                          return SessionHeader(
-                            sessions: sessions,
-                            selectedSessionId: selectedSessionId,
-                            selectedTermId: selectedTermId,
-                            onSelectionChanged: (sessionId, termId) {
-                              setSelectedSessionTerm(
-                                sessionId: sessionId,
-                                termId: termId,
+                          return ValueListenableBuilder<List<Course>>(
+                            valueListenable: coursesNotifier,
+                            builder: (context, _, __) {
+                              final termCourses =
+                                  coursesForSessionAndTerm(
+                                sessionId: selectedSessionId,
+                                termId: selectedTermId,
+                              );
+                              final courseCodes = termCourses
+                                .map((c) => c.courseCode.trim().toUpperCase())
+                                .where((c) => c.isNotEmpty)
+                                .toList(growable: false)
+                              ..sort();
+
+                              const autoValue = '__auto__';
+                              final normalizedSelected =
+                                  _taskAssignedCourseCode
+                                      ?.trim()
+                                      .toUpperCase();
+                              final effectiveSelected =
+                                  normalizedSelected != null &&
+                                          courseCodes.contains(normalizedSelected)
+                                      ? normalizedSelected
+                                      : null;
+                              final dropdownValue =
+                                  effectiveSelected ?? autoValue;
+
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  SessionHeader(
+                                    sessions: sessions,
+                                    selectedSessionId: selectedSessionId,
+                                    selectedTermId: selectedTermId,
+                                    onSelectionChanged: (sessionId, termId) {
+                                      setSelectedSessionTerm(
+                                        sessionId: sessionId,
+                                        termId: termId,
+                                      );
+                                      setState(() => _taskAssignedCourseCode = null);
+                                    },
+                                  ),
+                                  const SizedBox(height: AppSpacing.sm),
+                                  if (courseCodes.isNotEmpty)
+                                    DropdownField<String>(
+                                      label:
+                                          'Assign extracted tasks to course (optional)',
+                                      showLabel: true,
+                                      hintText: 'Select course code',
+                                      value: dropdownValue,
+                                      items: [
+                                        const DropdownMenuEntry<String>(
+                                          value: autoValue,
+                                          label:
+                                              'Auto (use extracted course codes)',
+                                        ),
+                                        ...courseCodes.map(
+                                          (code) => DropdownMenuEntry<String>(
+                                            value: code,
+                                            label: code,
+                                          ),
+                                        ),
+                                      ],
+                                      onChanged: (value) {
+                                        if (!mounted) return;
+                                        setState(() {
+                                          _taskAssignedCourseCode =
+                                              (value == autoValue)
+                                                  ? null
+                                                  : value;
+                                        });
+                                      },
+                                    ),
+                                ],
                               );
                             },
                           );

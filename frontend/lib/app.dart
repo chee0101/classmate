@@ -240,6 +240,16 @@ class MyApp extends StatelessWidget {
         },
         AppRoutes.reviewExtractedTasks: (context) {
           final args = ModalRoute.of(context)?.settings.arguments;
+          if (args is Map) {
+            final jsonStr = (args['responseJson'] as String?) ?? '';
+            final assignedCourseCode = (args['assignedCourseCode'] as String?)
+                ?.trim()
+                .toUpperCase();
+            return ReviewExtractedTasksScreen(
+              responseJson: jsonStr,
+              assignedCourseCode: assignedCourseCode,
+            );
+          }
           final jsonStr = args is String ? args : '';
           return ReviewExtractedTasksScreen(responseJson: jsonStr);
         },

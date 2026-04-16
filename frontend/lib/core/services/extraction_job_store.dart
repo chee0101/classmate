@@ -12,6 +12,7 @@ class ExtractionJobState {
     required this.endpoint,
     required this.status,
     required this.startedAt,
+    this.assignedCourseCode,
     this.finishedAt,
     this.statusCode,
     this.message,
@@ -27,6 +28,7 @@ class ExtractionJobState {
   final int? statusCode;
   final String? message;
   final String? responseBody;
+  final String? assignedCourseCode;
 
   bool get isRunning =>
       status == ExtractionJobStatus.queued || status == ExtractionJobStatus.running;
@@ -37,6 +39,7 @@ class ExtractionJobState {
     int? statusCode,
     String? message,
     String? responseBody,
+    String? assignedCourseCode,
   }) {
     return ExtractionJobState(
       typeLabel: typeLabel,
@@ -48,6 +51,7 @@ class ExtractionJobState {
       statusCode: statusCode ?? this.statusCode,
       message: message ?? this.message,
       responseBody: responseBody ?? this.responseBody,
+      assignedCourseCode: assignedCourseCode ?? this.assignedCourseCode,
     );
   }
 }
@@ -76,6 +80,7 @@ Future<void> startExtractionJob({
   required String typeLabel,
   required List<PlatformFile> files,
   required bool useMultiFilesField,
+  String? assignedCourseCode,
 }) async {
   if (files.isEmpty) {
     throw StateError('No files selected.');
@@ -95,6 +100,7 @@ Future<void> startExtractionJob({
     status: ExtractionJobStatus.queued,
     startedAt: DateTime.now(),
     message: 'Queued',
+    assignedCourseCode: assignedCourseCode,
   );
 
   final kind = endpoint.split('/').last;

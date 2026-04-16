@@ -162,7 +162,13 @@ class ExtractionProgressFloatingCard extends StatelessWidget {
                       if (job.status != ExtractionJobStatus.success) {
                         return;
                       }
-                      Navigator.of(context).pushNamed(route, arguments: body);
+                      final args = route == AppRoutes.reviewExtractedTasks
+                          ? <String, dynamic>{
+                              'responseJson': body,
+                              'assignedCourseCode': job.assignedCourseCode,
+                            }
+                          : body;
+                      Navigator.of(context).pushNamed(route, arguments: args);
                     },
                     icon: const Icon(Icons.arrow_forward_ios_rounded),
                   ),

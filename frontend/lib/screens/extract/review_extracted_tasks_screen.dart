@@ -21,9 +21,11 @@ class ReviewExtractedTasksScreen extends StatefulWidget {
   const ReviewExtractedTasksScreen({
     super.key,
     required this.responseJson,
+    this.assignedCourseCode,
   });
 
   final String responseJson;
+  final String? assignedCourseCode;
 
   @override
   State<ReviewExtractedTasksScreen> createState() =>
@@ -90,6 +92,14 @@ class _ReviewExtractedTasksScreenState extends State<ReviewExtractedTasksScreen>
         _parsed == null
             ? <ParsedExtractedTask>[]
             : List<ParsedExtractedTask>.from(_parsed!.tasks);
+    final normalizedAssigned = widget.assignedCourseCode?.trim().toUpperCase();
+    if (normalizedAssigned != null && normalizedAssigned.isNotEmpty) {
+      for (final task in _tasks) {
+        if (task.courseCode.trim().isEmpty) {
+          task.courseCode = normalizedAssigned;
+        }
+      }
+    }
     for (var i = 0; i < _tasks.length; i++) {
       _selectedTaskIndexes.add(i);
       _selectedSubtaskIndexesByTask[i] = <int>{
