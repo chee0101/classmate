@@ -469,18 +469,26 @@ class _ReviewExtractedTasksScreenState extends State<ReviewExtractedTasksScreen>
                                       },
                                     ),
                                     Expanded(
-                                      child: InkWell(
-                                        onTap: () => _editTask(taskIndex),
-                                        borderRadius: BorderRadius.circular(10),
-                                        child: Padding(
-                                          padding: const EdgeInsets.only(
-                                            top: AppSpacing.xs,
-                                            right: AppSpacing.xs,
-                                            bottom: AppSpacing.xs,
-                                          ),
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
+                                      child: Material(
+                                        color: Colors.transparent,
+                                        child: InkWell(
+                                          onTap: () => _editTask(taskIndex),
+                                          borderRadius: BorderRadius.circular(10),
+                                          splashColor: appPrimarySwatch.shade100.withValues(alpha: 0.45),
+                                          highlightColor: appPrimarySwatch.shade100.withValues(alpha: 0.25),
+                                          child: Padding(
+                                            padding: const EdgeInsets.only(
+                                              top: AppSpacing.xs,
+                                              right: AppSpacing.xs,
+                                              bottom: AppSpacing.xs,
+                                            ),
+                                            child: Row(
+                                              crossAxisAlignment: CrossAxisAlignment.center,
+                                              children: [
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
                                               Padding(
                                                 padding: const EdgeInsets.only(
                                                   bottom: AppSpacing.xs,
@@ -550,20 +558,26 @@ class _ReviewExtractedTasksScreenState extends State<ReviewExtractedTasksScreen>
                                                       ),
                                                 ),
                                               ],
-                                            ],
+                                                    ],
+                                                  ),
+                                                ),
+                                                Padding(
+                                                  padding: const EdgeInsets.only(
+                                                    left: AppSpacing.xs,
+                                                    right: AppSpacing.xs,
+                                                  ),
+                                                  child: Icon(
+                                                    Icons.arrow_forward_ios_rounded,
+                                                    size: 18,
+                                                    color: appPrimarySwatch.shade700,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
                                           ),
                                         ),
                                       ),
                                     ),
-                                  IconButton(
-                                    tooltip: 'Edit task',
-                                    onPressed: () => _editTask(taskIndex),
-                                    icon: Icon(
-                                      Icons.arrow_forward_ios_rounded,
-                                      size: 18,
-                                      color: appPrimarySwatch.shade700,
-                                    ),
-                                  ),
                                     if (task.subtasks.isNotEmpty)
                                       IconButton(
                                         tooltip: expanded ? 'Collapse' : 'Expand',
@@ -622,22 +636,26 @@ class _ReviewExtractedTasksScreenState extends State<ReviewExtractedTasksScreen>
                                                     : null,
                                           ),
                                           Expanded(
-                                            child: InkWell(
-                                              onTap: () => _editSubtask(task, subtask),
-                                              borderRadius: BorderRadius.circular(10),
-                                              child: Padding(
-                                                padding: const EdgeInsets.symmetric(
-                                                  vertical: AppSpacing.xs,
-                                                ),
-                                                child: Column(
-                                                  crossAxisAlignment:
-                                                      CrossAxisAlignment.start,
-                                                  children: [
+                                            child: Material(
+                                              color: Colors.transparent,
+                                              child: InkWell(
+                                                onTap: () => _editSubtask(task, subtask),
+                                                borderRadius: BorderRadius.circular(10),
+                                                splashColor: appPrimarySwatch.shade100.withValues(alpha: 0.45),
+                                                highlightColor: appPrimarySwatch.shade100.withValues(alpha: 0.25),
+                                                child: Padding(
+                                                  padding: const EdgeInsets.symmetric(
+                                                    vertical: AppSpacing.xs,
+                                                  ),
+                                                  child: Column(
+                                                    crossAxisAlignment:
+                                                        CrossAxisAlignment.start,
+                                                    children: [
                                                     Text(
                                                       subtask.title,
                                                       style: Theme.of(context)
                                                           .textTheme
-                                                          .titleMedium
+                                                          .titleSmall
                                                           ?.copyWith(
                                                             fontWeight: FontWeight.w500,
                                                           ),
@@ -671,7 +689,8 @@ class _ReviewExtractedTasksScreenState extends State<ReviewExtractedTasksScreen>
                                                             ),
                                                       ),
                                                     ],
-                                                  ],
+                                                    ],
+                                                  ),
                                                 ),
                                               ),
                                             ),
