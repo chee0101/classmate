@@ -4,6 +4,7 @@ import '../../constants/app_spacing.dart';
 import '../../models/task.dart';
 import '../../services/course_store.dart';
 import '../../utils/date_time_format.dart';
+import '../common/confirm_dialog.dart';
 import '../common/course_selector.dart';
 import '../common/form_fields.dart';
 import '../add/add_course_dialog.dart';
@@ -18,12 +19,28 @@ class TaskEditBottomSheet extends StatefulWidget {
     required this.sheetTitle,
     this.isSubtask = false,
     this.parentDueDateTime,
+    this.onDeleteRequested,
+    this.deleteConfirmTitle,
+    this.deleteConfirmMessage,
+    this.deleteConfirmText = 'Delete',
+    this.scopeSessionId,
+    this.scopeTermId,
+    this.minDueDateTime,
+    this.maxDueDateTime,
   });
 
   final Task task;
   final String sheetTitle;
   final bool isSubtask;
   final DateTime? parentDueDateTime;
+  final VoidCallback? onDeleteRequested;
+  final String? deleteConfirmTitle;
+  final String? deleteConfirmMessage;
+  final String deleteConfirmText;
+  final String? scopeSessionId;
+  final String? scopeTermId;
+  final DateTime? minDueDateTime;
+  final DateTime? maxDueDateTime;
 
   static Future<Task?> show(
     BuildContext context, {
@@ -31,6 +48,14 @@ class TaskEditBottomSheet extends StatefulWidget {
     required String sheetTitle,
     bool isSubtask = false,
     DateTime? parentDueDateTime,
+    VoidCallback? onDeleteRequested,
+    String? deleteConfirmTitle,
+    String? deleteConfirmMessage,
+    String deleteConfirmText = 'Delete',
+    String? scopeSessionId,
+    String? scopeTermId,
+    DateTime? minDueDateTime,
+    DateTime? maxDueDateTime,
   }) {
     return showModalBottomSheet<Task>(
       context: context,
@@ -43,6 +68,14 @@ class TaskEditBottomSheet extends StatefulWidget {
         sheetTitle: sheetTitle,
         isSubtask: isSubtask,
         parentDueDateTime: parentDueDateTime,
+        onDeleteRequested: onDeleteRequested,
+        deleteConfirmTitle: deleteConfirmTitle,
+        deleteConfirmMessage: deleteConfirmMessage,
+        deleteConfirmText: deleteConfirmText,
+        scopeSessionId: scopeSessionId,
+        scopeTermId: scopeTermId,
+        minDueDateTime: minDueDateTime,
+        maxDueDateTime: maxDueDateTime,
       ),
     );
   }
@@ -84,7 +117,11 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
     _selectedCourseCode = initialCode;
     _selectedDueDateTime = widget.task.dueDateTime;
 
-    if (_selectedCourseId != null) {
+    _scopeSessionId = widget.scopeSessionId;
+    _scopeTermId = widget.scopeTermId;
+
+    if (_selectedCourseId != null &&
+        (_scopeSessionId == null || _scopeTermId == null)) {
       final scope = courseScopeForCourseId(_selectedCourseId!);
       _scopeSessionId = scope?.sessionId;
       _scopeTermId = scope?.termId;
@@ -111,18 +148,41 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
 
   Future<void> _pickDate() async {
     final baseTheme = Theme.of(context);
-    final lastDate = widget.isSubtask && widget.parentDueDateTime != null
+    var lastDate = widget.isSubtask && widget.parentDueDateTime != null
         ? DateTime(
             widget.parentDueDateTime!.year,
             widget.parentDueDateTime!.month,
             widget.parentDueDateTime!.day,
           )
         : DateTime.now().add(const Duration(days: 365 * 5));
+    if (widget.maxDueDateTime != null && widget.maxDueDateTime!.isBefore(lastDate)) {
+      lastDate = DateTime(
+        widget.maxDueDateTime!.year,
+        widget.maxDueDateTime!.month,
+        widget.maxDueDateTime!.day,
+      );
+    }
+
+    var firstDate = DateTime.now().subtract(const Duration(days: 365));
+    if (widget.minDueDateTime != null && widget.minDueDateTime!.isAfter(firstDate)) {
+      firstDate = DateTime(
+        widget.minDueDateTime!.year,
+        widget.minDueDateTime!.month,
+        widget.minDueDateTime!.day,
+      );
+    }
+    if (lastDate.isBefore(firstDate)) {
+      firstDate = DateTime(lastDate.year, lastDate.month, lastDate.day);
+    }
+
+    var initialDate = _selectedDueDateTime;
+    if (initialDate.isBefore(firstDate)) initialDate = firstDate;
+    if (initialDate.isAfter(lastDate)) initialDate = lastDate;
 
     final picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDueDateTime,
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      initialDate: initialDate,
+      firstDate: firstDate,
       lastDate: lastDate,
       builder: (context, child) {
         return Theme(
@@ -178,6 +238,18 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
         });
         return;
       }
+      if (widget.maxDueDateTime != null && candidate.isAfter(widget.maxDueDateTime!)) {
+        setState(() {
+          _timeError = 'Due date/time must be within the selected session range.';
+        });
+        return;
+      }
+      if (widget.minDueDateTime != null && candidate.isBefore(widget.minDueDateTime!)) {
+        setState(() {
+          _timeError = 'Due date/time must be within the selected session range.';
+        });
+        return;
+      }
 
       setState(() {
         _selectedDueDateTime = candidate;
@@ -209,6 +281,21 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
         _timeError = null;
         _hasTime = true;
       }
+    }
+
+    if (widget.maxDueDateTime != null &&
+        _selectedDueDateTime.isAfter(widget.maxDueDateTime!)) {
+      setState(() {
+        _timeError = 'Due date/time must be within the selected session range.';
+      });
+      return;
+    }
+    if (widget.minDueDateTime != null &&
+        _selectedDueDateTime.isBefore(widget.minDueDateTime!)) {
+      setState(() {
+        _timeError = 'Due date/time must be within the selected session range.';
+      });
+      return;
     }
 
     var courseColor = widget.task.courseColor;
@@ -305,16 +392,40 @@ class _TaskEditBottomSheetState extends State<TaskEditBottomSheet> {
       padding: EdgeInsets.only(
         left: AppSpacing.lg,
         right: AppSpacing.lg,
-        top: AppSpacing.lg,
+        top: AppSpacing.md,
         bottom: MediaQuery.of(context).viewInsets.bottom + AppSpacing.lg,
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            widget.sheetTitle,
-            style: Theme.of(context).textTheme.headlineMedium,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  widget.sheetTitle,
+                  style: Theme.of(context).textTheme.headlineMedium,
+                ),
+              ),
+              if (widget.onDeleteRequested != null)
+                IconButton(
+                  tooltip: 'Delete',
+                  onPressed: () async {
+                    final confirmed = await showConfirmDeleteDialog(
+                      context,
+                      title: widget.deleteConfirmTitle ?? 'Delete Task',
+                      message:
+                          widget.deleteConfirmMessage ??
+                          'Are you sure you want to delete this task?',
+                      confirmText: widget.deleteConfirmText,
+                    );
+                    if (!confirmed || !context.mounted) return;
+                    widget.onDeleteRequested?.call();
+                    Navigator.of(context).pop();
+                  },
+                  icon: const Icon(Icons.delete_outline, color: Colors.red),
+                ),
+            ],
           ),
           const SizedBox(height: AppSpacing.md),
           LabeledTextField(

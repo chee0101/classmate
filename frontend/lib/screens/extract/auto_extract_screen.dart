@@ -7,11 +7,16 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/constants/app_spacing.dart';
+import '../../core/models/academic_session.dart';
+import '../../core/services/academic_session_store.dart';
 import '../../core/services/extraction_job_store.dart';
+import '../../core/services/session_term_selection_store.dart';
+import '../../core/utils/session_term_resolver.dart';
 import '../../core/widgets/common/app_outlined_icon_button.dart';
 import '../../core/widgets/common/animated_segmented_switch.dart';
 import '../../core/widgets/common/form_fields.dart';
 import '../../core/widgets/common/white_card.dart';
+import '../../core/widgets/home/session_header.dart';
 
 enum AutoExtractType { academicCalendar, timetable, task }
 
@@ -200,6 +205,77 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
               value: _type,
               onChanged: _isAnalyzing ? null : (v) => setState(() => _type = v),
             ),
+            if (_type == AutoExtractType.task) ...[
+              const SizedBox(height: AppSpacing.md),
+              ValueListenableBuilder<List<AcademicSession>>(
+                valueListenable: academicSessionsNotifier,
+                builder: (context, sessionsList, _) {
+                  return ValueListenableBuilder<AcademicSession?>(
+                    valueListenable: currentAcademicSessionNotifier,
+                    builder: (context, activeSession, __) {
+                      return ValueListenableBuilder<SessionTermSelection?>(
+                        valueListenable: selectedSessionTermNotifier,
+                        builder: (context, selectedSelection, ___) {
+                          final sessions = <AcademicSession>[...sessionsList];
+                          if (activeSession != null &&
+                              !sessions.any((s) => s.id == activeSession.id)) {
+                            sessions.add(activeSession);
+                          }
+                          if (sessions.isEmpty) return const SizedBox.shrink();
+
+                          final allTermRefs = buildAllSessionTermRefs(sessions);
+                          if (allTermRefs.isEmpty) return const SizedBox.shrink();
+
+                          final resolvedDefaultRef = resolveDefaultSessionTermRef(
+                            allTermRefs,
+                            DateTime.now(),
+                          );
+                          var selectedSessionId =
+                              selectedSelection?.sessionId ?? resolvedDefaultRef.session.id;
+                          var selectedTermId =
+                              selectedSelection?.termId ?? resolvedDefaultRef.term.id;
+
+                          final isValidSelection = allTermRefs.any(
+                            (ref) =>
+                                ref.session.id == selectedSessionId &&
+                                ref.term.id == selectedTermId,
+                          );
+                          if (!isValidSelection) {
+                            selectedSessionId = resolvedDefaultRef.session.id;
+                            selectedTermId = resolvedDefaultRef.term.id;
+                          }
+
+                          // Keep the global selection valid so downstream task save
+                          // resolves course IDs in the intended session/term.
+                          if (selectedSelection == null ||
+                              selectedSelection.sessionId != selectedSessionId ||
+                              selectedSelection.termId != selectedTermId) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              setSelectedSessionTerm(
+                                sessionId: selectedSessionId,
+                                termId: selectedTermId,
+                              );
+                            });
+                          }
+
+                          return SessionHeader(
+                            sessions: sessions,
+                            selectedSessionId: selectedSessionId,
+                            selectedTermId: selectedTermId,
+                            onSelectionChanged: (sessionId, termId) {
+                              setSelectedSessionTerm(
+                                sessionId: sessionId,
+                                termId: termId,
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
+            ],
             const SizedBox(height: AppSpacing.md),
             WhiteCard(
               child: Column(

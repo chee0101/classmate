@@ -10,6 +10,7 @@ import 'screens/auth/change_password_screen.dart';
 import 'screens/auth/verify_email_screen.dart';
 import 'screens/add/add_new_screen.dart' show AddNewScreen, AddType;
 import 'screens/extract/review_extracted_calendar_screen.dart';
+import 'screens/extract/review_extracted_tasks_screen.dart';
 import 'screens/task/task_detail_screen.dart';
 import 'screens/profile/academic_sessions_screen.dart';
 import 'screens/profile/courses_screen.dart';
@@ -236,6 +237,11 @@ class MyApp extends StatelessWidget {
           final args = ModalRoute.of(context)?.settings.arguments;
           final jsonStr = args is String ? args : '';
           return ReviewExtractedCalendarScreen(responseJson: jsonStr);
+        },
+        AppRoutes.reviewExtractedTasks: (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          final jsonStr = args is String ? args : '';
+          return ReviewExtractedTasksScreen(responseJson: jsonStr);
         },
         AppRoutes.taskDetail: (context) {
           final task = ModalRoute.of(context)!.settings.arguments as Task;

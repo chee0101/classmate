@@ -144,7 +144,12 @@ class ExtractionProgressFloatingCard extends StatelessWidget {
                         );
                         return;
                       }
-                      if (job.typeLabel != 'Academic calendar') {
+                      final route = switch (job.typeLabel) {
+                        'Academic calendar' => AppRoutes.reviewExtractedCalendar,
+                        'Task' => AppRoutes.reviewExtractedTasks,
+                        _ => null,
+                      };
+                      if (route == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
                             content: Text(
@@ -157,18 +162,15 @@ class ExtractionProgressFloatingCard extends StatelessWidget {
                       if (job.status != ExtractionJobStatus.success) {
                         return;
                       }
-                      Navigator.of(context).pushNamed(
-                        AppRoutes.reviewExtractedCalendar,
-                        arguments: body,
-                      );
+                      Navigator.of(context).pushNamed(route, arguments: body);
                     },
                     icon: const Icon(Icons.arrow_forward_ios_rounded),
                   ),
                 if (job.status == ExtractionJobStatus.failed)
-                  IconButton(
+                  const IconButton(
                     tooltip: 'Dismiss',
                     onPressed: dismissExtractionJobCard,
-                    icon: const Icon(Icons.close),
+                    icon: Icon(Icons.close),
                   ),
               ],
             ),

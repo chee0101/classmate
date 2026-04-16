@@ -75,7 +75,7 @@ class TaskExtract(BaseModel):
     title: str
     description: str | None = None
     due_datetime: datetime | None = None
-    course_code: str = "UNKNOWN"
+    course_code: str = ""
     course_code_candidates: list[str] = Field(default_factory=list)
     course_id: str | None = None
     subtasks: list[TaskSubtaskExtract] = Field(default_factory=list)

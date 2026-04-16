@@ -32,7 +32,7 @@ class SessionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final darkPurpleTextStyle = GoogleFonts.poppins(
       fontSize: 14,
-      fontWeight: FontWeight.w600,
+      fontWeight: FontWeight.w400,
       color: appPrimarySwatch.shade900,
     );
 
@@ -76,7 +76,7 @@ class SessionHeader extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.08),
+                color: Colors.black.withValues(alpha: 0.08),
                 blurRadius: 8,
                 offset: const Offset(0, 4),
               ),

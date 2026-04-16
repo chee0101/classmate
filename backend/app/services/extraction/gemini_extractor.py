@@ -178,7 +178,7 @@ def _extract_mixed_row_tasks_from_markdown_table(doc_text: str) -> list[TaskExtr
                 title=test_title,
                 description=None,
                 due_datetime=test_dt,
-                course_code="UNKNOWN",
+                course_code="",
                 course_code_candidates=[],
                 course_id=None,
                 subtasks=[],
@@ -191,7 +191,7 @@ def _extract_mixed_row_tasks_from_markdown_table(doc_text: str) -> list[TaskExtr
                 else "Submission",
                 description=None,
                 due_datetime=submission_dt,
-                course_code="UNKNOWN",
+                course_code="",
                 course_code_candidates=[],
                 course_id=None,
                 subtasks=[],
@@ -478,7 +478,7 @@ async def extract_task_with_gemini(
         title = item.title.strip()
         if not title:
             continue
-        code = (item.course_code or "").strip().upper() or "UNKNOWN"
+        code = (item.course_code or "").strip().upper()
         candidates = [
             c.strip().upper()
             for c in item.course_code_candidates
@@ -498,7 +498,7 @@ async def extract_task_with_gemini(
                 title=title,
                 description=_clean_task_description(item.description),
                 due_datetime=item.due_datetime,
-                course_code=code,
+                course_code=code if code else "",
                 course_code_candidates=candidates,
                 course_id=None,
                 subtasks=subtasks,
