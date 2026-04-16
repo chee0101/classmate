@@ -115,13 +115,13 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         ],
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(AppSpacing.lg),
+        padding: const EdgeInsets.all(AppSpacing.md),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Main task card with edit button
             _buildMainTaskCard(context, textTheme, colorScheme),
-            const SizedBox(height: AppSpacing.lg),
+            const SizedBox(height: AppSpacing.sm),
 
             // Sub Tasks section
             _buildSubtasksSection(textTheme, colorScheme),
@@ -164,6 +164,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
           onMarkDone: () {}, // Disabled in detail view
           showMarkDone: false,
           courses: termCourses,
+          truncateDescription: false,
           footer: _isEditing
               ? SizedBox(
                   height: 44,
@@ -205,7 +206,6 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
               ),
           ],
         ),
-        const SizedBox(height: AppSpacing.md),
         if (_subtasks.isEmpty)
           Center(
             child: Padding(
@@ -222,7 +222,7 @@ class _TaskDetailScreenState extends State<TaskDetailScreen> {
         else
           ..._subtasks.map(
             (subtask) => Padding(
-              padding: const EdgeInsets.only(bottom: AppSpacing.md),
+              padding: const EdgeInsets.only(bottom: AppSpacing.sm),
               child: SubtaskCard(
                 subtask: subtask,
                 onMarkDone: () async => _handleSubtaskMarkDone(subtask),

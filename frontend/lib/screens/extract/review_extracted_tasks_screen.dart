@@ -40,8 +40,13 @@ class _ReviewExtractedTasksScreenState extends State<ReviewExtractedTasksScreen>
   bool _showSaveBarShadow = false;
   bool _saving = false;
 
-  bool get _hasTasksMissingCourseCode =>
-      _tasks.any((task) => task.courseCode.trim().isEmpty);
+  bool get _hasSelectedTasksMissingCourseCode {
+    for (var i = 0; i < _tasks.length; i++) {
+      if (!_selectedTaskIndexes.contains(i)) continue;
+      if (_tasks[i].courseCode.trim().isEmpty) return true;
+    }
+    return false;
+  }
 
   AcademicSession? get _selectedSession {
     final selection = selectedSessionTermNotifier.value;
@@ -171,7 +176,6 @@ class _ReviewExtractedTasksScreenState extends State<ReviewExtractedTasksScreen>
       dueDateTime: _resolvedDueDateTime(parsed.dueDateTime),
       status: TaskStatus.ongoing,
     );
-    final hasSubtasks = parsed.subtasks.isNotEmpty;
     final updated = await TaskEditBottomSheet.show(
       context,
       task: draft,
@@ -180,12 +184,6 @@ class _ReviewExtractedTasksScreenState extends State<ReviewExtractedTasksScreen>
       scopeTermId: selectedSessionTermNotifier.value?.termId,
       minDueDateTime: _selectedSession?.startDate,
       maxDueDateTime: _selectedSession?.endDate,
-      onDeleteRequested: () => _deleteTaskAt(taskIndex),
-      deleteConfirmTitle: 'Delete Task',
-      deleteConfirmMessage: hasSubtasks
-          ? 'This task has ${parsed.subtasks.length} subtask(s). Deleting it will also remove the subtasks. Are you sure?'
-          : 'Are you sure you want to delete this task?',
-      deleteConfirmText: 'Delete',
     );
     if (updated == null || !mounted) return;
     setState(() {
@@ -237,7 +235,7 @@ class _ReviewExtractedTasksScreenState extends State<ReviewExtractedTasksScreen>
   }
 
   Future<void> _saveTasks() async {
-    if (_saving || _hasTasksMissingCourseCode) return;
+    if (_saving || _hasSelectedTasksMissingCourseCode) return;
     setState(() => _saving = true);
     try {
       var savedCount = 0;
@@ -303,49 +301,6 @@ class _ReviewExtractedTasksScreenState extends State<ReviewExtractedTasksScreen>
     } finally {
       if (mounted) setState(() => _saving = false);
     }
-  }
-
-  void _deleteTaskAt(int taskIndex) {
-    if (taskIndex < 0 || taskIndex >= _tasks.length) return;
-    setState(() {
-      _tasks.removeAt(taskIndex);
-
-      final nextExpanded = <int>{};
-      for (final i in _expandedTaskIndexes) {
-        if (i < taskIndex) {
-          nextExpanded.add(i);
-        } else if (i > taskIndex) {
-          nextExpanded.add(i - 1);
-        }
-      }
-      _expandedTaskIndexes
-        ..clear()
-        ..addAll(nextExpanded);
-
-      final nextSelectedTasks = <int>{};
-      for (final i in _selectedTaskIndexes) {
-        if (i < taskIndex) {
-          nextSelectedTasks.add(i);
-        } else if (i > taskIndex) {
-          nextSelectedTasks.add(i - 1);
-        }
-      }
-      _selectedTaskIndexes
-        ..clear()
-        ..addAll(nextSelectedTasks);
-
-      final nextSelectedSubtasksByTask = <int, Set<int>>{};
-      _selectedSubtaskIndexesByTask.forEach((key, value) {
-        if (key < taskIndex) {
-          nextSelectedSubtasksByTask[key] = value;
-        } else if (key > taskIndex) {
-          nextSelectedSubtasksByTask[key - 1] = value;
-        }
-      });
-      _selectedSubtaskIndexesByTask
-        ..clear()
-        ..addAll(nextSelectedSubtasksByTask);
-    });
   }
 
   @override
@@ -736,11 +691,11 @@ class _ReviewExtractedTasksScreenState extends State<ReviewExtractedTasksScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (_hasTasksMissingCourseCode)
+                  if (_hasSelectedTasksMissingCourseCode)
                     Padding(
                       padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                       child: Text(
-                        'Please add a course for all tasks before saving.',
+                        'Please add a course for selected tasks before saving.',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                               color: Colors.red.shade700,
                               fontWeight: FontWeight.w500,
@@ -752,7 +707,7 @@ class _ReviewExtractedTasksScreenState extends State<ReviewExtractedTasksScreen>
                     width: double.infinity,
                     child: ElevatedButton(
                       onPressed:
-                          (_saving || _hasTasksMissingCourseCode) ? null : _saveTasks,
+                          (_saving || _hasSelectedTasksMissingCourseCode) ? null : _saveTasks,
                       child:
                           _saving
                               ? const SizedBox(

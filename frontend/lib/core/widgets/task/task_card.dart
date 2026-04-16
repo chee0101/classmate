@@ -15,6 +15,7 @@ class TaskCard extends StatelessWidget {
     required this.onMarkDone,
     this.onTap,
     this.showMarkDone = true,
+    this.truncateDescription = true,
     this.nextSubtaskTitle,
     this.footer,
     this.courses,
@@ -24,6 +25,7 @@ class TaskCard extends StatelessWidget {
   final VoidCallback onMarkDone;
   final VoidCallback? onTap;
   final bool showMarkDone;
+  final bool truncateDescription;
   final String? nextSubtaskTitle;
   final Widget? footer;
   final List<Course>? courses;
@@ -82,11 +84,14 @@ class TaskCard extends StatelessWidget {
           const SizedBox(height: 4),
           Text(
             task.description!,
-            style: textTheme.bodyLarge,
+            style: textTheme.bodyMedium,
+            maxLines: truncateDescription ? 2 : null,
+            overflow:
+                truncateDescription ? TextOverflow.ellipsis : TextOverflow.visible,
           ),
         ],
         if (nextSubtaskTitle != null) ...[
-          const SizedBox(height: 4),
+          const SizedBox(height: AppSpacing.sm),
           Text(
             'Next: $nextSubtaskTitle',
             style: textTheme.bodyMedium?.copyWith(
