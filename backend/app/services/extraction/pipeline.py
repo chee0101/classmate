@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+import re
 import time
 
+from app.core.config import get_settings
 from app.schemas.extraction import (
     AcademicExtractionEnvelope,
     AcademicExtractionResult,
 )
 from app.schemas.extraction import DocumentKind, ExtractionEnvelope
-from app.schemas.extraction import ExtractionResult
+from app.schemas.extraction import ClassSlotExtract, ExtractionResult, TimetableExtract
 from app.services.extraction.calendar_parser import classify_and_extract
 from app.services.extraction.gemini_extractor import (
+    extract_timetable_with_gemini,
     extract_task_with_gemini,
     slice_english_calendar_section_with_debug,
 )
@@ -112,16 +115,40 @@ async def run_academic_calendar_pipeline(
     )
 
 
-async def run_timetable_pipeline(doc: RawDocument) -> ExtractionEnvelope:
+async def run_timetable_pipeline(
+    doc: RawDocument,
+    *,
+    course_codes_allowed: list[str] | None = None,
+    ai_notes: str | None = None,
+) -> ExtractionEnvelope:
     markdown, warnings, timing_ms = await _docling_to_markdown(doc)
-    extraction = ExtractionResult(
-        kind=DocumentKind.unknown,
-        confidence=0.0,
-        notes="Timetable extraction pipeline is not implemented yet.",
+    t0 = time.perf_counter()
+    slots = _extract_timetable_slots(markdown)
+    if not slots:
+        settings = get_settings()
+        if settings.gemini_api_key:
+            gslots, gms, gstatus, gerr, gmodel = await extract_timetable_with_gemini(markdown)
+            timing_ms["gemini_ms"] = gms
+            if gslots:
+                slots = gslots
+                warnings.append(
+                    f"Timetable parsed with Gemini fallback (status={gstatus!r}, model={gmodel!r})."
+                )
+            else:
+                warnings.append(
+                    f"Gemini timetable fallback returned no slots (status={gstatus!r}, error={gerr!r})."
+                )
+    filtered_slots, filter_warnings = _apply_timetable_rules(
+        slots,
+        course_codes_allowed=course_codes_allowed,
+        ai_notes=ai_notes,
     )
-    warnings.append("Timetable extraction is not implemented yet.")
+    filtered_slots = _merge_adjacent_slots(filtered_slots)
+    warnings.extend(filter_warnings)
+    timing_ms["timetable_parse_ms"] = (time.perf_counter() - t0) * 1000.0
+    extraction = _build_timetable_result(filtered_slots, warnings=warnings)
     return ExtractionEnvelope(
-        document_kind=DocumentKind.unknown,
+        document_kind=extraction.kind,
         source_filename=doc.filename,
         markdown_from_docling=markdown,
         extraction=extraction,
@@ -181,3 +208,397 @@ async def run_task_pipeline(docs: list[RawDocument]) -> ExtractionEnvelope:
         warnings=warnings,
         timing_ms=timing_ms,
     )
+
+
+_COURSE_CODE_RE = re.compile(r"\b([A-Z]{2,5}\s*\d{3,4}[A-Z]?)\b")
+_TIME_RANGE_RE = re.compile(
+    r"\b(?P<sh>\d{1,2})[:.](?P<sm>\d{2})\s*[-–—]\s*(?P<eh>\d{1,2})[:.](?P<em>\d{2})\b"
+)
+_TIME_TOKEN_RE = re.compile(
+    r"(?P<sh>\d{1,2})[:.](?P<sm>\d{2})\s*[-–—]\s*(?P<eh>\d{1,2})[:.](?P<em>\d{2})(?P<suffix>.*)$",
+    flags=re.IGNORECASE,
+)
+_DAY_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("Monday", ("monday", "mon", "isnin")),
+    ("Tuesday", ("tuesday", "tue", "selasa")),
+    ("Wednesday", ("wednesday", "wed", "rabu")),
+    ("Thursday", ("thursday", "thu", "khamis")),
+    ("Friday", ("friday", "fri", "jumaat", "jumat")),
+    ("Saturday", ("saturday", "sat", "sabtu")),
+    ("Sunday", ("sunday", "sun", "ahad")),
+)
+
+
+def _normalize_course_code(raw: str) -> str:
+    return re.sub(r"\s+", "", raw.strip().upper())
+
+
+def _to_minutes(hour: int, minute: int) -> int:
+    return (hour * 60) + minute
+
+
+def _to_24h(hour_12: int, minute: int, token_suffix: str) -> tuple[int, int]:
+    suffix = token_suffix.lower()
+    if "pagi" in suffix or "am" in suffix:
+        if hour_12 == 12:
+            return 0, minute
+        return hour_12, minute
+    if "petang" in suffix or "tengah hari" in suffix or "pm" in suffix:
+        if hour_12 == 12:
+            return 12, minute
+        return hour_12 + 12, minute
+    # Default fallback keeps original hour.
+    return hour_12, minute
+
+
+def _class_type_for_line(line_lower: str) -> str:
+    if "tutorial" in line_lower or "tut" in line_lower:
+        return "tutorial"
+    if "lab" in line_lower:
+        return "lab"
+    if "lecture" in line_lower or "lect" in line_lower:
+        return "lecture"
+    # Timetables usually omit explicit class type; default to lecture.
+    return "lecture"
+
+
+def _mode_for_line(line_lower: str) -> str:
+    if any(tok in line_lower for tok in ("online", "google meet", "zoom", "webex")):
+        return "online"
+    if any(tok in line_lower for tok in ("hybrid", "blended")):
+        return "hybrid"
+    return "physical"
+
+
+def _extract_day_label(line_lower: str) -> str | None:
+    padded = f" {line_lower} "
+    for canonical, aliases in _DAY_PATTERNS:
+        for alias in aliases:
+            if f" {alias} " in padded:
+                return canonical
+    return None
+
+
+def _extract_venue(line: str) -> str | None:
+    venue_match = re.search(r"(?i)\b(?:venue|room|location)\b[:\- ]+([^|,;]+)", line)
+    if venue_match:
+        venue = venue_match.group(1).strip()
+        return venue or None
+    # Common timetable style: COURSE ... (DK G31)
+    paren_match = re.search(r"\(([^()]{2,60})\)\s*$", line)
+    if paren_match:
+        venue = paren_match.group(1).strip()
+        return venue or None
+    return None
+
+
+def _split_markdown_row(row: str) -> list[str]:
+    return [cell.strip() for cell in row.strip().strip("|").split("|")]
+
+
+def _looks_like_separator_row(row_cells: list[str]) -> bool:
+    if not row_cells:
+        return False
+    return all(re.fullmatch(r"[:\- ]+", cell or "-") is not None for cell in row_cells)
+
+
+def _parse_time_range_cell(text: str) -> tuple[int, int] | None:
+    m = _TIME_TOKEN_RE.search(text)
+    if not m:
+        return None
+    sh = int(m.group("sh"))
+    sm = int(m.group("sm"))
+    eh = int(m.group("eh"))
+    em = int(m.group("em"))
+    suffix = m.group("suffix") or ""
+    sh24, sm24 = _to_24h(sh, sm, suffix)
+    eh24, em24 = _to_24h(eh, em, suffix)
+    start = _to_minutes(sh24, sm24)
+    end = _to_minutes(eh24, em24)
+    if end <= start:
+        return None
+    return start, end
+
+
+def _extract_day_from_cell(cell: str) -> str | None:
+    # Accept formats like "ISNIN", "(Monday)", or mixed.
+    normalized = re.sub(r"[()]", " ", cell).strip().lower()
+    return _extract_day_label(normalized)
+
+
+def _extract_cell_entries(cell: str) -> list[str]:
+    clean = re.sub(r"\s+", " ", cell).strip()
+    if not clean:
+        return []
+    # Split by course-code anchors to support multiple classes in one cell.
+    matches = list(_COURSE_CODE_RE.finditer(clean.upper()))
+    if not matches:
+        return []
+    entries: list[str] = []
+    for idx, match in enumerate(matches):
+        start = match.start()
+        end = matches[idx + 1].start() if idx + 1 < len(matches) else len(clean)
+        segment = clean[start:end].strip(" ;,/")
+        if segment:
+            entries.append(segment)
+    return entries
+
+
+def _extract_table_slots(markdown: str) -> list[ClassSlotExtract]:
+    rows_raw = [ln.strip() for ln in markdown.splitlines() if ln.strip().startswith("|")]
+    if len(rows_raw) < 3:
+        return []
+    rows = [_split_markdown_row(r) for r in rows_raw]
+    header_idx = -1
+    for i, row in enumerate(rows):
+        if not row:
+            continue
+        first = row[0].lower()
+        if "hari" in first or "day" in first:
+            header_idx = i
+            break
+    if header_idx < 0:
+        return []
+    if header_idx + 1 >= len(rows):
+        return []
+    header = rows[header_idx]
+    time_columns: dict[int, tuple[int, int]] = {}
+    for col_idx in range(1, len(header)):
+        parsed = _parse_time_range_cell(header[col_idx])
+        if parsed is not None:
+            time_columns[col_idx] = parsed
+    if not time_columns:
+        return []
+
+    slots: list[ClassSlotExtract] = []
+    seen: set[tuple[str, str, int, int, str]] = set()
+    active_day: str | None = None
+    for row in rows[header_idx + 1:]:
+        if _looks_like_separator_row(row):
+            continue
+        if not row:
+            continue
+        day_candidate = _extract_day_from_cell(row[0] if len(row) > 0 else "")
+        if day_candidate is not None:
+            active_day = day_candidate
+        if active_day is None:
+            continue
+
+        for col_idx, (start_minutes, end_minutes) in time_columns.items():
+            if col_idx >= len(row):
+                continue
+            entries = _extract_cell_entries(row[col_idx])
+            if not entries:
+                continue
+            for entry in entries:
+                code_match = _COURSE_CODE_RE.search(entry.upper())
+                if code_match is None:
+                    continue
+                course_code = _normalize_course_code(code_match.group(1))
+                entry_lower = entry.lower()
+                class_type = _class_type_for_line(entry_lower)
+                mode = _mode_for_line(entry_lower)
+                venue = _extract_venue(entry)
+                signature = (
+                    course_code,
+                    active_day,
+                    start_minutes,
+                    end_minutes,
+                    class_type,
+                )
+                if signature in seen:
+                    continue
+                seen.add(signature)
+                slots.append(
+                    ClassSlotExtract(
+                        course_code=course_code,
+                        day=active_day,
+                        start_minutes=start_minutes,
+                        end_minutes=end_minutes,
+                        mode=mode,
+                        venue=venue,
+                        class_type=class_type,  # type: ignore[arg-type]
+                    )
+                )
+    return slots
+
+
+def _extract_timetable_slots(markdown: str) -> list[ClassSlotExtract]:
+    table_slots = _extract_table_slots(markdown)
+    if table_slots:
+        return table_slots
+    slots: list[ClassSlotExtract] = []
+    seen: set[tuple[str, str, int, int, str]] = set()
+    for raw_line in markdown.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        line_lower = line.lower()
+        day = _extract_day_label(line_lower)
+        time_match = _TIME_RANGE_RE.search(line)
+        code_match = _COURSE_CODE_RE.search(line.upper())
+        if day is None or time_match is None or code_match is None:
+            continue
+        sh = int(time_match.group("sh"))
+        sm = int(time_match.group("sm"))
+        eh = int(time_match.group("eh"))
+        em = int(time_match.group("em"))
+        start_minutes = _to_minutes(sh, sm)
+        end_minutes = _to_minutes(eh, em)
+        if end_minutes <= start_minutes:
+            continue
+        course_code = _normalize_course_code(code_match.group(1))
+        class_type = _class_type_for_line(line_lower)
+        mode = _mode_for_line(line_lower)
+        venue = _extract_venue(line)
+        signature = (course_code, day, start_minutes, end_minutes, class_type)
+        if signature in seen:
+            continue
+        seen.add(signature)
+        slots.append(
+            ClassSlotExtract(
+                course_code=course_code,
+                day=day,
+                start_minutes=start_minutes,
+                end_minutes=end_minutes,
+                mode=mode,
+                venue=venue,
+                class_type=class_type,  # type: ignore[arg-type]
+            )
+        )
+    return slots
+
+
+def _build_timetable_result(
+    slots: list[ClassSlotExtract],
+    *,
+    warnings: list[str],
+) -> ExtractionResult:
+    if not slots:
+        warnings.append("No timetable slots detected from document text.")
+        return ExtractionResult(
+            kind=DocumentKind.unknown,
+            confidence=0.0,
+            notes="No parseable timetable lines found (need course code + day + time range).",
+        )
+    confidence = min(0.95, 0.45 + (0.03 * len(slots)))
+    return ExtractionResult(
+        kind=DocumentKind.timetable,
+        confidence=confidence,
+        timetable=TimetableExtract(slots=slots),
+        notes=f"Parsed {len(slots)} class slots using deterministic timetable parser.",
+    )
+
+
+def _merge_adjacent_slots(slots: list[ClassSlotExtract]) -> list[ClassSlotExtract]:
+    """
+    Merge consecutive slots for the same class identity when separated by a short break.
+    Typical timetable blocks are 50 mins + 10 mins gap + 50 mins for one continuous class.
+    """
+    if len(slots) <= 1:
+        return slots
+
+    sorted_slots = sorted(
+        slots,
+        key=lambda s: (
+            s.day,
+            s.course_code,
+            s.class_type,
+            s.mode,
+            s.venue or "",
+            s.start_minutes,
+        ),
+    )
+
+    merged: list[ClassSlotExtract] = []
+    for slot in sorted_slots:
+        if not merged:
+            merged.append(slot)
+            continue
+
+        prev = merged[-1]
+        same_identity = (
+            prev.day == slot.day
+            and prev.course_code == slot.course_code
+            and prev.class_type == slot.class_type
+            and prev.mode == slot.mode
+            and (prev.venue or "") == (slot.venue or "")
+        )
+        gap = slot.start_minutes - prev.end_minutes
+        if same_identity and 0 <= gap <= 10:
+            merged[-1] = ClassSlotExtract(
+                course_code=prev.course_code,
+                day=prev.day,
+                start_minutes=prev.start_minutes,
+                end_minutes=max(prev.end_minutes, slot.end_minutes),
+                mode=prev.mode,
+                venue=prev.venue,
+                class_type=prev.class_type,
+                course_id=prev.course_id,
+            )
+            continue
+
+        merged.append(slot)
+
+    return merged
+
+
+def _extract_group_filters(ai_notes: str | None) -> list[str]:
+    if not ai_notes:
+        return []
+    group_tokens: list[str] = []
+    # Examples supported: "Group B1 only", "section 2", "grp A".
+    for m in re.finditer(
+        r"(?i)\b(?:group|grp|section|sec|slot)\s*[:\- ]*\(?([A-Za-z0-9][A-Za-z0-9\-]*)\)?",
+        ai_notes,
+    ):
+        token = m.group(1).strip().upper()
+        if token and token not in group_tokens:
+            group_tokens.append(token)
+    return group_tokens
+
+
+def _apply_timetable_rules(
+    slots: list[ClassSlotExtract],
+    *,
+    course_codes_allowed: list[str] | None,
+    ai_notes: str | None,
+) -> tuple[list[ClassSlotExtract], list[str]]:
+    warnings: list[str] = []
+    allowed = {
+        _normalize_course_code(code)
+        for code in (course_codes_allowed or [])
+        if code.strip()
+    }
+    group_filters = _extract_group_filters(ai_notes)
+
+    kept: list[ClassSlotExtract] = []
+    skipped_course = 0
+    skipped_group = 0
+    for slot in slots:
+        normalized_code = _normalize_course_code(slot.course_code)
+        if allowed and normalized_code not in allowed:
+            skipped_course += 1
+            continue
+        if group_filters:
+            # The deterministic parser does not currently expose a dedicated group field.
+            # For now, apply strict mode only when group hints can be matched in venue/mode.
+            searchable = f"{slot.venue or ''} {slot.mode or ''}".upper()
+            if not any(token in searchable for token in group_filters):
+                skipped_group += 1
+                continue
+        kept.append(slot)
+
+    if allowed:
+        warnings.append(
+            f"Applied course-code whitelist ({len(allowed)} codes); skipped {skipped_course} slot(s)."
+        )
+    if group_filters:
+        warnings.append(
+            f"Applied group filters {group_filters}; skipped {skipped_group} slot(s) without matching hints."
+        )
+    if ai_notes and not group_filters:
+        warnings.append(
+            "AI notes were provided but no explicit group token was detected (expected terms like 'group B1')."
+        )
+    return kept, warnings

@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
 
-from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
 from app.core.config import get_settings
 from app.schemas.extraction import AcademicExtractionEnvelope, ExtractionEnvelope
@@ -23,7 +23,25 @@ def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-async def _run_job(job_id: str, kind: str, docs: list[RawDocument]) -> None:
+def _parse_course_codes_csv(csv_value: str | None) -> list[str]:
+    if not csv_value:
+        return []
+    out: list[str] = []
+    for token in csv_value.split(","):
+        normalized = token.strip().upper().replace(" ", "")
+        if normalized and normalized not in out:
+            out.append(normalized)
+    return out
+
+
+async def _run_job(
+    job_id: str,
+    kind: str,
+    docs: list[RawDocument],
+    *,
+    course_codes_allowed: list[str] | None = None,
+    ai_notes: str | None = None,
+) -> None:
     job = _extraction_jobs.get(job_id)
     if job is None:
         return
@@ -33,7 +51,11 @@ async def _run_job(job_id: str, kind: str, docs: list[RawDocument]) -> None:
         if kind == "academic-calendar":
             result = await run_academic_calendar_pipeline(docs)
         elif kind == "timetable":
-            result = await run_timetable_pipeline(docs[0])
+            result = await run_timetable_pipeline(
+                docs[0],
+                course_codes_allowed=course_codes_allowed,
+                ai_notes=ai_notes,
+            )
         elif kind == "task":
             result = await run_task_pipeline(docs)
         else:
@@ -97,9 +119,21 @@ async def extract_academic_calendar(
 @router.post("/extract/timetable", response_model=ExtractionEnvelope)
 async def extract_timetable(
     file: UploadFile = File(..., description="PDF, DOCX, or image (per Docling support)"),
+    course_codes_allowed: str | None = Form(
+        None,
+        description="Optional CSV whitelist of allowed course codes, e.g. CSC101,MTH120.",
+    ),
+    ai_notes: str | None = Form(
+        None,
+        description="Optional extraction notes (e.g. group filters such as 'group B1 only').",
+    ),
 ) -> ExtractionEnvelope:
     doc = await _read_upload(file)
-    return await run_timetable_pipeline(doc)
+    return await run_timetable_pipeline(
+        doc,
+        course_codes_allowed=_parse_course_codes_csv(course_codes_allowed),
+        ai_notes=ai_notes,
+    )
 
 
 @router.post("/extract/task", response_model=ExtractionEnvelope)
@@ -128,6 +162,14 @@ async def submit_extraction_job(
         None,
         description="Multiple screenshots/images/PDFs in order.",
     ),
+    course_codes_allowed: str | None = Form(
+        None,
+        description="Optional CSV whitelist of allowed course codes for timetable extraction.",
+    ),
+    ai_notes: str | None = Form(
+        None,
+        description="Optional extraction notes for timetable extraction.",
+    ),
 ) -> dict[str, Any]:
     normalized_kind = kind.strip().lower()
     if normalized_kind not in {"academic-calendar", "timetable", "task"}:
@@ -150,7 +192,16 @@ async def submit_extraction_job(
         "result": None,
         "error": None,
     }
-    asyncio.create_task(_run_job(job_id, normalized_kind, docs))
+    parsed_codes = _parse_course_codes_csv(course_codes_allowed)
+    asyncio.create_task(
+        _run_job(
+            job_id,
+            normalized_kind,
+            docs,
+            course_codes_allowed=parsed_codes,
+            ai_notes=ai_notes,
+        )
+    )
     return {"job_id": job_id, "status": "queued"}
 
 

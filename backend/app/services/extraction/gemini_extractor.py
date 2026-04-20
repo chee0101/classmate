@@ -9,7 +9,7 @@ from time import perf_counter
 from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
-from app.schemas.extraction import TaskExtract, TaskSubtaskExtract
+from app.schemas.extraction import ClassSlotExtract, TaskExtract, TaskSubtaskExtract
 
 
 class GeminiFullCalendarEvent(BaseModel):
@@ -44,6 +44,20 @@ class GeminiTaskItem(BaseModel):
 
 class GeminiTaskPayload(BaseModel):
     tasks: list[GeminiTaskItem] = Field(default_factory=list)
+
+
+class GeminiTimetableSlot(BaseModel):
+    course_code: str = Field(min_length=3)
+    day: str = Field(min_length=3)
+    start_minutes: int = Field(ge=0, le=24 * 60)
+    end_minutes: int = Field(ge=0, le=24 * 60)
+    mode: str | None = None
+    venue: str | None = None
+    class_type: str | None = None
+
+
+class GeminiTimetablePayload(BaseModel):
+    slots: list[GeminiTimetableSlot] = Field(default_factory=list)
 
 
 def slice_english_calendar_section_with_debug(
@@ -532,3 +546,108 @@ async def extract_task_with_gemini(
     # Previously we filtered to only explicit "due action" titles, which could
     # drop valid phased timeline parent tasks.
     return list(dedup.values()), gemini_ms, "ok", "", model_name
+
+
+async def extract_timetable_with_gemini(
+    doc_text: str,
+) -> tuple[list[ClassSlotExtract], float, str, str, str]:
+    """
+    Layout-agnostic timetable extraction for noisy/flexible documents.
+    Returns:
+      (slots, gemini_ms, status, error_message, model_used)
+    """
+    settings = get_settings()
+    if not settings.gemini_api_key:
+        return [], 0.0, "no_api_key", "", ""
+
+    try:
+        from google import genai  # type: ignore
+    except Exception as e:
+        return [], 0.0, "import_error", f"{type(e).__name__}: {e}", ""
+
+    raw = (doc_text or "").strip()
+    if not raw:
+        return [], 0.0, "empty_input", "", ""
+    if len(raw) > _FULL_CALENDAR_MAX_CHARS:
+        raw = raw[:_FULL_CALENDAR_MAX_CHARS]
+
+    prompt = (
+        "Extract class timetable slots from this OCR/markdown text.\n"
+        "Return STRICT JSON only using this schema:\n"
+        '{"slots":[{"course_code":"string","day":"Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday","start_minutes":0,"end_minutes":0,"mode":"online|hybrid|physical|","venue":"string|null","class_type":"lecture|tutorial|lab|other"}]}\n'
+        "Rules:\n"
+        "- Extract only real class slots with a valid course code like ABC123/ABC1234.\n"
+        "- Normalize day to English weekday names exactly.\n"
+        "- start_minutes/end_minutes are minutes from midnight.\n"
+        "- Skip non-class entries (minor/co-curriculum/ceramah/general activities) unless a valid course code exists.\n"
+        "- If cell has multiple classes, output multiple slots.\n"
+        "- Use class_type=other when uncertain.\n"
+        "- mode can be empty string if unknown.\n"
+        "Input text:\n"
+        f"{raw}"
+    )
+
+    model_name = settings.gemini_model
+    t0 = perf_counter()
+    try:
+        client = genai.Client(api_key=settings.gemini_api_key)
+        response = await asyncio.to_thread(
+            client.models.generate_content,
+            model=model_name,
+            contents=prompt,
+        )
+    except Exception as e:
+        gemini_ms_err = (perf_counter() - t0) * 1000.0
+        return [], gemini_ms_err, "api_error", f"{type(e).__name__}: {e}", ""
+
+    gemini_ms = (perf_counter() - t0) * 1000.0
+    raw_text = getattr(response, "text", "") or ""
+    blob = _extract_json_blob(raw_text)
+    if not blob:
+        return [], gemini_ms, "no_json_blob", "", model_name
+
+    try:
+        payload = GeminiTimetablePayload.model_validate(json.loads(blob))
+    except Exception as e:
+        return [], gemini_ms, "json_parse_error", f"{type(e).__name__}: {e}", model_name
+
+    out: list[ClassSlotExtract] = []
+    for item in payload.slots:
+        code = re.sub(r"\s+", "", item.course_code.strip().upper())
+        if not re.fullmatch(r"[A-Z]{2,5}\d{3,4}[A-Z]?", code):
+            continue
+        if item.end_minutes <= item.start_minutes:
+            continue
+        day = item.day.strip().title()
+        if day not in {
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+        }:
+            continue
+        ctype = (item.class_type or "other").strip().lower()
+        if ctype not in {"lecture", "tutorial", "lab", "other"}:
+            ctype = "other"
+        mode = (item.mode or "").strip().lower()
+        if mode not in {"online", "hybrid", "physical", ""}:
+            mode = ""
+        venue = (item.venue or "").strip() or None
+        out.append(
+            ClassSlotExtract(
+                course_code=code,
+                day=day,
+                start_minutes=item.start_minutes,
+                end_minutes=item.end_minutes,
+                mode=mode,
+                venue=venue,
+                class_type=ctype,  # type: ignore[arg-type]
+            )
+        )
+
+    if not out:
+        return [], gemini_ms, "empty_result", "", model_name
+    return out, gemini_ms, "ok", "", model_name
