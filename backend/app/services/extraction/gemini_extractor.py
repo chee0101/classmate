@@ -550,6 +550,8 @@ async def extract_task_with_gemini(
 
 async def extract_timetable_with_gemini(
     doc_text: str,
+    *,
+    ai_notes: str | None = None,
 ) -> tuple[list[ClassSlotExtract], float, str, str, str]:
     """
     Layout-agnostic timetable extraction for noisy/flexible documents.
@@ -570,6 +572,14 @@ async def extract_timetable_with_gemini(
         return [], 0.0, "empty_input", "", ""
     if len(raw) > _FULL_CALENDAR_MAX_CHARS:
         raw = raw[:_FULL_CALENDAR_MAX_CHARS]
+    notes_rule = ""
+    if ai_notes and ai_notes.strip():
+        notes_rule = (
+            "- IMPORTANT USER REMARKS (must follow strictly): "
+            f"{ai_notes.strip()}\n"
+            "- If remarks specify a particular group/section, return only slots that match that group/section.\n"
+            "- If uncertain whether a row matches the remarks, skip that row.\n"
+        )
 
     prompt = (
         "Extract class timetable slots from this OCR/markdown text.\n"
@@ -583,6 +593,7 @@ async def extract_timetable_with_gemini(
         "- If cell has multiple classes, output multiple slots.\n"
         "- Use class_type=other when uncertain.\n"
         "- mode can be empty string if unknown.\n"
+        f"{notes_rule}"
         "Input text:\n"
         f"{raw}"
     )

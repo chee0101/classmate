@@ -122,12 +122,17 @@ async def run_timetable_pipeline(
     ai_notes: str | None = None,
 ) -> ExtractionEnvelope:
     markdown, warnings, timing_ms = await _docling_to_markdown(doc)
+    group_filters = _extract_group_filters(ai_notes)
+    non_numeric_group_filters = [t for t in group_filters if not t.isdigit()]
     t0 = time.perf_counter()
-    slots = _extract_timetable_slots(markdown)
+    slots = _extract_timetable_slots(markdown, group_filters=group_filters)
     if not slots:
         settings = get_settings()
         if settings.gemini_api_key:
-            gslots, gms, gstatus, gerr, gmodel = await extract_timetable_with_gemini(markdown)
+            gslots, gms, gstatus, gerr, gmodel = await extract_timetable_with_gemini(
+                markdown,
+                ai_notes=ai_notes,
+            )
             timing_ms["gemini_ms"] = gms
             if gslots:
                 slots = gslots
@@ -344,7 +349,22 @@ def _extract_cell_entries(cell: str) -> list[str]:
     return entries
 
 
-def _extract_table_slots(markdown: str) -> list[ClassSlotExtract]:
+def _extract_group_cell_value(cell: str) -> str | None:
+    normalized = re.sub(r"\s+", " ", cell).strip()
+    if not normalized:
+        return None
+    # Prefer compact tokens like "1", "B1", "G1", etc.
+    m = re.search(r"(?i)\b([A-Z]?\d+[A-Z]?)\b", normalized)
+    if m:
+        return m.group(1).upper()
+    return None
+
+
+def _extract_table_slots(
+    markdown: str,
+    *,
+    group_filters: list[str] | None = None,
+) -> list[ClassSlotExtract]:
     rows_raw = [ln.strip() for ln in markdown.splitlines() if ln.strip().startswith("|")]
     if len(rows_raw) < 3:
         return []
@@ -362,6 +382,12 @@ def _extract_table_slots(markdown: str) -> list[ClassSlotExtract]:
     if header_idx + 1 >= len(rows):
         return []
     header = rows[header_idx]
+    group_col_idx = 0
+    for col_idx, header_cell in enumerate(header):
+        hc = header_cell.lower()
+        if "kumpulan" in hc or "group" in hc:
+            group_col_idx = col_idx
+            break
     time_columns: dict[int, tuple[int, int]] = {}
     for col_idx in range(1, len(header)):
         parsed = _parse_time_range_cell(header[col_idx])
@@ -373,6 +399,8 @@ def _extract_table_slots(markdown: str) -> list[ClassSlotExtract]:
     slots: list[ClassSlotExtract] = []
     seen: set[tuple[str, str, int, int, str]] = set()
     active_day: str | None = None
+    active_group: str | None = None
+    group_filters_set = {g.strip().upper() for g in (group_filters or []) if g.strip()}
     for row in rows[header_idx + 1:]:
         if _looks_like_separator_row(row):
             continue
@@ -381,7 +409,13 @@ def _extract_table_slots(markdown: str) -> list[ClassSlotExtract]:
         day_candidate = _extract_day_from_cell(row[0] if len(row) > 0 else "")
         if day_candidate is not None:
             active_day = day_candidate
+        if group_col_idx < len(row):
+            group_candidate = _extract_group_cell_value(row[group_col_idx])
+            if group_candidate is not None:
+                active_group = group_candidate
         if active_day is None:
+            continue
+        if group_filters_set and active_group not in group_filters_set:
             continue
 
         for col_idx, (start_minutes, end_minutes) in time_columns.items():
@@ -423,8 +457,12 @@ def _extract_table_slots(markdown: str) -> list[ClassSlotExtract]:
     return slots
 
 
-def _extract_timetable_slots(markdown: str) -> list[ClassSlotExtract]:
-    table_slots = _extract_table_slots(markdown)
+def _extract_timetable_slots(
+    markdown: str,
+    *,
+    group_filters: list[str] | None = None,
+) -> list[ClassSlotExtract]:
+    table_slots = _extract_table_slots(markdown, group_filters=group_filters)
     if table_slots:
         return table_slots
     slots: list[ClassSlotExtract] = []
@@ -571,6 +609,7 @@ def _apply_timetable_rules(
         if code.strip()
     }
     group_filters = _extract_group_filters(ai_notes)
+    non_numeric_group_filters = [token for token in group_filters if not token.isdigit()]
 
     kept: list[ClassSlotExtract] = []
     skipped_course = 0
@@ -580,11 +619,17 @@ def _apply_timetable_rules(
         if allowed and normalized_code not in allowed:
             skipped_course += 1
             continue
-        if group_filters:
-            # The deterministic parser does not currently expose a dedicated group field.
-            # For now, apply strict mode only when group hints can be matched in venue/mode.
+        if group_filters and non_numeric_group_filters:
             searchable = f"{slot.venue or ''} {slot.mode or ''}".upper()
-            if not any(token in searchable for token in group_filters):
+            # Last-chance heuristic for non-table/gemini outputs:
+            # avoid numeric-only substring matching (e.g., group "1" matching room "G03:117").
+            matched = False
+            for token in non_numeric_group_filters:
+                token_u = token.upper()
+                if re.search(rf"\b{re.escape(token_u)}\b", searchable):
+                    matched = True
+                    break
+            if not matched:
                 skipped_group += 1
                 continue
         kept.append(slot)
