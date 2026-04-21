@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:image_cropper/image_cropper.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../core/constants/app_spacing.dart';
@@ -18,6 +19,7 @@ import '../../core/widgets/common/app_outlined_icon_button.dart';
 import '../../core/widgets/common/animated_segmented_switch.dart';
 import '../../core/widgets/common/form_fields.dart';
 import '../../core/widgets/common/white_card.dart';
+import '../../core/widgets/add/add_course_dialog.dart';
 import '../../core/widgets/home/session_header.dart';
 
 enum AutoExtractType { academicCalendar, timetable, task }
@@ -53,6 +55,30 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
   final TextEditingController _remarkFilterController = TextEditingController();
   List<PlatformFile> _selectedFiles = const [];
 
+  SessionTermSelection? _resolvedSessionTermSelection() {
+    final sessions = <AcademicSession>[...academicSessionsNotifier.value];
+    final activeSession = currentAcademicSessionNotifier.value;
+    if (activeSession != null &&
+        !sessions.any((s) => s.id == activeSession.id)) {
+      sessions.add(activeSession);
+    }
+    if (sessions.isEmpty) return null;
+    final refs = buildAllSessionTermRefs(sessions);
+    if (refs.isEmpty) return null;
+    final current = selectedSessionTermNotifier.value;
+    if (current != null &&
+        refs.any(
+          (r) => r.session.id == current.sessionId && r.term.id == current.termId,
+        )) {
+      return current;
+    }
+    final fallback = resolveDefaultSessionTermRef(refs, DateTime.now());
+    return SessionTermSelection(
+      sessionId: fallback.session.id,
+      termId: fallback.term.id,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
@@ -79,12 +105,29 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
   String get _subtitle {
     switch (_type) {
       case AutoExtractType.academicCalendar:
-        return 'Upload your academic calendar document or screenshots.';
+        return 'Upload academic calendar document or screenshots.';
       case AutoExtractType.timetable:
-        return 'Upload your timetable document or screenshots.';
+        return 'Upload timetable document or screenshots.';
       case AutoExtractType.task:
         return 'Upload task documents or screenshots.';
     }
+  }
+
+  void _handleTypeChanged(AutoExtractType nextType) {
+    if (_type == nextType) return;
+    setState(() {
+      _type = nextType;
+      _selectedFiles = const [];
+      _taskAssignedCourseCode = null;
+    });
+  }
+
+  void _removeSelectedFileAt(int index) {
+    if (index < 0 || index >= _selectedFiles.length) return;
+    setState(() {
+      final updated = [..._selectedFiles]..removeAt(index);
+      _selectedFiles = updated;
+    });
   }
 
   Future<void> _notImplementedYet(String feature) async {
@@ -96,26 +139,52 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
 
   Future<void> _handleChooseFile() async {
     final result = await FilePicker.platform.pickFiles(
-      allowMultiple: _type != AutoExtractType.timetable,
+      allowMultiple: true,
       withData: true,
       type: FileType.custom,
       allowedExtensions: const ['pdf', 'docx', 'png', 'jpg', 'jpeg'],
     );
     if (result == null || result.files.isEmpty) return;
     setState(() {
-      _selectedFiles = result.files;
+      _selectedFiles = [..._selectedFiles, ...result.files];
     });
   }
 
   Future<void> _handleScanFromCamera() async {
     try {
+      final colorScheme = Theme.of(context).colorScheme;
       final captured = await _imagePicker.pickImage(
         source: ImageSource.camera,
         imageQuality: 90,
       );
       if (captured == null) return;
 
-      final bytes = await captured.readAsBytes();
+      CroppedFile? cropped;
+      try {
+        cropped = await ImageCropper().cropImage(
+          sourcePath: captured.path,
+          compressFormat: ImageCompressFormat.jpg,
+          compressQuality: 90,
+          uiSettings: [
+            AndroidUiSettings(
+              toolbarTitle: 'Crop image',
+              toolbarColor: colorScheme.primary,
+              toolbarWidgetColor: colorScheme.onPrimary,
+              initAspectRatio: CropAspectRatioPreset.original,
+              lockAspectRatio: false,
+            ),
+            IOSUiSettings(
+              title: 'Crop image',
+              aspectRatioLockEnabled: false,
+            ),
+          ],
+        );
+      } catch (_) {
+        cropped = null;
+      }
+
+      final imagePath = cropped?.path ?? captured.path;
+      final bytes = await File(imagePath).readAsBytes();
       final fileName = captured.name.trim().isEmpty
           ? 'camera_${DateTime.now().millisecondsSinceEpoch}.jpg'
           : captured.name;
@@ -123,15 +192,11 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
         name: fileName,
         size: bytes.length,
         bytes: bytes,
-        path: captured.path,
+        path: imagePath,
       );
 
       setState(() {
-        if (_type != AutoExtractType.timetable) {
-          _selectedFiles = [..._selectedFiles, platformFile];
-        } else {
-          _selectedFiles = [platformFile];
-        }
+        _selectedFiles = [..._selectedFiles, platformFile];
       });
     } on FileSystemException catch (_) {
       if (!mounted) return;
@@ -180,21 +245,32 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
     String? sessionId;
     String? termId;
     if (_type == AutoExtractType.timetable) {
-      final sel = selectedSessionTermNotifier.value;
+      final sel = _resolvedSessionTermSelection();
+      if (sel != null && selectedSessionTermNotifier.value == null) {
+        setSelectedSessionTerm(sessionId: sel.sessionId, termId: sel.termId);
+      }
       sessionId = sel?.sessionId;
       termId = sel?.termId;
-      if (sel != null) {
-        final codes = coursesForSessionAndTerm(
-              sessionId: sel.sessionId,
-              termId: sel.termId,
-            )
-            .map((c) => c.courseCode.trim().toUpperCase())
-            .where((c) => c.isNotEmpty)
-            .toList()
-          ..sort();
-        if (codes.isNotEmpty) {
-          courseCodesAllowedCsv = codes.join(', ');
-        }
+      if (sel == null) {
+        await _notImplementedYet('Please select a valid session/term first');
+        return;
+      }
+      final codes = coursesForSessionAndTerm(
+            sessionId: sel.sessionId,
+            termId: sel.termId,
+          )
+          .map((c) => c.courseCode.trim().toUpperCase())
+          .where((c) => c.isNotEmpty)
+          .toList()
+        ..sort();
+      if (codes.isNotEmpty) {
+        courseCodesAllowedCsv = codes.join(', ');
+      }
+      if (codes.isEmpty) {
+        await _notImplementedYet(
+          'No courses found for selected session/term. Add courses first.',
+        );
+        return;
       }
       final remark = _remarkFilterController.text.trim();
       if (remark.isNotEmpty) aiNotes = remark;
@@ -206,7 +282,7 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
         endpoint: endpoint,
         typeLabel: typeLabel,
         files: _selectedFiles,
-        useMultiFilesField: _type != AutoExtractType.timetable,
+        useMultiFilesField: true,
         assignedCourseCode: _type == AutoExtractType.task
             ? _taskAssignedCourseCode
             : null,
@@ -248,11 +324,237 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
                 color: Theme.of(context).colorScheme.primary,
               ),
             ),
-            const SizedBox(height: AppSpacing.md),
+            const SizedBox(height: AppSpacing.sm),
             _ExtractTypeTabs(
               value: _type,
-              onChanged: _isAnalyzing ? null : (v) => setState(() => _type = v),
+              onChanged: _isAnalyzing ? null : _handleTypeChanged,
             ),
+            if (_type == AutoExtractType.timetable) ...[
+              const SizedBox(height: AppSpacing.md),
+              ValueListenableBuilder<List<AcademicSession>>(
+                valueListenable: academicSessionsNotifier,
+                builder: (context, sessionsList, _) {
+                  return ValueListenableBuilder<AcademicSession?>(
+                    valueListenable: currentAcademicSessionNotifier,
+                    builder: (context, activeSession, __) {
+                      return ValueListenableBuilder<SessionTermSelection?>(
+                        valueListenable: selectedSessionTermNotifier,
+                        builder: (context, selectedSelection, ___) {
+                          final sessions = <AcademicSession>[...sessionsList];
+                          if (activeSession != null &&
+                              !sessions.any((s) => s.id == activeSession.id)) {
+                            sessions.add(activeSession);
+                          }
+                          if (sessions.isEmpty) {
+                            return Text(
+                              'Add an academic session and courses first.',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: Colors.black54,
+                              ),
+                            );
+                          }
+
+                          final allTermRefs = buildAllSessionTermRefs(sessions);
+                          if (allTermRefs.isEmpty) return const SizedBox.shrink();
+                          final resolvedDefaultRef = resolveDefaultSessionTermRef(
+                            allTermRefs,
+                            DateTime.now(),
+                          );
+                          var selectedSessionId =
+                              selectedSelection?.sessionId ?? resolvedDefaultRef.session.id;
+                          var selectedTermId =
+                              selectedSelection?.termId ?? resolvedDefaultRef.term.id;
+                          final isValidSelection = allTermRefs.any(
+                            (ref) =>
+                                ref.session.id == selectedSessionId &&
+                                ref.term.id == selectedTermId,
+                          );
+                          if (!isValidSelection) {
+                            selectedSessionId = resolvedDefaultRef.session.id;
+                            selectedTermId = resolvedDefaultRef.term.id;
+                          }
+                          if (selectedSelection == null ||
+                              selectedSelection.sessionId != selectedSessionId ||
+                              selectedSelection.termId != selectedTermId) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              setSelectedSessionTerm(
+                                sessionId: selectedSessionId,
+                                termId: selectedTermId,
+                              );
+                            });
+                          }
+
+                          return ValueListenableBuilder<List<Course>>(
+                            valueListenable: coursesNotifier,
+                            builder: (context, _, __) {
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  ValueListenableBuilder<List<AcademicSession>>(
+                                    valueListenable: academicSessionsNotifier,
+                                    builder: (context, sessionsList, _) {
+                                      return ValueListenableBuilder<AcademicSession?>(
+                                        valueListenable: currentAcademicSessionNotifier,
+                                        builder: (context, activeSession, __) {
+                                          return ValueListenableBuilder<SessionTermSelection?>(
+                                            valueListenable: selectedSessionTermNotifier,
+                                            builder: (context, selectedSelection, ___) {
+                                              final sessions = <AcademicSession>[...sessionsList];
+
+                                              if (activeSession != null &&
+                                                  !sessions.any((s) => s.id == activeSession.id)) {
+                                                sessions.add(activeSession);
+                                              }
+
+                                              if (sessions.isEmpty) {
+                                                return Text(
+                                                  'Add an academic session and courses first.',
+                                                  style: textTheme.bodySmall?.copyWith(
+                                                    color: Colors.black54,
+                                                  ),
+                                                );
+                                              }
+
+                                              final allTermRefs = buildAllSessionTermRefs(sessions);
+                                              if (allTermRefs.isEmpty) return const SizedBox.shrink();
+
+                                              final resolvedDefaultRef = resolveDefaultSessionTermRef(
+                                                allTermRefs,
+                                                DateTime.now(),
+                                              );
+
+                                              var selectedSessionId =
+                                                  selectedSelection?.sessionId ??
+                                                      resolvedDefaultRef.session.id;
+
+                                              var selectedTermId =
+                                                  selectedSelection?.termId ??
+                                                      resolvedDefaultRef.term.id;
+
+                                              final isValidSelection = allTermRefs.any(
+                                                (ref) =>
+                                                    ref.session.id == selectedSessionId &&
+                                                    ref.term.id == selectedTermId,
+                                              );
+
+                                              if (!isValidSelection) {
+                                                selectedSessionId = resolvedDefaultRef.session.id;
+                                                selectedTermId = resolvedDefaultRef.term.id;
+                                              }
+
+                                              if (selectedSelection == null ||
+                                                  selectedSelection.sessionId != selectedSessionId ||
+                                                  selectedSelection.termId != selectedTermId) {
+                                                WidgetsBinding.instance.addPostFrameCallback((_) {
+                                                  setSelectedSessionTerm(
+                                                    sessionId: selectedSessionId,
+                                                    termId: selectedTermId,
+                                                  );
+                                                });
+                                              }
+
+                                              return ValueListenableBuilder<List<Course>>(
+                                                valueListenable: coursesNotifier,
+                                                builder: (context, _, __) {
+                                                  final courseCodes = coursesForSessionAndTerm(
+                                                    sessionId: selectedSessionId,
+                                                    termId: selectedTermId,
+                                                  )
+                                                      .map((c) => c.courseCode.trim().toUpperCase())
+                                                      .where((c) => c.isNotEmpty)
+                                                      .toList(growable: false)
+                                                    ..sort();
+
+                                                  return Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      /// 🔹 Session Selector
+                                                      SessionHeader(
+                                                        sessions: sessions,
+                                                        selectedSessionId: selectedSessionId,
+                                                        selectedTermId: selectedTermId,
+                                                        onSelectionChanged: (sessionId, termId) {
+                                                          setSelectedSessionTerm(
+                                                            sessionId: sessionId,
+                                                            termId: termId,
+                                                          );
+                                                        },
+                                                      ),
+                                                      const SizedBox(height: AppSpacing.md),
+                                                      WhiteCard(
+                                                        padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
+                                                        child: Column(
+                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                          children: [
+                                                            /// Header row
+                                                            Row(
+                                                              children: [
+                                                                Expanded(
+                                                                  child: Text(
+                                                                    'Courses to extract',
+                                                                    style: textTheme.titleSmall,
+                                                                  ),
+                                                                ),
+                                                                TextButton.icon(
+                                                                  onPressed: () async {
+                                                                    await CourseDialog.show(
+                                                                      context,
+                                                                      sessionId: selectedSessionId,
+                                                                      termId: selectedTermId,
+                                                                    );
+                                                                  },
+                                                                  icon: const Icon(Icons.add, size: 16),
+                                                                  label: const Text('Add course', style: TextStyle(fontSize: 14)),
+                                                                ),
+                                                              ],
+                                                            ),
+                                                            /// Empty state
+                                                            if (courseCodes.isEmpty)
+                                                              Text(
+                                                                'No courses added yet.',
+                                                                style: textTheme.bodySmall?.copyWith(
+                                                                  color: Colors.black54,
+                                                                ),
+                                                              )
+                                                            else
+                                                              Wrap(
+                                                                spacing: AppSpacing.sm,
+                                                                children: [
+                                                                  for (final code in courseCodes)
+                                                                    Chip(
+                                                                      label: Text(
+                                                                        code,
+                                                                        style: textTheme.bodySmall,
+                                                                      ),
+                                                                      visualDensity:
+                                                                          VisualDensity.compact,
+                                                                    ),
+                                                                ],
+                                                              ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ],
+                                                  );
+                                                },
+                                              );
+                                            },
+                                          );
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                        },
+                      );
+                    },
+                  );
+                },
+              ),
+            ],
             if (_type == AutoExtractType.task) ...[
               const SizedBox(height: AppSpacing.md),
               ValueListenableBuilder<List<AcademicSession>>(
@@ -393,14 +695,30 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
             const SizedBox(height: AppSpacing.md),
             WhiteCard(
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _isAnalyzing ? null : _handleChooseFile,
-                      icon: const Icon(Icons.upload_file_outlined),
-                      label: const Text('Choose file'),
-                    ),
+                  Text('Upload Method', style: textTheme.titleSmall),
+                  const SizedBox(height: AppSpacing.sm),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: AppOutlinedIconButton(
+                          expand: false,
+                          onPressed: _isAnalyzing ? null : _handleChooseFile,
+                          icon: const Icon(Icons.upload_file_outlined),
+                          label: const Text('File', style: TextStyle(fontSize: 14)),
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Expanded(
+                        child: AppOutlinedIconButton(
+                          expand: false,
+                          onPressed: _isAnalyzing ? null : _handleScanFromCamera,
+                          icon: const Icon(Icons.photo_camera_outlined),
+                          label: const Text('Camera', style: TextStyle(fontSize: 14)),
+                        ),
+                      ),
+                    ],
                   ),
                   const SizedBox(height: AppSpacing.sm),
                   Text(
@@ -415,18 +733,29 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
                   if (_selectedFiles.isNotEmpty) ...[
                     const SizedBox(height: AppSpacing.sm),
                     Text(
-                      'Selected file(s): ${_selectedFiles.map((f) => f.name).join(', ')}',
+                      'Selected file(s)',
                       style: textTheme.bodySmall?.copyWith(color: Colors.black54),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    Wrap(
+                      spacing: AppSpacing.xs,
+                      children: [
+                        for (var i = 0; i < _selectedFiles.length; i++)
+                          Chip(
+                            label: Text(
+                              _selectedFiles[i].name,
+                              style: textTheme.bodySmall,
+                            ),
+                            onDeleted: _isAnalyzing
+                                ? null
+                                : () => _removeSelectedFileAt(i),
+                            deleteIcon: const Icon(Icons.close, size: 16),
+                          ),
+                      ],
                     ),
                   ],
                 ],
               ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            AppOutlinedIconButton(
-              onPressed: _isAnalyzing ? null : _handleScanFromCamera,
-              icon: const Icon(Icons.photo_camera_outlined),
-              label: const Text('Scan from camera'),
             ),
                   if (_type == AutoExtractType.timetable) ...[
                     const SizedBox(height: AppSpacing.md),
@@ -446,21 +775,33 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
               ),
             ),
           ),
-          SafeArea(
-            top: false,
-            minimum: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.sm,
-              AppSpacing.md,
-              AppSpacing.md,
+          Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.16),
+                  blurRadius: 14,
+                  offset: const Offset(0, -5),
+                ),
+              ],
             ),
-            child: SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: _isAnalyzing ? null : _handleContinue,
-                child: _isAnalyzing
-                    ? const _AnalyzingInline()
-                    : Text('Continue ($_title)'),
+            child: SafeArea(
+              top: false,
+              minimum: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.sm,
+                AppSpacing.md,
+                AppSpacing.md,
+              ),
+              child: SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isAnalyzing ? null : _handleContinue,
+                  child: _isAnalyzing
+                      ? const _AnalyzingInline()
+                      : Text('Continue ($_title)'),
+                ),
               ),
             ),
           ),
