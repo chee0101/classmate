@@ -283,6 +283,19 @@ class _ReviewExtractedTimetableScreenState
     );
   }
 
+  Future<bool> _confirmDiscardReview() async {
+    if (_saving) return false;
+    return showConfirmDialog(
+      context,
+      title: 'Discard extracted timetable?',
+      message:
+          'If you leave now, reviewed extracted timetable data will not be saved and will be lost.',
+      cancelText: 'Stay',
+      confirmText: 'Discard and leave',
+      destructive: true,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final parsed = _parsed;
@@ -335,15 +348,29 @@ class _ReviewExtractedTimetableScreenState
       );
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Review timetable'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldLeave = await _confirmDiscardReview();
+        if (!shouldLeave || !mounted) return;
+        dismissExtractionJobCard();
+        Navigator.of(context).pop();
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Review timetable'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () async {
+              final shouldLeave = await _confirmDiscardReview();
+              if (!mounted || !shouldLeave) return;
+              dismissExtractionJobCard();
+              Navigator.of(context).pop();
+            },
+          ),
         ),
-      ),
-      body: Column(
+        body: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Padding(
@@ -474,6 +501,7 @@ class _ReviewExtractedTimetableScreenState
             ),
           ),
         ],
+        ),
       ),
     );
   }

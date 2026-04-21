@@ -15,6 +15,9 @@ class ExtractionJobState {
     this.assignedCourseCode,
     this.sessionId,
     this.termId,
+    this.hasWarnings = false,
+    this.warningMessage,
+    this.durationMs,
     this.finishedAt,
     this.statusCode,
     this.message,
@@ -34,6 +37,9 @@ class ExtractionJobState {
   /// When set (e.g. timetable import), review/save uses this session/term.
   final String? sessionId;
   final String? termId;
+  final bool hasWarnings;
+  final String? warningMessage;
+  final int? durationMs;
 
   bool get isRunning =>
       status == ExtractionJobStatus.queued || status == ExtractionJobStatus.running;
@@ -47,6 +53,9 @@ class ExtractionJobState {
     String? assignedCourseCode,
     String? sessionId,
     String? termId,
+    bool? hasWarnings,
+    String? warningMessage,
+    int? durationMs,
   }) {
     return ExtractionJobState(
       typeLabel: typeLabel,
@@ -61,6 +70,9 @@ class ExtractionJobState {
       assignedCourseCode: assignedCourseCode ?? this.assignedCourseCode,
       sessionId: sessionId ?? this.sessionId,
       termId: termId ?? this.termId,
+      hasWarnings: hasWarnings ?? this.hasWarnings,
+      warningMessage: warningMessage ?? this.warningMessage,
+      durationMs: durationMs ?? this.durationMs,
     );
   }
 }
@@ -190,15 +202,44 @@ Future<void> startExtractionJob({
         continue;
       }
       final now = DateTime.now();
+      final startedAt = extractionJobNotifier.value?.startedAt ?? now;
       if (status == 'success') {
         final resultObj = pollJson['result'];
         final resultBody = resultObj == null ? '' : jsonEncode(resultObj);
+        final warnings = switch (resultObj) {
+          Map<String, dynamic> m => (m['warnings'] as List<dynamic>? ?? const []),
+          _ => const <dynamic>[],
+        };
+        final warningTexts = warnings
+            .map((w) => w.toString().trim())
+            .where((w) => w.isNotEmpty)
+            .toList(growable: false);
+        final hasMemoryLikeWarnings = warningTexts.any(
+          (w) {
+            final t = w.toLowerCase();
+            return t.contains('bad_alloc') ||
+                t.contains('out of memory') ||
+                t.contains('preprocess failed') ||
+                t.contains('failed for run');
+          },
+        );
+        final durationMs = pollJson['duration_ms'] is num
+            ? (pollJson['duration_ms'] as num).round()
+            : now.difference(startedAt).inMilliseconds;
+        debugPrint(
+          '[extract] Completed kind=$kind job_id=$jobId duration_ms=$durationMs warnings=${warningTexts.length}',
+        );
         extractionJobNotifier.value = extractionJobNotifier.value?.copyWith(
           status: ExtractionJobStatus.success,
           finishedAt: now,
           statusCode: 200,
-          message: 'Completed',
+          message: hasMemoryLikeWarnings ? 'Completed with warnings' : 'Completed',
           responseBody: resultBody,
+          hasWarnings: hasMemoryLikeWarnings,
+          warningMessage: hasMemoryLikeWarnings
+              ? 'Some pages could not be processed due to memory limits, but partial results were extracted.'
+              : null,
+          durationMs: durationMs,
         );
         return;
       }
@@ -209,6 +250,9 @@ Future<void> startExtractionJob({
         statusCode: 500,
         message: error,
         responseBody: error,
+        durationMs: pollJson['duration_ms'] is num
+            ? (pollJson['duration_ms'] as num).round()
+            : now.difference(startedAt).inMilliseconds,
       );
       return;
     }

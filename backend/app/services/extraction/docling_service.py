@@ -11,6 +11,8 @@ from functools import lru_cache
 from mimetypes import guess_extension
 from pathlib import Path
 import asyncio
+import io
+import re
 import tempfile
 
 @dataclass(frozen=True)
@@ -108,3 +110,170 @@ async def document_to_outputs(doc: RawDocument) -> DoclingOutputs:
 async def document_to_markdown(doc: RawDocument) -> str:
     outputs = await document_to_outputs(doc)
     return outputs.markdown
+
+
+def split_pdf_document(doc: RawDocument, *, pages_per_chunk: int) -> list[RawDocument]:
+    """Split PDF bytes into smaller PDF chunks; return original doc on any failure."""
+    filename = (doc.filename or "").lower()
+    ctype = (doc.content_type or "").lower()
+    is_pdf = filename.endswith(".pdf") or "pdf" in ctype
+    if not is_pdf:
+        return [doc]
+
+    safe_pages_per_chunk = max(1, pages_per_chunk)
+    try:
+        from pypdf import PdfReader, PdfWriter  # type: ignore
+    except Exception:
+        return [doc]
+
+
+def split_pdf_document_targeted_for_timetable(
+    doc: RawDocument,
+    *,
+    pages_per_chunk: int,
+    following_pages: int = 3,
+    max_selected_pages: int = 10,
+) -> tuple[list[RawDocument], dict[str, int | str]]:
+    """
+    Select pages likely containing timetable slots by course-code pattern, include nearby pages,
+    then split those pages into smaller PDF chunks.
+    Falls back to normal split on failure/low confidence.
+    """
+    filename = (doc.filename or "").lower()
+    ctype = (doc.content_type or "").lower()
+    is_pdf = filename.endswith(".pdf") or "pdf" in ctype
+    if not is_pdf:
+        return [doc], {
+            "matched_pages": 0,
+            "selected_pages": 0,
+            "total_pages": 0,
+            "strategy": "not_pdf",
+        }
+
+    safe_pages_per_chunk = max(1, pages_per_chunk)
+    safe_following_pages = max(0, following_pages)
+    safe_max_selected_pages = max(1, max_selected_pages)
+
+    try:
+        from pypdf import PdfReader, PdfWriter  # type: ignore
+    except Exception:
+        return split_pdf_document(doc, pages_per_chunk=safe_pages_per_chunk), {
+            "matched_pages": 0,
+            "selected_pages": 0,
+            "total_pages": 0,
+            "strategy": "fallback_no_pypdf",
+        }
+
+    try:
+        reader = PdfReader(io.BytesIO(doc.data))
+        total_pages = len(reader.pages)
+        if total_pages <= safe_pages_per_chunk:
+            return [doc], {
+                "matched_pages": total_pages,
+                "selected_pages": total_pages,
+                "total_pages": total_pages,
+                "strategy": "small_pdf_passthrough",
+            }
+
+        code_re = re.compile(r"\b[A-Z]{2,5}\s*\d{3,4}[A-Z]?\b")
+        group_re = re.compile(
+            r"\b(?:kumpulan|group|grp|seksyen|section)\b[\s:._-]*[a-z0-9]{0,4}",
+            flags=re.IGNORECASE,
+        )
+        matched_indices: set[int] = set()
+        pages_with_group_token: set[int] = set()
+        for idx in range(total_pages):
+            page = reader.pages[idx]
+            text = page.extract_text() or ""
+            if group_re.search(text):
+                pages_with_group_token.add(idx)
+            if code_re.search(text.upper()):
+                matched_indices.add(idx)
+
+        if not matched_indices:
+            chunks = split_pdf_document(doc, pages_per_chunk=safe_pages_per_chunk)
+            return chunks, {
+                "matched_pages": 0,
+                "selected_pages": total_pages,
+                "total_pages": total_pages,
+                "strategy": "fallback_no_course_code_match",
+            }
+
+        selected_indices: set[int] = set()
+        for idx in matched_indices:
+            if idx in pages_with_group_token:
+                lo = idx
+                hi = idx
+            else:
+                lo = idx
+                hi = min(total_pages - 1, idx + safe_following_pages)
+            for j in range(lo, hi + 1):
+                selected_indices.add(j)
+
+        ordered = sorted(selected_indices)
+        if len(ordered) > safe_max_selected_pages:
+            ordered = ordered[:safe_max_selected_pages]
+
+        chunks: list[RawDocument] = []
+        for start in range(0, len(ordered), safe_pages_per_chunk):
+            sub = ordered[start : start + safe_pages_per_chunk]
+            writer = PdfWriter()
+            for page_idx in sub:
+                writer.add_page(reader.pages[page_idx])
+            buff = io.BytesIO()
+            writer.write(buff)
+            from_page = sub[0] + 1
+            to_page = sub[-1] + 1
+            chunks.append(
+                RawDocument(
+                    filename=f"{Path(doc.filename).stem}_sel_p{from_page}-{to_page}.pdf",
+                    content_type="application/pdf",
+                    data=buff.getvalue(),
+                )
+            )
+        if not chunks:
+            return [doc], {
+                "matched_pages": len(matched_indices),
+                "selected_pages": 0,
+                "total_pages": total_pages,
+            }
+        return chunks, {
+            "matched_pages": len(matched_indices),
+            "selected_pages": len(ordered),
+            "total_pages": total_pages,
+            "strategy": "targeted_selection",
+        }
+    except Exception:
+        chunks = split_pdf_document(doc, pages_per_chunk=safe_pages_per_chunk)
+        return chunks, {
+            "matched_pages": 0,
+            "selected_pages": 0,
+            "total_pages": 0,
+            "strategy": "fallback_exception",
+        }
+
+    try:
+        reader = PdfReader(io.BytesIO(doc.data))
+        total_pages = len(reader.pages)
+        if total_pages <= safe_pages_per_chunk:
+            return [doc]
+
+        chunks: list[RawDocument] = []
+        for start in range(0, total_pages, safe_pages_per_chunk):
+            end = min(start + safe_pages_per_chunk, total_pages)
+            writer = PdfWriter()
+            for idx in range(start, end):
+                writer.add_page(reader.pages[idx])
+            buff = io.BytesIO()
+            writer.write(buff)
+            chunk_data = buff.getvalue()
+            chunks.append(
+                RawDocument(
+                    filename=f"{Path(doc.filename).stem}_p{start + 1}-{end}.pdf",
+                    content_type="application/pdf",
+                    data=chunk_data,
+                )
+            )
+        return chunks or [doc]
+    except Exception:
+        return [doc]

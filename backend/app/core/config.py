@@ -24,6 +24,11 @@ class Settings(BaseSettings):
 
     # Max upload size (bytes) — enforce in route as well
     max_upload_bytes: int = 15 * 1024 * 1024
+    extraction_job_timeout_seconds: int = 240
+    pdf_pages_per_chunk: int = 4
+    timetable_targeted_page_selection: bool = True
+    timetable_page_following_pages: int = 3
+    timetable_max_selected_pages: int = 10
 
     # Comma-separated origins, or "*" for any (dev only)
     cors_origins: str = "*"

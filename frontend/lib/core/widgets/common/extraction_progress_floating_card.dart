@@ -54,13 +54,17 @@ class ExtractionProgressFloatingCard extends StatelessWidget {
         final titleText = switch (job.status) {
           ExtractionJobStatus.queued || ExtractionJobStatus.running =>
             'Extracting...',
-          ExtractionJobStatus.success => 'Extraction Complete',
+          ExtractionJobStatus.success => job.hasWarnings
+              ? 'Extraction Complete (Warnings)'
+              : 'Extraction Complete',
           ExtractionJobStatus.failed => 'Extraction Failed',
         };
         final subtitleText = switch (job.status) {
           ExtractionJobStatus.queued || ExtractionJobStatus.running =>
             'May take a few minutes...',
-          ExtractionJobStatus.success => 'Tap for review',
+          ExtractionJobStatus.success => job.hasWarnings
+              ? (job.warningMessage ?? 'Tap for review')
+              : 'Tap for review',
           ExtractionJobStatus.failed => _friendlyExtractionErrorMessage(job),
         };
         final icon = switch (job.status) {

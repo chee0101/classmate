@@ -584,14 +584,16 @@ async def extract_timetable_with_gemini(
     prompt = (
         "Extract class timetable slots from this OCR/markdown text.\n"
         "Return STRICT JSON only using this schema:\n"
-        '{"slots":[{"course_code":"string","day":"Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday","start_minutes":0,"end_minutes":0,"mode":"online|hybrid|physical|","venue":"string|null","class_type":"lecture|tutorial|lab|other"}]}\n'
+        '{"slots":[{"course_code":"string","day":"Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday","start_minutes":0,"end_minutes":0,"mode":"online|hybrid|physical|","venue":"string|null","class_type":"lecture|tutorial|lab"}]}\n'
         "Rules:\n"
         "- Extract only real class slots with a valid course code like ABC123/ABC1234.\n"
         "- Normalize day to English weekday names exactly.\n"
         "- start_minutes/end_minutes are minutes from midnight.\n"
         "- Skip non-class entries (minor/co-curriculum/ceramah/general activities) unless a valid course code exists.\n"
         "- If cell has multiple classes, output multiple slots.\n"
-        "- Use class_type=other when uncertain.\n"
+        "- If class type is not explicit, default class_type=lecture.\n"
+        "- Use tutorial only when clearly stated (e.g. tutorial/tut).\n"
+        "- Use lab only when clearly stated (e.g. lab/practical).\n"
         "- mode can be empty string if unknown.\n"
         f"{notes_rule}"
         "Input text:\n"
@@ -640,9 +642,9 @@ async def extract_timetable_with_gemini(
             "Sunday",
         }:
             continue
-        ctype = (item.class_type or "other").strip().lower()
-        if ctype not in {"lecture", "tutorial", "lab", "other"}:
-            ctype = "other"
+        ctype = (item.class_type or "lecture").strip().lower()
+        if ctype not in {"lecture", "tutorial", "lab"}:
+            ctype = "lecture"
         mode = (item.mode or "").strip().lower()
         if mode not in {"online", "hybrid", "physical", ""}:
             mode = ""
