@@ -17,7 +17,7 @@ import '../../core/widgets/common/app_outlined_icon_button.dart';
 import '../../core/widgets/common/confirm_dialog.dart';
 import '../../core/widgets/common/form_fields.dart';
 import '../../core/widgets/common/white_card.dart';
-import 'widgets/session_conflict_sheet.dart';
+import '../../core/widgets/extract/session_conflict_sheet.dart';
 
 /// Review flow after academic calendar extraction: structure (2 pages) + holidays.
 enum _ExactSessionAction { replace, mergeIntoExisting, addNew, cancel }
