@@ -20,6 +20,9 @@ import '../../core/widgets/schedule/class_slot_sheet.dart';
 import '../../core/widgets/common/animated_segmented_switch.dart';
 import '../../core/widgets/common/label_chip.dart';
 import '../../core/widgets/common/confirm_dialog.dart';
+import '../../core/widgets/timetable/timetable_course_card.dart';
+import '../../core/constants/routes.dart';
+import '../extract/auto_extract_screen.dart';
 import '../schedule/class_slot_editor_screen.dart';
 import '../../core/models/course.dart';
 
@@ -102,6 +105,18 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          IconButton(
+            tooltip: 'Import from file',
+            icon: const Icon(Icons.upload_file_outlined),
+            onPressed: () {
+              Navigator.of(context).pushNamed(
+                AppRoutes.autoExtract,
+                arguments: AutoExtractType.timetable,
+              );
+            },
+          ),
+        ],
       ),
       body: ValueListenableBuilder<List<AcademicSession>>(
         valueListenable: academicSessionsNotifier,
@@ -357,13 +372,19 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
 
                             if (_viewMode == _TimetableViewMode.byCourse) {
                               final entry = filtered[index];
+                              final displayCode =
+                                  displayCourseCodeForTimetableEntry(
+                                entry,
+                                termCourses,
+                              );
                               final courseColor =
                                   displayCourseColorForTimetableEntry(
                                 entry,
                                 termCourses,
                               );
-                              return _TimetableCourseCard(
-                                entry: entry,
+                              return TimetableCourseCard(
+                                courseCode: displayCode,
+                                slots: entry.slots,
                                 courseColor: courseColor,
                                 onTap: () => _openEditor(
                                   selectedSession: selectedSession,
@@ -711,97 +732,6 @@ class _TimetableDaySection extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _TimetableCourseCard extends StatelessWidget {
-  const _TimetableCourseCard({
-    required this.entry,
-    required this.courseColor,
-    required this.onTap,
-    required this.onDelete,
-  });
-
-  final TimetableEntry entry;
-  final Color courseColor;
-  final VoidCallback onTap;
-  final VoidCallback onDelete;
-
-  int _slotStartMinutes(TimetableSlot slot) {
-    return parseTimeLabel12hToMinutes(slot.startTime.trim()) ?? 0;
-  }
-
-  Map<String, List<TimetableSlot>> _groupSlotsByDay(List<TimetableSlot> slots) {
-    final grouped = <String, List<TimetableSlot>>{};
-    for (final slot in slots) {
-      grouped.putIfAbsent(slot.day, () => <TimetableSlot>[]).add(slot);
-    }
-    for (final day in grouped.keys) {
-      grouped[day]!.sort(
-        (a, b) => _slotStartMinutes(a).compareTo(_slotStartMinutes(b)),
-      );
-    }
-    return grouped;
-  }
-
-  List<String> _sortedDays(Iterable<String> days) {
-    final sorted = days.toList(growable: false);
-    sorted.sort((a, b) {
-      final ai = weekdayOrderFromString(a);
-      final bi = weekdayOrderFromString(b);
-      if (ai == 99 && bi == 99) return a.compareTo(b);
-      if (ai == 99) return 1;
-      if (bi == 99) return -1;
-      return ai.compareTo(bi);
-    });
-    return sorted;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final grouped = _groupSlotsByDay(entry.slots);
-    final days = _sortedDays(grouped.keys);
-
-    return _TimetableCardShell(
-      courseCode: entry.courseCode,
-      courseColor: courseColor,
-      onTap: onTap,
-      onDelete: onDelete,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: List.generate(days.length, (index) {
-          final day = days[index];
-          final slots = grouped[day]!;
-
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: index == days.length - 1 ? 0 : AppSpacing.md,
-            ),
-            child: SizedBox(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    day.length >= 3 ? day.substring(0, 3) : day,
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: const Color(0xFF6043BF),
-                          fontWeight: FontWeight.w700,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  ...slots.map(
-                    (slot) => Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: _TimetableSlotMeta(slot: slot),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        }),
-      ),
     );
   }
 }

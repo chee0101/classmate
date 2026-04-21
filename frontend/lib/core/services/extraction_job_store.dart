@@ -13,6 +13,8 @@ class ExtractionJobState {
     required this.status,
     required this.startedAt,
     this.assignedCourseCode,
+    this.sessionId,
+    this.termId,
     this.finishedAt,
     this.statusCode,
     this.message,
@@ -29,6 +31,9 @@ class ExtractionJobState {
   final String? message;
   final String? responseBody;
   final String? assignedCourseCode;
+  /// When set (e.g. timetable import), review/save uses this session/term.
+  final String? sessionId;
+  final String? termId;
 
   bool get isRunning =>
       status == ExtractionJobStatus.queued || status == ExtractionJobStatus.running;
@@ -40,6 +45,8 @@ class ExtractionJobState {
     String? message,
     String? responseBody,
     String? assignedCourseCode,
+    String? sessionId,
+    String? termId,
   }) {
     return ExtractionJobState(
       typeLabel: typeLabel,
@@ -52,6 +59,8 @@ class ExtractionJobState {
       message: message ?? this.message,
       responseBody: responseBody ?? this.responseBody,
       assignedCourseCode: assignedCourseCode ?? this.assignedCourseCode,
+      sessionId: sessionId ?? this.sessionId,
+      termId: termId ?? this.termId,
     );
   }
 }
@@ -81,6 +90,11 @@ Future<void> startExtractionJob({
   required List<PlatformFile> files,
   required bool useMultiFilesField,
   String? assignedCourseCode,
+  /// Comma-separated course codes sent to backend whitelist (timetable).
+  String? courseCodesAllowedCsv,
+  String? aiNotes,
+  String? sessionId,
+  String? termId,
 }) async {
   if (files.isEmpty) {
     throw StateError('No files selected.');
@@ -101,6 +115,8 @@ Future<void> startExtractionJob({
     startedAt: DateTime.now(),
     message: 'Queued',
     assignedCourseCode: assignedCourseCode,
+    sessionId: sessionId,
+    termId: termId,
   );
 
   final kind = endpoint.split('/').last;
@@ -110,6 +126,15 @@ Future<void> startExtractionJob({
 
   for (final file in files) {
     req.files.add(await _toMultipartFile(fileField, file));
+  }
+
+  final codes = (courseCodesAllowedCsv ?? '').trim();
+  if (codes.isNotEmpty) {
+    req.fields['course_codes_allowed'] = codes;
+  }
+  final notes = (aiNotes ?? '').trim();
+  if (notes.isNotEmpty) {
+    req.fields['ai_notes'] = notes;
   }
 
   extractionJobNotifier.value = extractionJobNotifier.value?.copyWith(

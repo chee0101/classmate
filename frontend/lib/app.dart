@@ -11,6 +11,7 @@ import 'screens/auth/verify_email_screen.dart';
 import 'screens/add/add_new_screen.dart' show AddNewScreen, AddType;
 import 'screens/extract/review_extracted_calendar_screen.dart';
 import 'screens/extract/review_extracted_tasks_screen.dart';
+import 'screens/extract/review_extracted_timetable_screen.dart';
 import 'screens/task/task_detail_screen.dart';
 import 'screens/profile/academic_sessions_screen.dart';
 import 'screens/profile/courses_screen.dart';
@@ -232,7 +233,11 @@ class MyApp extends StatelessWidget {
           final initialType = args is AddType ? args : null;
           return AddNewScreen(initialType: initialType);
         },
-        AppRoutes.autoExtract: (context) => const AutoExtractScreen(),
+        AppRoutes.autoExtract: (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          final initialType = args is AutoExtractType ? args : null;
+          return AutoExtractScreen(initialType: initialType);
+        },
         AppRoutes.reviewExtractedCalendar: (context) {
           final args = ModalRoute.of(context)?.settings.arguments;
           final jsonStr = args is String ? args : '';
@@ -252,6 +257,21 @@ class MyApp extends StatelessWidget {
           }
           final jsonStr = args is String ? args : '';
           return ReviewExtractedTasksScreen(responseJson: jsonStr);
+        },
+        AppRoutes.reviewExtractedTimetable: (context) {
+          final args = ModalRoute.of(context)?.settings.arguments;
+          if (args is Map) {
+            final jsonStr = (args['responseJson'] as String?) ?? '';
+            final sessionId = args['sessionId'] as String?;
+            final termId = args['termId'] as String?;
+            return ReviewExtractedTimetableScreen(
+              responseJson: jsonStr,
+              sessionId: sessionId,
+              termId: termId,
+            );
+          }
+          final jsonStr = args is String ? args : '';
+          return ReviewExtractedTimetableScreen(responseJson: jsonStr);
         },
         AppRoutes.taskDetail: (context) {
           final task = ModalRoute.of(context)!.settings.arguments as Task;

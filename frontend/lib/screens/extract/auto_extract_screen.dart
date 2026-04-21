@@ -23,7 +23,12 @@ import '../../core/widgets/home/session_header.dart';
 enum AutoExtractType { academicCalendar, timetable, task }
 
 class AutoExtractScreen extends StatefulWidget {
-  const AutoExtractScreen({super.key});
+  const AutoExtractScreen({
+    super.key,
+    this.initialType,
+  });
+
+  final AutoExtractType? initialType;
 
   @override
   State<AutoExtractScreen> createState() => _AutoExtractScreenState();
@@ -47,6 +52,12 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
 
   final TextEditingController _remarkFilterController = TextEditingController();
   List<PlatformFile> _selectedFiles = const [];
+
+  @override
+  void initState() {
+    super.initState();
+    _type = widget.initialType ?? AutoExtractType.academicCalendar;
+  }
 
   @override
   void dispose() {
@@ -164,6 +175,31 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
       AutoExtractType.task => 'Task',
     };
 
+    String? courseCodesAllowedCsv;
+    String? aiNotes;
+    String? sessionId;
+    String? termId;
+    if (_type == AutoExtractType.timetable) {
+      final sel = selectedSessionTermNotifier.value;
+      sessionId = sel?.sessionId;
+      termId = sel?.termId;
+      if (sel != null) {
+        final codes = coursesForSessionAndTerm(
+              sessionId: sel.sessionId,
+              termId: sel.termId,
+            )
+            .map((c) => c.courseCode.trim().toUpperCase())
+            .where((c) => c.isNotEmpty)
+            .toList()
+          ..sort();
+        if (codes.isNotEmpty) {
+          courseCodesAllowedCsv = codes.join(', ');
+        }
+      }
+      final remark = _remarkFilterController.text.trim();
+      if (remark.isNotEmpty) aiNotes = remark;
+    }
+
     unawaited(
       startExtractionJob(
         apiBaseUrl: _apiBaseUrl,
@@ -174,6 +210,10 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
         assignedCourseCode: _type == AutoExtractType.task
             ? _taskAssignedCourseCode
             : null,
+        courseCodesAllowedCsv: courseCodesAllowedCsv,
+        aiNotes: aiNotes,
+        sessionId: sessionId,
+        termId: termId,
       ),
     );
 

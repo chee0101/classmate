@@ -1,19 +1,12 @@
 import 'package:flutter/material.dart';
 
-import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_spacing.dart';
+import '../../constants/app_colors.dart';
+import '../../constants/app_spacing.dart';
 
-enum SessionConflictAction { merge, addNew, replace, cancel }
+enum TimetableSaveModeAction { merge, replace, cancel }
 
-class SessionConflictSheet extends StatelessWidget {
-  const SessionConflictSheet({
-    super.key,
-    required this.sessionName,
-    required this.sessionRangeText,
-  });
-
-  final String sessionName;
-  final String sessionRangeText;
+class TimetableSaveModeSheet extends StatelessWidget {
+  const TimetableSaveModeSheet({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -27,46 +20,35 @@ class SessionConflictSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Session already exists',
+              'Save timetable',
               style: textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: AppSpacing.sm),
             Text(
-              'A session with the same dates was found:',
+              'Choose how to apply selected courses.',
               style: textTheme.bodyMedium?.copyWith(
                 color: appPrimarySwatch.shade700,
               ),
             ),
-            const SizedBox(height: 2),
-            Text(
-              '$sessionName ($sessionRangeText)',
-              style: textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
-            ),
             const SizedBox(height: AppSpacing.md),
-            _ConflictOptionCard(
+            _ModeOptionCard(
               title: 'Merge with existing',
-              subtitle: 'Combine extracted holidays with current session',
+              subtitle: 'Keep existing slots and add new unique ones',
               emphasized: true,
-              onTap: () => Navigator.of(context).pop(SessionConflictAction.merge),
+              onTap: () => Navigator.of(context).pop(TimetableSaveModeAction.merge),
             ),
             const SizedBox(height: AppSpacing.sm),
-            _ConflictOptionCard(
-              title: 'Add as new session',
-              subtitle: 'Create a separate session with same dates',
-              onTap: () => Navigator.of(context).pop(SessionConflictAction.addNew),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            _ConflictOptionCard(
-              title: 'Replace existing session',
-              subtitle: 'This will overwrite all existing data',
+            _ModeOptionCard(
+              title: 'Replace selected courses',
+              subtitle: 'Overwrite selected courses with reviewed slots',
               warning: true,
-              onTap: () => Navigator.of(context).pop(SessionConflictAction.replace),
+              onTap: () => Navigator.of(context).pop(TimetableSaveModeAction.replace),
             ),
             const SizedBox(height: AppSpacing.md),
             SizedBox(
               width: double.infinity,
               child: TextButton(
-                onPressed: () => Navigator.of(context).pop(SessionConflictAction.cancel),
+                onPressed: () => Navigator.of(context).pop(TimetableSaveModeAction.cancel),
                 child: const Text('Cancel'),
               ),
             ),
@@ -77,8 +59,8 @@ class SessionConflictSheet extends StatelessWidget {
   }
 }
 
-class _ConflictOptionCard extends StatelessWidget {
-  const _ConflictOptionCard({
+class _ModeOptionCard extends StatelessWidget {
+  const _ModeOptionCard({
     required this.title,
     required this.subtitle,
     required this.onTap,

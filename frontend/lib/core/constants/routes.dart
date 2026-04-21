@@ -10,6 +10,7 @@ class AppRoutes {
   static const String autoExtract = '/auto-extract';
   static const String reviewExtractedCalendar = '/review-extracted-calendar';
   static const String reviewExtractedTasks = '/review-extracted-tasks';
+  static const String reviewExtractedTimetable = '/review-extracted-timetable';
   static const String academicSessions = '/academic-sessions';
   static const String courses = '/courses';
   static const String timetables = '/timetables';

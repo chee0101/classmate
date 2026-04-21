@@ -147,6 +147,7 @@ class ExtractionProgressFloatingCard extends StatelessWidget {
                       final route = switch (job.typeLabel) {
                         'Academic calendar' => AppRoutes.reviewExtractedCalendar,
                         'Task' => AppRoutes.reviewExtractedTasks,
+                        'Timetable' => AppRoutes.reviewExtractedTimetable,
                         _ => null,
                       };
                       if (route == null) {
@@ -162,12 +163,21 @@ class ExtractionProgressFloatingCard extends StatelessWidget {
                       if (job.status != ExtractionJobStatus.success) {
                         return;
                       }
-                      final args = route == AppRoutes.reviewExtractedTasks
-                          ? <String, dynamic>{
-                              'responseJson': body,
-                              'assignedCourseCode': job.assignedCourseCode,
-                            }
-                          : body;
+                      final Object args;
+                      if (route == AppRoutes.reviewExtractedTasks) {
+                        args = <String, dynamic>{
+                          'responseJson': body,
+                          'assignedCourseCode': job.assignedCourseCode,
+                        };
+                      } else if (route == AppRoutes.reviewExtractedTimetable) {
+                        args = <String, dynamic>{
+                          'responseJson': body,
+                          'sessionId': job.sessionId,
+                          'termId': job.termId,
+                        };
+                      } else {
+                        args = body;
+                      }
                       Navigator.of(context).pushNamed(route, arguments: args);
                     },
                     icon: const Icon(Icons.arrow_forward_ios_rounded),
