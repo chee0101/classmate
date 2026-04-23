@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
+import '../../core/constants/routes.dart';
 import '../../core/services/academic_event_store.dart';
 import '../../core/services/academic_session_store.dart';
 import '../../core/models/academic_event.dart';
 import '../../core/services/session_term_selection_store.dart';
 import '../../core/models/academic_session.dart';
+import '../../core/models/task.dart';
 import '../../core/services/task_store.dart';
 import '../../core/services/class_slot_store.dart';
 import '../../core/services/class_slot_override_store.dart';
@@ -26,10 +28,14 @@ import '../../core/utils/day_bounds_utils.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/home/insight_card.dart';
+import '../../core/widgets/home/home_next_action_card.dart';
+import '../../core/widgets/home/home_overview_cards.dart';
+import '../../core/widgets/home/home_workload_chart_card.dart';
 import '../../core/widgets/home/session_header.dart';
 import '../../core/widgets/home/today_schedule_card.dart';
 import '../../core/widgets/home/upcoming_events_card.dart';
 import '../../core/widgets/home/upcoming_deadlines_card.dart';
+import '../add/add_new_screen.dart' show AddType;
 
 /// Puts all-day events first, then sorts by start time (see [TodayScheduleItem.isAllDay]).
 int _compareTodayScheduleItems(TodayScheduleItem a, TodayScheduleItem b) {
@@ -69,6 +75,81 @@ List<Widget> _upcomingDeadlinesAndEventsOrdered({
     const SizedBox(height: AppSpacing.md),
     eventsCard,
   ];
+}
+
+class _WeekWorkloadBucket {
+  const _WeekWorkloadBucket({
+    required this.label,
+    required this.count,
+  });
+
+  final String label;
+  final int count;
+}
+
+List<_WeekWorkloadBucket> _next4WeekWorkloadBuckets({
+  required List<Task> pendingTasks,
+  required TermWindow selectedTerm,
+  required DateTime now,
+}) {
+  final termStart = DateTime(
+    selectedTerm.start.year,
+    selectedTerm.start.month,
+    selectedTerm.start.day,
+  );
+  final termEnd = DateTime(
+    selectedTerm.end.year,
+    selectedTerm.end.month,
+    selectedTerm.end.day,
+  );
+  final today = DateTime(now.year, now.month, now.day);
+  if (today.isAfter(termEnd)) return const <_WeekWorkloadBucket>[];
+
+  final anchorDay = today.isBefore(termStart) ? termStart : today;
+  final baseWeekIndex = anchorDay.difference(termStart).inDays ~/ 7;
+  final buckets = <_WeekWorkloadBucket>[];
+
+  for (var i = 0; i < 4; i++) {
+    final weekIndex = baseWeekIndex + i;
+    final weekStart = termStart.add(Duration(days: weekIndex * 7));
+    if (weekStart.isAfter(termEnd)) break;
+    final rawWeekEnd = weekStart.add(const Duration(days: 6));
+    final weekEnd = rawWeekEnd.isAfter(termEnd) ? termEnd : rawWeekEnd;
+    final count = pendingTasks.where((task) {
+      final due = DateTime(
+        task.dueDateTime.year,
+        task.dueDateTime.month,
+        task.dueDateTime.day,
+      );
+      return !due.isBefore(weekStart) && !due.isAfter(weekEnd);
+    }).length;
+
+    buckets.add(
+      _WeekWorkloadBucket(
+        label: 'W${weekIndex + 1}',
+        count: count,
+      ),
+    );
+  }
+
+  return buckets;
+}
+
+String _busiestWeekLabel(List<_WeekWorkloadBucket> buckets) {
+  if (buckets.isEmpty) return 'Week -';
+  var bestIndex = 0;
+  for (var i = 1; i < buckets.length; i++) {
+    if (buckets[i].count > buckets[bestIndex].count) {
+      bestIndex = i;
+    }
+  }
+  return 'Week ${buckets[bestIndex].label.replaceFirst('W', '')}';
+}
+
+int _busiestWeekCount(List<_WeekWorkloadBucket> buckets) {
+  if (buckets.isEmpty) return 0;
+  final counts = buckets.map((b) => b.count).toList(growable: false)..sort();
+  return counts.last;
 }
 
 class HomeScreen extends StatefulWidget {
@@ -176,6 +257,45 @@ class _HomeScreenState extends State<HomeScreen> {
                                       .where((task) => isInTerm(
                                           task.dueDateTime, selectedTerm))
                                       .toList();
+                                  final termRootTasks = tasks
+                                      .where((t) => t.parentTaskId == null)
+                                      .where((t) => isInTerm(t.dueDateTime, selectedTerm))
+                                      .toList(growable: false);
+                                  final pendingTasks = termRootTasks
+                                      .where((t) =>
+                                          TaskUtils.effectiveStatus(t) !=
+                                          TaskStatus.completed)
+                                      .toList(growable: false)
+                                    ..sort((a, b) =>
+                                        a.dueDateTime.compareTo(b.dueDateTime));
+                                  final overdueTasks = pendingTasks
+                                      .where((t) =>
+                                          TaskUtils.effectiveStatus(t) ==
+                                          TaskStatus.overdue)
+                                      .toList(growable: false)
+                                    ..sort((a, b) =>
+                                        a.dueDateTime.compareTo(b.dueDateTime));
+                                  final nextRecommendedTask = overdueTasks.isNotEmpty
+                                      ? overdueTasks.first
+                                      : (pendingTasks.isNotEmpty
+                                          ? pendingTasks.first
+                                          : null);
+                                  final workloadBuckets =
+                                      _next4WeekWorkloadBuckets(
+                                    pendingTasks: pendingTasks,
+                                    selectedTerm: selectedTerm,
+                                    now: now,
+                                  );
+                                  final busiestWeekLabel =
+                                      _busiestWeekLabel(workloadBuckets);
+                                  final busiestWeekCount =
+                                      _busiestWeekCount(workloadBuckets);
+                                  final weekCounts = workloadBuckets
+                                      .map((b) => b.count)
+                                      .toList(growable: false);
+                                  final weekLabels = workloadBuckets
+                                      .map((b) => b.label)
+                                      .toList(growable: false);
                                   final today =
                                       DateTime(now.year, now.month, now.day);
                                   final todayStart = startOfDay(today);
@@ -461,6 +581,41 @@ class _HomeScreenState extends State<HomeScreen> {
                                                   selectedSessionId:
                                                       selectedSession.id,
                                                 ),
+                                                HomeOverviewCards(
+                                                  pendingCount: pendingTasks.length,
+                                                  overdueCount: overdueTasks.length,
+                                                  busiestWeekLabel: busiestWeekLabel,
+                                                  busiestWeekCount: busiestWeekCount,
+                                                ),
+                                                const SizedBox(
+                                                    height: AppSpacing.md),
+                                                HomeNextActionCard(
+                                                  nextTask: nextRecommendedTask,
+                                                  onOpenTask: () {
+                                                    final task = nextRecommendedTask;
+                                                    if (task == null) return;
+                                                    Navigator.pushNamed(
+                                                      context,
+                                                      AppRoutes.taskDetail,
+                                                      arguments: task,
+                                                    );
+                                                  },
+                                                  onAddTask: () {
+                                                    Navigator.pushNamed(
+                                                      context,
+                                                      AppRoutes.addNew,
+                                                      arguments: AddType.task,
+                                                    );
+                                                  },
+                                                ),
+                                                const SizedBox(
+                                                    height: AppSpacing.md),
+                                                HomeWorkloadChartCard(
+                                                  weekLabels: weekLabels,
+                                                  weekCounts: weekCounts,
+                                                ),
+                                                const SizedBox(
+                                                    height: AppSpacing.md),
                                                 TodayScheduleCard(
                                                   items: const [],
                                                   academicBreakTitle:
@@ -538,6 +693,41 @@ class _HomeScreenState extends State<HomeScreen> {
                                                   selectedSessionId:
                                                       selectedSession.id,
                                                 ),
+                                                HomeOverviewCards(
+                                                  pendingCount: pendingTasks.length,
+                                                  overdueCount: overdueTasks.length,
+                                                  busiestWeekLabel: busiestWeekLabel,
+                                                  busiestWeekCount: busiestWeekCount,
+                                                ),
+                                                const SizedBox(
+                                                    height: AppSpacing.md),
+                                                HomeNextActionCard(
+                                                  nextTask: nextRecommendedTask,
+                                                  onOpenTask: () {
+                                                    final task = nextRecommendedTask;
+                                                    if (task == null) return;
+                                                    Navigator.pushNamed(
+                                                      context,
+                                                      AppRoutes.taskDetail,
+                                                      arguments: task,
+                                                    );
+                                                  },
+                                                  onAddTask: () {
+                                                    Navigator.pushNamed(
+                                                      context,
+                                                      AppRoutes.addNew,
+                                                      arguments: AddType.task,
+                                                    );
+                                                  },
+                                                ),
+                                                const SizedBox(
+                                                    height: AppSpacing.md),
+                                                HomeWorkloadChartCard(
+                                                  weekLabels: weekLabels,
+                                                  weekCounts: weekCounts,
+                                                ),
+                                                const SizedBox(
+                                                    height: AppSpacing.md),
                                                 TodayScheduleCard(
                                                   items: scheduleItems,
                                                   academicBreakTitle:
@@ -658,6 +848,41 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 selectedSessionId:
                                                     selectedSession.id,
                                               ),
+                                              HomeOverviewCards(
+                                                pendingCount: pendingTasks.length,
+                                                overdueCount: overdueTasks.length,
+                                                busiestWeekLabel: busiestWeekLabel,
+                                                busiestWeekCount: busiestWeekCount,
+                                              ),
+                                              const SizedBox(
+                                                  height: AppSpacing.md),
+                                              HomeNextActionCard(
+                                                nextTask: nextRecommendedTask,
+                                                onOpenTask: () {
+                                                  final task = nextRecommendedTask;
+                                                  if (task == null) return;
+                                                  Navigator.pushNamed(
+                                                    context,
+                                                    AppRoutes.taskDetail,
+                                                    arguments: task,
+                                                  );
+                                                },
+                                                onAddTask: () {
+                                                  Navigator.pushNamed(
+                                                    context,
+                                                    AppRoutes.addNew,
+                                                    arguments: AddType.task,
+                                                  );
+                                                },
+                                              ),
+                                              const SizedBox(
+                                                  height: AppSpacing.md),
+                                              HomeWorkloadChartCard(
+                                                weekLabels: weekLabels,
+                                                weekCounts: weekCounts,
+                                              ),
+                                              const SizedBox(
+                                                  height: AppSpacing.md),
                                               TodayScheduleCard(
                                                 items: scheduleItems,
                                                 academicBreakTitle: null,
