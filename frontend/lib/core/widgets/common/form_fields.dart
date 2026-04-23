@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 class LabeledTextField extends StatelessWidget {
   const LabeledTextField({
@@ -15,6 +16,7 @@ class LabeledTextField extends StatelessWidget {
     this.suffixIcon,
     this.enabled = true,
     this.readOnly = false,
+    this.inputFormatters,
   });
 
   final String label;
@@ -29,6 +31,7 @@ class LabeledTextField extends StatelessWidget {
   final Widget? suffixIcon;
   final bool enabled;
   final bool readOnly;
+  final List<TextInputFormatter>? inputFormatters;
 
   @override
   Widget build(BuildContext context) {
@@ -42,6 +45,7 @@ class LabeledTextField extends StatelessWidget {
           focusNode: focusNode,
           maxLines: maxLines,
           keyboardType: keyboardType,
+          inputFormatters: inputFormatters,
           obscureText: obscureText,
           enabled: enabled,
           readOnly: readOnly,

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../constants/app_spacing.dart';
 import '../../services/course_store.dart';
@@ -45,6 +46,7 @@ class _CourseDialogState extends State<CourseDialog> {
   late final TextEditingController _codeController;
   String? _errorText;
   int _selectedColorIndex = 0;
+  bool _isSaving = false;
 
   final List<Color> _colors = const [
     Color(0xFF3B82F6),
@@ -89,19 +91,42 @@ class _CourseDialogState extends State<CourseDialog> {
     super.dispose();
   }
 
-  void _handleSave() {
-    final code = _codeController.text.trim();
+  List<String> _parseCourseCodes(String input) {
+    final tokens = input
+        .split(RegExp(r'[,\n]'))
+        .map((e) => e.trim().toUpperCase())
+        .where((e) => e.isNotEmpty)
+        .toList(growable: false);
+    final seen = <String>{};
+    final out = <String>[];
+    for (final token in tokens) {
+      if (seen.add(token)) {
+        out.add(token);
+      }
+    }
+    return out;
+  }
 
-    if (code.isEmpty) {
+  String _normalizeInput(String value) {
+    return value.toUpperCase();
+  }
+
+  String _toHex(Color color) {
+    return '#${color.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
+  }
+
+  Future<void> _handleSave() async {
+    if (_isSaving) return;
+    final rawInput = _codeController.text.trim();
+
+    if (rawInput.isEmpty) {
       setState(() => _errorText = 'Course code is required.');
       return;
     }
 
-    final color = _colors[_selectedColorIndex];
-    final hex =
-        '#${color.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
-
     if (widget.isEdit) {
+      final code = rawInput.toUpperCase();
+      final hex = _toHex(_colors[_selectedColorIndex]);
       final course = widget.course!;
 
       if (courseCodeExistsInSessionAndTermExcludingCourse(
@@ -114,32 +139,80 @@ class _CourseDialogState extends State<CourseDialog> {
         return;
       }
 
-      updateCourse(
-        id: course.id,
-        sessionId: course.sessionId,
-        termId: course.termId,
-        courseCode: code,
-        courseColor: hex,
-      );
-    } else {
-      if (courseCodeExistsInSessionAndTerm(
-        sessionId: widget.sessionId,
-        termId: widget.termId,
-        courseCode: code,
-      )) {
-        setState(() => _errorText = 'This course code already exists.');
-        return;
+      setState(() => _isSaving = true);
+      try {
+        await updateCourse(
+          id: course.id,
+          sessionId: course.sessionId,
+          termId: course.termId,
+          courseCode: code,
+          courseColor: hex,
+        );
+      } finally {
+        if (mounted) {
+          setState(() => _isSaving = false);
+        }
       }
-
-      addCourse(
-        sessionId: widget.sessionId,
-        termId: widget.termId,
-        courseCode: code,
-        courseColor: hex,
-      );
+      Navigator.of(context).pop(code);
+      return;
     }
 
-    Navigator.of(context).pop(code.toUpperCase()); // ✅ RETURN VALUE
+    final parsedCodes = _parseCourseCodes(rawInput);
+    if (parsedCodes.isEmpty) {
+      setState(() => _errorText = 'Course code is required.');
+      return;
+    }
+
+    final existingCodes = courseCodesForSessionAndTerm(
+      sessionId: widget.sessionId,
+      termId: widget.termId,
+    ).toSet();
+    final newCodes = parsedCodes.where((c) => !existingCodes.contains(c)).toList();
+
+    if (newCodes.isEmpty) {
+      setState(() => _errorText = 'All entered course codes already exist.');
+      return;
+    }
+
+    setState(() => _isSaving = true);
+    try {
+      if (newCodes.length == 1) {
+        final hex = _toHex(_colors[_selectedColorIndex]);
+        await addCourse(
+          sessionId: widget.sessionId,
+          termId: widget.termId,
+          courseCode: newCodes.first,
+          courseColor: hex,
+        );
+      } else {
+        final existingCount = coursesForSessionAndTerm(
+          sessionId: widget.sessionId,
+          termId: widget.termId,
+        ).length;
+        for (var i = 0; i < newCodes.length; i++) {
+          final color = _colors[(existingCount + i) % _colors.length];
+          await addCourse(
+            sessionId: widget.sessionId,
+            termId: widget.termId,
+            courseCode: newCodes[i],
+            courseColor: _toHex(color),
+          );
+        }
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
+
+    if (!mounted) return;
+    final addedText = newCodes.length == 1
+        ? 'Course ${newCodes.first} added.'
+        : '${newCodes.length} courses added.';
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(addedText)),
+    );
+    Navigator.of(context).pop(newCodes.first);
   }
 
   @override
@@ -165,9 +238,16 @@ class _CourseDialogState extends State<CourseDialog> {
             ),
             const SizedBox(height: AppSpacing.md),
             LabeledTextField(
-              label: 'Course Code',
-              hintText: 'Enter course code',
+              label: widget.isEdit ? 'Course Code' : 'Course Code(s)',
+              hintText: widget.isEdit
+                  ? 'Enter course code'
+                  : 'e.g. CSC101, MTH120, PHY103',
               controller: _codeController,
+              inputFormatters: [
+                TextInputFormatter.withFunction((oldValue, newValue) {
+                  return newValue.copyWith(text: _normalizeInput(newValue.text));
+                }),
+              ],
               errorText: _errorText,
               onChanged: (_) {
                 if (_errorText != null) {
@@ -175,30 +255,43 @@ class _CourseDialogState extends State<CourseDialog> {
                 }
               },
             ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              'Color Tag',
-              style: textTheme.titleSmall,
-            ),
-            const SizedBox(height: 8),
-
-            /// ✅ Reusable Color Picker
-            ColorPicker(
-              colors: _colors,
-              selectedIndex: _selectedColorIndex,
-              onSelect: (index) {
-                setState(() => _selectedColorIndex = index);
-              },
-            ),
+            if (!widget.isEdit) ...[
+              const SizedBox(height: 6),
+              Text(
+                'Tip: Add multiple courses using commas or new lines.',
+                style: textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+              ),
+            ],
+            if (widget.isEdit) ...[
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                'Color Tag',
+                style: textTheme.titleSmall,
+              ),
+              const SizedBox(height: 8),
+              ColorPicker(
+                colors: _colors,
+                selectedIndex: _selectedColorIndex,
+                onSelect: (index) {
+                  setState(() => _selectedColorIndex = index);
+                },
+              ),
+            ],
 
             const SizedBox(height: AppSpacing.lg),
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
-                onPressed: _handleSave,
-                child: Text(
-                  widget.isEdit ? 'Save changes' : 'Add course',
-                ),
+                onPressed: _isSaving ? null : _handleSave,
+                child: _isSaving
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Text(
+                        widget.isEdit ? 'Save changes' : 'Add course',
+                      ),
               ),
             ),
           ],
