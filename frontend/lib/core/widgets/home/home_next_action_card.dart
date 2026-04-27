@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../constants/app_spacing.dart';
 import '../../models/task.dart';
-import '../../utils/date_time_format.dart';
 
 class HomeNextActionCard extends StatelessWidget {
   const HomeNextActionCard({
@@ -15,6 +14,19 @@ class HomeNextActionCard extends StatelessWidget {
   final Task? nextTask;
   final VoidCallback onOpenTask;
   final VoidCallback onAddTask;
+
+  String _relativeDayLabel(DateTime due) {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final dueDay = DateTime(due.year, due.month, due.day);
+    final diff = dueDay.difference(today).inDays;
+    if (diff == 0) return 'due today';
+    if (diff < 0) {
+      final daysAgo = -diff;
+      return '$daysAgo day${daysAgo == 1 ? '' : 's'} ago';
+    }
+    return '$diff day${diff == 1 ? '' : 's'} left';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -51,26 +63,39 @@ class HomeNextActionCard extends StatelessWidget {
               children: [
                 Text('Next Recommended Action', style: textTheme.titleMedium),
                 const SizedBox(height: AppSpacing.xs),
-                Text(
-                  nextTask!.title,
-                  style: textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '${nextTask!.courseCode} • ${formatRelativeDueDate(nextTask!.dueDateTime)}',
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey.shade700,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: onOpenTask,
-                    child: const Text('Open task'),
-                  ),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            nextTask!.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '${nextTask!.courseCode} • ${_relativeDayLabel(nextTask!.dueDateTime)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: textTheme.bodyMedium?.copyWith(
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    TextButton(
+                      onPressed: onOpenTask,
+                      child: const Text('View'),
+                    ),
+                  ],
                 ),
               ],
             ),

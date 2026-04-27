@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
+import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/routes.dart';
 import '../../core/models/academic_session.dart';
@@ -13,11 +14,90 @@ import '../../core/utils/course_display.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/utils/task_utils.dart';
 import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
+import '../../core/widgets/common/animated_segmented_switch.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/common/session_term_context_label.dart';
+import '../../core/widgets/home/home_next_action_card.dart';
+import '../../core/widgets/home/home_overview_cards.dart';
+import '../../core/widgets/home/home_workload_chart_card.dart';
 import '../../core/widgets/task/task_card.dart';
 import '../../core/widgets/task/task_course_filter.dart';
-import '../../core/widgets/task/task_status_tabs.dart';
+import '../add/add_new_screen.dart' show AddType;
+
+class _WeekWorkloadBucket {
+  const _WeekWorkloadBucket({
+    required this.label,
+    required this.count,
+  });
+
+  final String label;
+  final int count;
+}
+
+List<_WeekWorkloadBucket> _next4WeekWorkloadBuckets({
+  required List<Task> pendingTasks,
+  required TermWindow selectedTerm,
+  required DateTime now,
+}) {
+  final termStart = DateTime(
+    selectedTerm.start.year,
+    selectedTerm.start.month,
+    selectedTerm.start.day,
+  );
+  final termEnd = DateTime(
+    selectedTerm.end.year,
+    selectedTerm.end.month,
+    selectedTerm.end.day,
+  );
+  final today = DateTime(now.year, now.month, now.day);
+  if (today.isAfter(termEnd)) return const <_WeekWorkloadBucket>[];
+
+  final anchorDay = today.isBefore(termStart) ? termStart : today;
+  final baseWeekIndex = anchorDay.difference(termStart).inDays ~/ 7;
+  final buckets = <_WeekWorkloadBucket>[];
+
+  for (var i = 0; i < 4; i++) {
+    final weekIndex = baseWeekIndex + i;
+    final weekStart = termStart.add(Duration(days: weekIndex * 7));
+    if (weekStart.isAfter(termEnd)) break;
+    final rawWeekEnd = weekStart.add(const Duration(days: 6));
+    final weekEnd = rawWeekEnd.isAfter(termEnd) ? termEnd : rawWeekEnd;
+    final count = pendingTasks.where((task) {
+      final due = DateTime(
+        task.dueDateTime.year,
+        task.dueDateTime.month,
+        task.dueDateTime.day,
+      );
+      return !due.isBefore(weekStart) && !due.isAfter(weekEnd);
+    }).length;
+
+    buckets.add(
+      _WeekWorkloadBucket(
+        label: 'W${weekIndex + 1}',
+        count: count,
+      ),
+    );
+  }
+
+  return buckets;
+}
+
+String _busiestWeekLabel(List<_WeekWorkloadBucket> buckets) {
+  if (buckets.isEmpty) return 'Week -';
+  var bestIndex = 0;
+  for (var i = 1; i < buckets.length; i++) {
+    if (buckets[i].count > buckets[bestIndex].count) {
+      bestIndex = i;
+    }
+  }
+  return 'Peak Week (${buckets[bestIndex].label})';
+}
+
+int _busiestWeekCount(List<_WeekWorkloadBucket> buckets) {
+  if (buckets.isEmpty) return 0;
+  final counts = buckets.map((b) => b.count).toList(growable: false)..sort();
+  return counts.last;
+}
 
 class TaskScreen extends StatefulWidget {
   const TaskScreen({super.key});
@@ -26,8 +106,11 @@ class TaskScreen extends StatefulWidget {
   State<TaskScreen> createState() => _TaskScreenState();
 }
 
+enum _TaskViewMode { tasks, insights }
+
 class _TaskScreenState extends State<TaskScreen> {
   TaskStatus _selectedStatus = TaskStatus.ongoing;
+  _TaskViewMode _selectedViewMode = _TaskViewMode.tasks;
 
   String? _selectedCourseCode; // null = All courses
 
@@ -148,6 +231,31 @@ class _TaskScreenState extends State<TaskScreen> {
                         isInTerm(task.dueDateTime, selectedRef.term),
                   )
                   .toList();
+              final pendingTasks = topLevelTasks
+                  .where((t) =>
+                      TaskUtils.effectiveStatus(t) != TaskStatus.completed)
+                  .toList(growable: false)
+                ..sort((a, b) => a.dueDateTime.compareTo(b.dueDateTime));
+              final overdueTasks = pendingTasks
+                  .where((t) => TaskUtils.effectiveStatus(t) == TaskStatus.overdue)
+                  .toList(growable: false)
+                ..sort((a, b) => a.dueDateTime.compareTo(b.dueDateTime));
+              final nextRecommendedTask = overdueTasks.isNotEmpty
+                  ? overdueTasks.first
+                  : (pendingTasks.isNotEmpty ? pendingTasks.first : null);
+              final workloadBuckets = _next4WeekWorkloadBuckets(
+                pendingTasks: pendingTasks,
+                selectedTerm: selectedRef.term,
+                now: now,
+              );
+              final busiestWeekLabel = _busiestWeekLabel(workloadBuckets);
+              final busiestWeekCount = _busiestWeekCount(workloadBuckets);
+              final weekCounts = workloadBuckets
+                  .map((b) => b.count)
+                  .toList(growable: false);
+              final weekLabels = workloadBuckets
+                  .map((b) => b.label)
+                  .toList(growable: false);
 
               // Build distinct display course codes for the filter.
               final courseCodes = topLevelTasks
@@ -191,62 +299,131 @@ class _TaskScreenState extends State<TaskScreen> {
                   AppSpacing.md,
                   0,
                 ),
-                child: TaskStatusTabs(
-                  selected: _selectedStatus,
-                  onChanged: (status) {
-                    setState(() => _selectedStatus = status);
+                child: AnimatedSegmentedSwitch<_TaskViewMode>(
+                  value: _selectedViewMode,
+                  onChanged: (value) {
+                    setState(() => _selectedViewMode = value);
                   },
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-                child: TaskCourseFilter(
-                  courseCodes: courseCodes,
-                  selectedCourseCode: _selectedCourseCode,
-                  onChanged: (code) {
-                    setState(() => _selectedCourseCode = code);
-                  },
+                  options: const [
+                    SegmentedSwitchOption<_TaskViewMode>(
+                      value: _TaskViewMode.tasks,
+                      label: 'Tasks',
+                    ),
+                    SegmentedSwitchOption<_TaskViewMode>(
+                      value: _TaskViewMode.insights,
+                      label: 'Insights',
+                    ),
+                  ],
                 ),
               ),
               const SizedBox(height: AppSpacing.sm),
               Expanded(
-                child: Padding(
-                  padding: EdgeInsets.zero,
-                  child: tasks.isEmpty
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md), 
-                            child: Text(
-                              'No tasks found. Looks like you\'re all caught up!',
-                              style: textTheme.bodyLarge,
-                              textAlign: TextAlign.center,
-                            )
+                child: _selectedViewMode == _TaskViewMode.tasks
+                    ? Column(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 0,
+                            ),
+                            child: _buildStatusChipRow(),
                           ),
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.only(
-                            bottom: AppSpacing.md,
-                            left: AppSpacing.md,
-                            right: AppSpacing.md,
+                          const SizedBox(height: AppSpacing.sm),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: AppSpacing.md,
+                            ),
+                            child: TaskCourseFilter(
+                              courseCodes: courseCodes,
+                              selectedCourseCode: _selectedCourseCode,
+                              onChanged: (code) {
+                                setState(() => _selectedCourseCode = code);
+                              },
+                            ),
                           ),
-                          itemCount: tasks.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: AppSpacing.sm),
-                          itemBuilder: (context, index) {
-                            final task = tasks[index];
-                            final nextSubtaskTitle =
-                                _getNextSubtaskTitle(task.id, allTasks);
-                            return TaskCard(
-                              task: task,
-                              onMarkDone: () async => _markTaskAsCompleted(task),
-                              onTap: () => _navigateToTaskDetail(task),
-                              nextSubtaskTitle: nextSubtaskTitle,
-                              courses: termCourses,
-                            );
-                          },
+                          const SizedBox(height: AppSpacing.sm),
+                          Expanded(
+                            child: Padding(
+                              padding: EdgeInsets.zero,
+                              child: tasks.isEmpty
+                                  ? Center(
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: AppSpacing.md,
+                                        ),
+                                        child: Text(
+                                          'No tasks found. Looks like you\'re all caught up!',
+                                          style: textTheme.bodyLarge,
+                                          textAlign: TextAlign.center,
+                                        ),
+                                      ),
+                                    )
+                                  : ListView.separated(
+                                      padding: const EdgeInsets.only(
+                                        bottom: AppSpacing.md,
+                                        left: AppSpacing.md,
+                                        right: AppSpacing.md,
+                                      ),
+                                      itemCount: tasks.length,
+                                      separatorBuilder: (_, __) =>
+                                          const SizedBox(height: AppSpacing.sm),
+                                      itemBuilder: (context, index) {
+                                        final task = tasks[index];
+                                        final nextSubtaskTitle =
+                                            _getNextSubtaskTitle(task.id, allTasks);
+                                        return TaskCard(
+                                          task: task,
+                                          onMarkDone: () async =>
+                                              _markTaskAsCompleted(task),
+                                          onTap: () => _navigateToTaskDetail(task),
+                                          nextSubtaskTitle: nextSubtaskTitle,
+                                          courses: termCourses,
+                                        );
+                                      },
+                                    ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : SingleChildScrollView(
+                        padding: const EdgeInsets.only(
+                          top: AppSpacing.sm,
+                          left: AppSpacing.md,
+                          right: AppSpacing.md,
+                          bottom: AppSpacing.md,
                         ),
-                ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            HomeOverviewCards(
+                              pendingCount: pendingTasks.length,
+                              overdueCount: overdueTasks.length,
+                              busiestWeekLabel: busiestWeekLabel,
+                              busiestWeekCount: busiestWeekCount,
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            HomeNextActionCard(
+                              nextTask: nextRecommendedTask,
+                              onOpenTask: () {
+                                final task = nextRecommendedTask;
+                                if (task == null) return;
+                                _navigateToTaskDetail(task);
+                              },
+                              onAddTask: () {
+                                Navigator.pushNamed(
+                                  context,
+                                  AppRoutes.addNew,
+                                  arguments: AddType.task,
+                                );
+                              },
+                            ),
+                            const SizedBox(height: AppSpacing.sm),
+                            HomeWorkloadChartCard(
+                              weekLabels: weekLabels,
+                              weekCounts: weekCounts,
+                            ),
+                          ],
+                        ),
+                      ),
               ),
             ],
             );
@@ -258,6 +435,68 @@ class _TaskScreenState extends State<TaskScreen> {
           );
         },
       ),
+    );
+  }
+
+  Widget _buildStatusChipRow() {
+    final outlineColor = appPrimarySwatch.shade600.withValues(alpha: 0.55);
+    final selectedFill = appPrimarySwatch.shade600.withValues(alpha: 0.16);
+
+    return Wrap(
+      spacing: AppSpacing.sm,
+      children: [
+        ChoiceChip(
+          label: const Text('Ongoing'),
+          selected: _selectedStatus == TaskStatus.ongoing,
+          side: BorderSide(color: outlineColor),
+          backgroundColor: Colors.white,
+          selectedColor: selectedFill,
+          labelStyle: TextStyle(
+            color: appPrimarySwatch.shade700,
+            fontWeight: FontWeight.w600,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          onSelected: (_) {
+            setState(() => _selectedStatus = TaskStatus.ongoing);
+          },
+        ),
+        ChoiceChip(
+          label: const Text('Overdue'),
+          selected: _selectedStatus == TaskStatus.overdue,
+          side: BorderSide(color: outlineColor),
+          backgroundColor: Colors.white,
+          selectedColor: selectedFill,
+          labelStyle: TextStyle(
+            color: appPrimarySwatch.shade700,
+            fontWeight: FontWeight.w600,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          onSelected: (_) {
+            setState(() => _selectedStatus = TaskStatus.overdue);
+          },
+        ),
+        ChoiceChip(
+          label: const Text('Complete'),
+          selected: _selectedStatus == TaskStatus.completed,
+          side: BorderSide(color: outlineColor),
+          backgroundColor: Colors.white,
+          selectedColor: selectedFill,
+          labelStyle: TextStyle(
+            color: appPrimarySwatch.shade700,
+            fontWeight: FontWeight.w600,
+          ),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          onSelected: (_) {
+            setState(() => _selectedStatus = TaskStatus.completed);
+          },
+        ),
+      ],
     );
   }
 

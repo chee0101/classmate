@@ -44,7 +44,7 @@ class ScheduleScreen extends StatefulWidget {
 }
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
-  bool _showMonthly = false;
+  bool _showMonthly = true;
   final CalendarController _calendarController = CalendarController();
   DateTime _visibleDate = DateTime.now();
   Offset? _lastPointerGlobalPosition;
@@ -52,7 +52,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   @override
   void initState() {
     super.initState();
-    _calendarController.view = CalendarView.week;
+    _calendarController.view = CalendarView.month;
     _calendarController.displayDate = _visibleDate;
   }
 
@@ -374,9 +374,20 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                                       showCurrentTimeIndicator:
                                                           true,
                                                       selectionDecoration:
-                                                          const BoxDecoration(
-                                                        color:
-                                                            Colors.transparent,
+                                                          BoxDecoration(
+                                                        color: appPrimarySwatch
+                                                            .shade600
+                                                            .withValues(
+                                                                alpha: 0.28),
+                                                        border: Border.all(
+                                                          color:
+                                                              appPrimarySwatch
+                                                                  .shade700,
+                                                          width: 1.3,
+                                                        ),
+                                                        borderRadius:
+                                                            BorderRadius
+                                                                .circular(8),
                                                       ),
                                                       onViewChanged: (details) {
                                                         if (details.visibleDates

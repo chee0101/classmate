@@ -13,6 +13,32 @@ class HomeWorkloadChartCard extends StatelessWidget {
   final List<String> weekLabels;
   final List<int> weekCounts;
 
+  String _insightLine({
+    required List<String> labels,
+    required List<int> counts,
+    required int peakIndex,
+    required int peakValue,
+  }) {
+    if (counts.isEmpty || peakValue == 0) {
+      return 'No deadlines in the next 4 weeks.';
+    }
+
+    final peakWeek = labels[peakIndex].replaceFirst('W', 'Week ');
+    final remainingAfterPeak = counts.skip(peakIndex + 1).toList(growable: false);
+    final noDeadlinesAfterPeak = remainingAfterPeak.isEmpty ||
+        remainingAfterPeak.every((count) => count == 0);
+
+    if (peakValue >= 5) {
+      return 'You have a heavy workload in $peakWeek. Consider starting early.';
+    }
+
+    if (noDeadlinesAfterPeak) {
+      return '$peakWeek is your main deadline week.';
+    }
+
+    return '$peakWeek is your busiest upcoming week.';
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -36,7 +62,7 @@ class HomeWorkloadChartCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Workload (Next 4 Weeks)', style: textTheme.titleMedium),
+          Text('Deadline Count (Next 4 Weeks)', style: textTheme.titleMedium),
           const SizedBox(height: AppSpacing.sm),
           SizedBox(
             height: 136,
@@ -100,9 +126,12 @@ class HomeWorkloadChartCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            peakValue == 0
-                ? 'No task deadlines in the next 4 weeks.'
-                : 'Peak: Week ${peakIndex + 1} ($peakValue tasks)',
+            _insightLine(
+              labels: safeLabels,
+              counts: safeCounts,
+              peakIndex: peakIndex,
+              peakValue: peakValue,
+            ),
             style: textTheme.bodySmall?.copyWith(
               color: Colors.grey.shade700,
               fontWeight: FontWeight.w600,
