@@ -8,6 +8,9 @@ import 'academic_session_store.dart';
 import 'class_slot_store.dart';
 import 'class_slot_override_store.dart';
 import 'course_store.dart';
+import 'notification_service.dart';
+import 'notification_preferences_store.dart';
+import 'reminder_policy_service.dart';
 import 'task_store.dart';
 
 /// Runs one-time app bootstrapping work after the first Flutter frame.
@@ -46,6 +49,7 @@ class AppBootstrapper {
           options: DefaultFirebaseOptions.currentPlatform,
         );
       }
+      await NotificationService.instance.initialize();
       // Must run before any Firestore reads/writes (offline cache + write queue).
       configureFirestorePersistence();
       _setProgress(0.50);
@@ -71,6 +75,8 @@ class AppBootstrapper {
       initializeTasksSync();
       _setProgress(0.89);
       await Future<void>.delayed(Duration.zero);
+      initializeNotificationPreferencesSync();
+      ReminderPolicyService.instance.start();
 
       initializeAcademicEventsSync();
       _setProgress(0.95);

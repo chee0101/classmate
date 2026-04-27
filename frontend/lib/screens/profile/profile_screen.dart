@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/routes.dart';
+import '../../core/services/notification_preferences_store.dart';
 import '../../core/services/user_profile_store.dart';
 import '../../core/widgets/common/confirm_dialog.dart';
 import '../../core/widgets/common/white_card.dart';
@@ -108,6 +109,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _updatePrefs(NotificationPreferences next) async {
+    try {
+      await updateNotificationPreferences(next);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Reminder preferences updated.')),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Failed to save. Check internet and try again.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -145,6 +161,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   Navigator.pushNamed(context, AppRoutes.changePassword);
                 },
               ),
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            ValueListenableBuilder<NotificationPreferences>(
+              valueListenable: notificationPreferencesNotifier,
+              builder: (context, prefs, _) {
+                return WhiteCard(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildMenuSwitchRow(
+                        context,
+                        icon: Icons.notifications_outlined,
+                        title: 'Task Reminders',
+                        value: prefs.enabled,
+                        onChanged: (value) {
+                          _updatePrefs(prefs.copyWith(enabled: value));
+                        },
+                      ),
+                      if (prefs.enabled) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          'Reminder Lead Time',
+                          style: textTheme.titleSmall,
+                        ),
+                        const SizedBox(height: 4),
+                        DropdownButtonFormField<int>(
+                          value: prefs.leadTimeMinutes,
+                          items: const [
+                            DropdownMenuItem(
+                              value: 30,
+                              child: Text('30 minutes before'),
+                            ),
+                            DropdownMenuItem(
+                              value: 120,
+                              child: Text('2 hours before'),
+                            ),
+                            DropdownMenuItem(
+                              value: 24 * 60,
+                              child: Text('1 day before'),
+                            ),
+                          ],
+                          onChanged: (value) {
+                            if (value == null) return;
+                            _updatePrefs(
+                              prefs.copyWith(leadTimeMinutes: value),
+                            );
+                          },
+                          decoration: const InputDecoration(
+                            isDense: true,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              },
             ),
             const SizedBox(height: AppSpacing.md),
 
@@ -310,6 +382,46 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildMenuSwitchRow(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: colorScheme.primary.withValues(alpha: 0.08),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            icon,
+            color: colorScheme.primary,
+            size: 20,
+          ),
+        ),
+        const SizedBox(width: AppSpacing.md),
+        Expanded(
+          child: Text(
+            title,
+            style: textTheme.bodyLarge,
+          ),
+        ),
+        Switch(
+          value: value,
+          onChanged: onChanged,
+        ),
+      ],
     );
   }
 }
