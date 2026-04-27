@@ -100,6 +100,22 @@ async def run_academic_calendar_pipeline(
     if extraction.kind == DocumentKind.unknown:
         warnings.append("Could not classify/extract document type.")
 
+    # If Gemini is enabled but temporarily unavailable, do not silently return
+    # a session-only payload with 0 holidays. Surface a retryable error instead.
+    notes_l = (extraction.notes or "").lower()
+    is_session_only_fallback = "path=deterministic_session_only" in notes_l
+    has_gemini_api_error = "last_gemini_status='api_error'" in notes_l
+    looks_transient_unavailable = (
+        "503" in notes_l
+        or "unavailable" in notes_l
+        or "resource_exhausted" in notes_l
+        or "try again later" in notes_l
+    )
+    if is_session_only_fallback and has_gemini_api_error and looks_transient_unavailable:
+        raise RuntimeError(
+            "AI extraction service is temporarily unavailable. Please try again."
+        )
+
     return AcademicExtractionEnvelope(
         source_filename=source_filename,
         markdown_from_docling=markdown,

@@ -24,6 +24,13 @@ String _friendlyExtractionErrorMessage(ExtractionJobState job) {
       combined.contains('connection')) {
     return 'Connection issue while extracting. Please check internet and try again.';
   }
+  if (combined.contains('service unavailable') ||
+      combined.contains('temporarily unavailable') ||
+      combined.contains('503') ||
+      combined.contains('resource_exhausted') ||
+      combined.contains('try again later')) {
+    return 'AI service is temporarily unavailable. Please try again shortly.';
+  }
   if (combined.contains('500') ||
       combined.contains('internal server error') ||
       combined.contains('preprocess failed')) {

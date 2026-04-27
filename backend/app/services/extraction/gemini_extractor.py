@@ -215,6 +215,25 @@ def _extract_mixed_row_tasks_from_markdown_table(doc_text: str) -> list[TaskExtr
 
 
 _FULL_CALENDAR_MAX_CHARS = 250_000
+_GEMINI_MAX_RETRIES = 3
+
+
+def _is_transient_gemini_error(message: str) -> bool:
+    text = (message or "").lower()
+    transient_hints = (
+        "503",
+        "unavailable",
+        "resource_exhausted",
+        "429",
+        "deadline_exceeded",
+        "temporarily",
+        "try again later",
+        "timed out",
+        "timeout",
+        "connection reset",
+        "connection aborted",
+    )
+    return any(h in text for h in transient_hints)
 
 
 def _is_due_action_task(task: TaskExtract) -> bool:
@@ -382,16 +401,27 @@ async def extract_full_academic_calendar_with_gemini(
 
     model_name = settings.gemini_model
     t0 = perf_counter()
-    try:
-        client = genai.Client(api_key=settings.gemini_api_key)
-        response = await asyncio.to_thread(
-            client.models.generate_content,
-            model=model_name,
-            contents=prompt,
-        )
-    except Exception as e:
+    client = genai.Client(api_key=settings.gemini_api_key)
+    response = None
+    last_error = ""
+    for attempt in range(1, _GEMINI_MAX_RETRIES + 1):
+        try:
+            response = await asyncio.to_thread(
+                client.models.generate_content,
+                model=model_name,
+                contents=prompt,
+            )
+            break
+        except Exception as e:
+            last_error = f"{type(e).__name__}: {e}"
+            if attempt >= _GEMINI_MAX_RETRIES or not _is_transient_gemini_error(last_error):
+                gemini_ms_err = (perf_counter() - t0) * 1000.0
+                return None, gemini_ms_err, "api_error", last_error, ""
+            await asyncio.sleep(0.8 * attempt)
+
+    if response is None:
         gemini_ms_err = (perf_counter() - t0) * 1000.0
-        return None, gemini_ms_err, "api_error", f"{type(e).__name__}: {e}", ""
+        return None, gemini_ms_err, "api_error", last_error, ""
 
     gemini_ms = (perf_counter() - t0) * 1000.0
     raw_text = getattr(response, "text", "") or ""

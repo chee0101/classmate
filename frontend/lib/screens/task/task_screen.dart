@@ -90,7 +90,7 @@ String _busiestWeekLabel(List<_WeekWorkloadBucket> buckets) {
       bestIndex = i;
     }
   }
-  return 'Peak Week (${buckets[bestIndex].label})';
+  return 'Peak: ${buckets[bestIndex].label}';
 }
 
 int _busiestWeekCount(List<_WeekWorkloadBucket> buckets) {
@@ -323,7 +323,7 @@ class _TaskScreenState extends State<TaskScreen> {
                         children: [
                           Padding(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 0,
+                              horizontal: AppSpacing.md,
                             ),
                             child: _buildStatusChipRow(),
                           ),
@@ -442,61 +442,71 @@ class _TaskScreenState extends State<TaskScreen> {
     final outlineColor = appPrimarySwatch.shade600.withValues(alpha: 0.55);
     final selectedFill = appPrimarySwatch.shade600.withValues(alpha: 0.16);
 
-    return Wrap(
-      spacing: AppSpacing.sm,
+    return Row(
       children: [
-        ChoiceChip(
-          label: const Text('Ongoing'),
-          selected: _selectedStatus == TaskStatus.ongoing,
-          side: BorderSide(color: outlineColor),
-          backgroundColor: Colors.white,
-          selectedColor: selectedFill,
-          labelStyle: TextStyle(
-            color: appPrimarySwatch.shade700,
-            fontWeight: FontWeight.w600,
+        Expanded(
+          child: _buildStatusChip(
+            label: 'Ongoing',
+            status: TaskStatus.ongoing,
+            outlineColor: outlineColor,
+            selectedFill: selectedFill,
           ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          onSelected: (_) {
-            setState(() => _selectedStatus = TaskStatus.ongoing);
-          },
         ),
-        ChoiceChip(
-          label: const Text('Overdue'),
-          selected: _selectedStatus == TaskStatus.overdue,
-          side: BorderSide(color: outlineColor),
-          backgroundColor: Colors.white,
-          selectedColor: selectedFill,
-          labelStyle: TextStyle(
-            color: appPrimarySwatch.shade700,
-            fontWeight: FontWeight.w600,
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: _buildStatusChip(
+            label: 'Overdue',
+            status: TaskStatus.overdue,
+            outlineColor: outlineColor,
+            selectedFill: selectedFill,
           ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          onSelected: (_) {
-            setState(() => _selectedStatus = TaskStatus.overdue);
-          },
         ),
-        ChoiceChip(
-          label: const Text('Complete'),
-          selected: _selectedStatus == TaskStatus.completed,
-          side: BorderSide(color: outlineColor),
-          backgroundColor: Colors.white,
-          selectedColor: selectedFill,
-          labelStyle: TextStyle(
-            color: appPrimarySwatch.shade700,
-            fontWeight: FontWeight.w600,
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: _buildStatusChip(
+            label: 'Complete',
+            status: TaskStatus.completed,
+            outlineColor: outlineColor,
+            selectedFill: selectedFill,
           ),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
-          ),
-          onSelected: (_) {
-            setState(() => _selectedStatus = TaskStatus.completed);
-          },
         ),
       ],
+    );
+  }
+
+  Widget _buildStatusChip({
+    required String label,
+    required TaskStatus status,
+    required Color outlineColor,
+    required Color selectedFill,
+  }) {
+    return ChoiceChip(
+      label: SizedBox(
+        width: double.infinity,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ),
+      labelPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+      selected: _selectedStatus == status,
+      side: BorderSide(color: outlineColor),
+      backgroundColor: Colors.white,
+      selectedColor: selectedFill,
+      labelStyle: TextStyle(
+        color: appPrimarySwatch.shade700,
+        fontWeight: FontWeight.w600,
+      ),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(20),
+      ),
+      onSelected: (_) {
+        setState(() => _selectedStatus = status);
+      },
     );
   }
 
