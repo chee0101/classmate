@@ -19,6 +19,7 @@ import 'screens/profile/notification_settings_screen.dart';
 import 'screens/profile/timetables_screen.dart';
 import 'screens/extract/auto_extract_screen.dart';
 import 'core/models/task.dart';
+import 'core/navigation/notification_navigation_coordinator.dart';
 import 'splash_screen.dart';
 
 class MyApp extends StatelessWidget {
@@ -27,6 +28,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: appNavigatorKey,
       title: 'ClassMate',
       debugShowCheckedModeBanner: false,
 

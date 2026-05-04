@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../navigation/notification_navigation_coordinator.dart';
 import '../widgets/common/app_bottom_nav.dart';
 import '../widgets/common/extraction_progress_floating_card.dart';
 import '../../screens/home/home_screen.dart';
@@ -36,6 +37,23 @@ class _MainScaffoldState extends State<MainScaffold> {
     TaskScreen(),
     ProfileScreen(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    NotificationNavigationCoordinator.registerHomeTab(() {
+      if (mounted) switchToTab(0);
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      NotificationNavigationCoordinator.consumePendingLaunchPayload();
+    });
+  }
+
+  @override
+  void dispose() {
+    NotificationNavigationCoordinator.registerHomeTab(null);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -8,6 +8,7 @@ import 'package:timezone/timezone.dart' as tz;
 
 import '../models/academic_event.dart';
 import '../models/task.dart';
+import '../navigation/notification_navigation_coordinator.dart';
 
 class NotificationService {
   NotificationService._();
@@ -49,7 +50,20 @@ class NotificationService {
       android: androidInit,
       iOS: iosInit,
     );
-    await _plugin.initialize(settings: initSettings);
+    await _plugin.initialize(
+      settings: initSettings,
+      onDidReceiveNotificationResponse: _onDidReceiveNotificationResponse,
+    );
+
+    try {
+      final launch = await _plugin.getNotificationAppLaunchDetails();
+      if (launch?.didNotificationLaunchApp ?? false) {
+        final p = launch!.notificationResponse?.payload;
+        if (p != null && p.isNotEmpty) {
+          NotificationNavigationCoordinator.setPendingLaunchPayload(p);
+        }
+      }
+    } catch (_) {}
 
     final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
         AndroidFlutterLocalNotificationsPlugin>();
@@ -120,7 +134,7 @@ class NotificationService {
       scheduledDate: tz.TZDateTime.from(remindAt, tz.local),
       notificationDetails: details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      payload: task.id,
+      payload: 'task:${task.id}',
     );
   }
 
@@ -341,5 +355,9 @@ class NotificationService {
     if (dartTzName.trim().isEmpty) return 'UTC';
     if (kIsWeb) return 'UTC';
     return dartTzName;
+  }
+
+  void _onDidReceiveNotificationResponse(NotificationResponse response) {
+    NotificationNavigationCoordinator.handlePayload(response.payload);
   }
 }
