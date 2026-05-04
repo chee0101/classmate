@@ -7,10 +7,8 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/constants/app_spacing.dart';
 import '../../core/constants/routes.dart';
-import '../../core/services/notification_preferences_store.dart';
 import '../../core/services/user_profile_store.dart';
 import '../../core/widgets/common/confirm_dialog.dart';
-import '../../core/widgets/common/form_fields.dart';
 import '../../core/widgets/common/white_card.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -110,21 +108,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  Future<void> _updatePrefs(NotificationPreferences next) async {
-    try {
-      await updateNotificationPreferences(next);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Reminder preferences updated.')),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to save. Check internet and try again.')),
-      );
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -154,74 +137,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
             _buildSectionHeader(textTheme, 'Account Management'),
             const SizedBox(height: AppSpacing.sm),
             WhiteCard(
-              child: _buildMenuItem(
-                context,
-                icon: Icons.lock_outline,
-                title: 'Change Password',
-                onTap: () {
-                  Navigator.pushNamed(context, AppRoutes.changePassword);
-                },
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            ValueListenableBuilder<NotificationPreferences>(
-              valueListenable: notificationPreferencesNotifier,
-              builder: (context, prefs, _) {
-                return WhiteCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildMenuSwitchRow(
-                        context,
-                        icon: Icons.notifications_outlined,
-                        title: 'Task Reminders',
-                        value: prefs.enabled,
-                        onChanged: (value) {
-                          _updatePrefs(prefs.copyWith(enabled: value));
-                        },
-                      ),
-                      if (prefs.enabled) ...[
-                        const SizedBox(height: AppSpacing.sm),
-                        Text(
-                          'Reminder Lead Time',
-                          style: textTheme.titleSmall,
-                        ),
-                        const SizedBox(height: 4),
-                        DropdownField<int>(
-                          label: 'Reminder Lead Time',
-                          showLabel: false,
-                          value: prefs.leadTimeMinutes,
-                          items: const [
-                            DropdownMenuEntry(
-                              value: 60,
-                              label: '1 hour before',
-                            ),
-                            DropdownMenuEntry(
-                              value: 45,
-                              label: '45 minutes before',
-                            ),
-                            DropdownMenuEntry(
-                              value: 30,
-                              label: '30 minutes before',
-                            ),
-                            DropdownMenuEntry(
-                              value: 15,
-                              label: '15 minutes before',
-                            ),
-                          ],
-                          onChanged: (value) {
-                            if (value == null) return;
-                            _updatePrefs(
-                              prefs.copyWith(leadTimeMinutes: value),
-                            );
-                          },
-                          hintText: '30 minutes before',
-                        ),
-                      ],
-                    ],
+              child: Column(
+                children: [
+                  _buildMenuItem(
+                    context,
+                    icon: Icons.lock_outline,
+                    title: 'Change Password',
+                    onTap: () {
+                      Navigator.pushNamed(context, AppRoutes.changePassword);
+                    },
                   ),
-                );
-              },
+                  const SizedBox(height: AppSpacing.md),
+                  const Divider(height: 0.5),
+                  const SizedBox(height: AppSpacing.md),
+                  _buildMenuItem(
+                    context,
+                    icon: Icons.notifications_outlined,
+                    title: 'Notifications',
+                    onTap: () {
+                      Navigator.pushNamed(context, AppRoutes.notificationSettings);
+                    },
+                  ),
+                ],
+              ),
             ),
             const SizedBox(height: AppSpacing.md),
 
@@ -390,43 +328,4 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildMenuSwitchRow(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    final textTheme = Theme.of(context).textTheme;
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Row(
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: colorScheme.primary.withValues(alpha: 0.08),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            icon,
-            color: colorScheme.primary,
-            size: 20,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: Text(
-            title,
-            style: textTheme.bodyLarge,
-          ),
-        ),
-        Switch(
-          value: value,
-          onChanged: onChanged,
-        ),
-      ],
-    );
-  }
 }

@@ -6,23 +6,89 @@ import 'package:flutter/foundation.dart';
 
 class NotificationPreferences {
   const NotificationPreferences({
+    required this.task,
+    required this.event,
+    required this.classReminder,
+  });
+
+  static const NotificationPreferences defaults = NotificationPreferences(
+    task: NotificationTypePreferences(
+      enabled: true,
+      leadTimeMinutes: 30,
+    ),
+    event: NotificationTypePreferences(
+      enabled: true,
+      leadTimeMinutes: 60,
+    ),
+    classReminder: NotificationTypePreferences(
+      enabled: false,
+      leadTimeMinutes: 10,
+    ),
+  );
+
+  final NotificationTypePreferences task;
+  final NotificationTypePreferences event;
+  final NotificationTypePreferences classReminder;
+
+  NotificationPreferences copyWith({
+    NotificationTypePreferences? task,
+    NotificationTypePreferences? event,
+    NotificationTypePreferences? classReminder,
+  }) {
+    return NotificationPreferences(
+      task: task ?? this.task,
+      event: event ?? this.event,
+      classReminder: classReminder ?? this.classReminder,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'task': task.toJson(),
+      'event': event.toJson(),
+      'class': classReminder.toJson(),
+      'updatedAt': FieldValue.serverTimestamp(),
+    };
+  }
+
+  static NotificationPreferences fromJson(Map<String, dynamic>? json) {
+    if (json == null) return defaults;
+    final legacyEnabled = (json['enabled'] as bool?) ?? true;
+    final legacyLead = (json['leadTimeMinutes'] as num?)?.toInt() ?? 30;
+    return NotificationPreferences(
+      task: NotificationTypePreferences.fromJson(
+        json['task'] as Map<String, dynamic>?,
+        fallbackEnabled: legacyEnabled,
+        fallbackLeadTimeMinutes: legacyLead,
+      ),
+      event: NotificationTypePreferences.fromJson(
+        json['event'] as Map<String, dynamic>?,
+        fallbackEnabled: defaults.event.enabled,
+        fallbackLeadTimeMinutes: defaults.event.leadTimeMinutes,
+      ),
+      classReminder: NotificationTypePreferences.fromJson(
+        json['class'] as Map<String, dynamic>?,
+        fallbackEnabled: defaults.classReminder.enabled,
+        fallbackLeadTimeMinutes: defaults.classReminder.leadTimeMinutes,
+      ),
+    );
+  }
+}
+
+class NotificationTypePreferences {
+  const NotificationTypePreferences({
     required this.enabled,
     required this.leadTimeMinutes,
   });
 
-  static const NotificationPreferences defaults = NotificationPreferences(
-    enabled: true,
-    leadTimeMinutes: 30,
-  );
-
   final bool enabled;
   final int leadTimeMinutes;
 
-  NotificationPreferences copyWith({
+  NotificationTypePreferences copyWith({
     bool? enabled,
     int? leadTimeMinutes,
   }) {
-    return NotificationPreferences(
+    return NotificationTypePreferences(
       enabled: enabled ?? this.enabled,
       leadTimeMinutes: leadTimeMinutes ?? this.leadTimeMinutes,
     );
@@ -32,15 +98,18 @@ class NotificationPreferences {
     return {
       'enabled': enabled,
       'leadTimeMinutes': leadTimeMinutes,
-      'updatedAt': FieldValue.serverTimestamp(),
     };
   }
 
-  static NotificationPreferences fromJson(Map<String, dynamic>? json) {
-    if (json == null) return defaults;
-    final lead = (json['leadTimeMinutes'] as num?)?.toInt() ?? defaults.leadTimeMinutes;
-    return NotificationPreferences(
-      enabled: (json['enabled'] as bool?) ?? defaults.enabled,
+  static NotificationTypePreferences fromJson(
+    Map<String, dynamic>? json, {
+    required bool fallbackEnabled,
+    required int fallbackLeadTimeMinutes,
+  }) {
+    final lead =
+        (json?['leadTimeMinutes'] as num?)?.toInt() ?? fallbackLeadTimeMinutes;
+    return NotificationTypePreferences(
+      enabled: (json?['enabled'] as bool?) ?? fallbackEnabled,
       leadTimeMinutes: lead.clamp(5, 7 * 24 * 60),
     );
   }
@@ -56,8 +125,8 @@ DocumentReference<Map<String, dynamic>> _prefsDoc(String uid) {
   return FirebaseFirestore.instance
       .collection('users')
       .doc(uid)
-      .collection('settings')
-      .doc('notifications');
+      .collection('notificationPreferences')
+      .doc('main');
 }
 
 void initializeNotificationPreferencesSync() {

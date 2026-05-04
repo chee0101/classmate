@@ -6,6 +6,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
+import '../models/academic_event.dart';
 import '../models/task.dart';
 
 class NotificationService {
@@ -124,6 +125,72 @@ class NotificationService {
     );
   }
 
+  Future<void> scheduleEventReminder({
+    required AcademicEvent event,
+    required Duration leadTime,
+  }) async {
+    final remindAt = event.startDateTime.subtract(leadTime);
+    if (!remindAt.isAfter(DateTime.now())) return;
+
+    final id = _eventNotificationId(event.id);
+    const androidDetails = AndroidNotificationDetails(
+      'task_reminders',
+      _taskReminderChannelName,
+      channelDescription: _taskReminderChannelDescription,
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    const iosDetails = DarwinNotificationDetails();
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    await _plugin.zonedSchedule(
+      id: id,
+      title: 'Upcoming event: ${event.title}',
+      body: 'Starts in ${_formatLeadTime(leadTime)} at ${_formatTime(event.startDateTime)}',
+      scheduledDate: tz.TZDateTime.from(remindAt, tz.local),
+      notificationDetails: details,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      payload: 'event:${event.id}',
+    );
+  }
+
+  Future<void> scheduleClassReminder({
+    required String classSlotId,
+    required String courseCode,
+    required DateTime classStart,
+    required Duration leadTime,
+  }) async {
+    final remindAt = classStart.subtract(leadTime);
+    if (!remindAt.isAfter(DateTime.now())) return;
+
+    final id = _classNotificationId(classSlotId, classStart);
+    const androidDetails = AndroidNotificationDetails(
+      'task_reminders',
+      _taskReminderChannelName,
+      channelDescription: _taskReminderChannelDescription,
+      importance: Importance.high,
+      priority: Priority.high,
+    );
+    const iosDetails = DarwinNotificationDetails();
+    const details = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+
+    await _plugin.zonedSchedule(
+      id: id,
+      title: 'Class starting soon: $courseCode',
+      body: 'Starts in ${_formatLeadTime(leadTime)} at ${_formatTime(classStart)}',
+      scheduledDate: tz.TZDateTime.from(remindAt, tz.local),
+      notificationDetails: details,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      payload: 'class:$classSlotId:${classStart.toIso8601String()}',
+    );
+  }
+
   Future<void> scheduleDebugTestNotification({
     Duration delay = const Duration(seconds: 10),
   }) async {
@@ -229,6 +296,17 @@ class NotificationService {
 
   static int _taskNotificationId(String taskId) {
     final id = taskId.hashCode & 0x7fffffff;
+    return _taskReminderChannelId + (id % 900000);
+  }
+
+  static int _eventNotificationId(String eventId) {
+    final id = eventId.hashCode & 0x7fffffff;
+    return _taskReminderChannelId + (id % 900000);
+  }
+
+  static int _classNotificationId(String classSlotId, DateTime classStart) {
+    final key = '$classSlotId|${classStart.toIso8601String()}';
+    final id = key.hashCode & 0x7fffffff;
     return _taskReminderChannelId + (id % 900000);
   }
 

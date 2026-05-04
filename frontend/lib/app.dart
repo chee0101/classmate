@@ -15,6 +15,7 @@ import 'screens/extract/review_extracted_timetable_screen.dart';
 import 'screens/task/task_detail_screen.dart';
 import 'screens/profile/academic_sessions_screen.dart';
 import 'screens/profile/courses_screen.dart';
+import 'screens/profile/notification_settings_screen.dart';
 import 'screens/profile/timetables_screen.dart';
 import 'screens/extract/auto_extract_screen.dart';
 import 'core/models/task.dart';
@@ -281,6 +282,8 @@ class MyApp extends StatelessWidget {
             const AcademicSessionsScreen(),
         AppRoutes.courses: (context) => const CoursesScreen(),
         AppRoutes.timetables: (context) => const TimetablesScreen(),
+        AppRoutes.notificationSettings: (context) =>
+            const NotificationSettingsScreen(),
       },
     );
   }

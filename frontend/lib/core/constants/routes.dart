@@ -14,4 +14,5 @@ class AppRoutes {
   static const String academicSessions = '/academic-sessions';
   static const String courses = '/courses';
   static const String timetables = '/timetables';
+  static const String notificationSettings = '/notification-settings';
 }
