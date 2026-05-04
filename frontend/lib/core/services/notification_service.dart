@@ -115,9 +115,8 @@ class NotificationService {
 
     await _plugin.zonedSchedule(
       id: id,
-      title: 'Almost due: ${task.title}',
-      body:
-          '${task.courseCode} is due in ${_formatLeadTime(leadTime)} at ${_formatTime(task.dueDateTime)}',
+      title: '${task.title} due in ${_formatLeadTime(leadTime)}',
+      body: '${task.courseCode} • ${_formatTime(task.dueDateTime)}',
       scheduledDate: tz.TZDateTime.from(remindAt, tz.local),
       notificationDetails: details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
