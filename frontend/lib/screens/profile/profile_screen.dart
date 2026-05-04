@@ -10,6 +10,7 @@ import '../../core/constants/routes.dart';
 import '../../core/services/notification_preferences_store.dart';
 import '../../core/services/user_profile_store.dart';
 import '../../core/widgets/common/confirm_dialog.dart';
+import '../../core/widgets/common/form_fields.dart';
 import '../../core/widgets/common/white_card.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -186,24 +187,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           style: textTheme.titleSmall,
                         ),
                         const SizedBox(height: 4),
-                        DropdownButtonFormField<int>(
+                        DropdownField<int>(
+                          label: 'Reminder Lead Time',
+                          showLabel: false,
                           value: prefs.leadTimeMinutes,
                           items: const [
-                            DropdownMenuItem(
+                            DropdownMenuEntry(
                               value: 60,
-                              child: Text('1 hour before'),
+                              label: '1 hour before',
                             ),
-                            DropdownMenuItem(
+                            DropdownMenuEntry(
                               value: 45,
-                              child: Text('45 minutes before'),
+                              label: '45 minutes before',
                             ),
-                            DropdownMenuItem(
+                            DropdownMenuEntry(
                               value: 30,
-                              child: Text('30 minutes before'),
+                              label: '30 minutes before',
                             ),
-                            DropdownMenuItem(
+                            DropdownMenuEntry(
                               value: 15,
-                              child: Text('15 minutes before'),
+                              label: '15 minutes before',
                             ),
                           ],
                           onChanged: (value) {
@@ -212,9 +215,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               prefs.copyWith(leadTimeMinutes: value),
                             );
                           },
-                          decoration: const InputDecoration(
-                            isDense: true,
-                          ),
+                          hintText: '30 minutes before',
                         ),
                       ],
                     ],
