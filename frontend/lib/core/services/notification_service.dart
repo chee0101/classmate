@@ -96,18 +96,7 @@ class NotificationService {
   }) async {
     final remindAt = task.dueDateTime.subtract(leadTime);
     final now = DateTime.now();
-    DateTime? effectiveRemindAt;
-    if (remindAt.isAfter(now)) {
-      effectiveRemindAt = remindAt;
-    } else {
-      // Grace window: if user sets due time near "now + 24h", avoid silently skipping.
-      final lateBy = now.difference(remindAt);
-      if (lateBy <= const Duration(minutes: 5) && task.dueDateTime.isAfter(now)) {
-        effectiveRemindAt = now.add(const Duration(seconds: 5));
-      } else {
-        return;
-      }
-    }
+    if (!remindAt.isAfter(now)) return;
 
     final id = _taskNotificationId(task.id);
     const androidDetails = AndroidNotificationDetails(
@@ -125,11 +114,12 @@ class NotificationService {
 
     await _plugin.zonedSchedule(
       id: id,
-      title: 'Task due soon: ${task.title}',
-      body: '${task.courseCode} due at ${_formatTime(task.dueDateTime)}',
-      scheduledDate: tz.TZDateTime.from(effectiveRemindAt, tz.local),
+      title: 'Almost due: ${task.title}',
+      body:
+          '${task.courseCode} is due in ${_formatLeadTime(leadTime)} at ${_formatTime(task.dueDateTime)}',
+      scheduledDate: tz.TZDateTime.from(remindAt, tz.local),
       notificationDetails: details,
-      androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
+      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       payload: task.id,
     );
   }
@@ -247,6 +237,15 @@ class NotificationService {
     final m = value.minute.toString().padLeft(2, '0');
     final suffix = value.hour >= 12 ? 'PM' : 'AM';
     return '$h:$m $suffix';
+  }
+
+  static String _formatLeadTime(Duration leadTime) {
+    final totalMinutes = leadTime.inMinutes;
+    if (totalMinutes % 60 == 0) {
+      final hours = totalMinutes ~/ 60;
+      return hours == 1 ? '1 hour' : '$hours hours';
+    }
+    return '$totalMinutes minutes';
   }
 
   static String _tzName(String dartTzName) {

@@ -12,7 +12,7 @@ class NotificationPreferences {
 
   static const NotificationPreferences defaults = NotificationPreferences(
     enabled: true,
-    leadTimeMinutes: 24 * 60,
+    leadTimeMinutes: 30,
   );
 
   final bool enabled;

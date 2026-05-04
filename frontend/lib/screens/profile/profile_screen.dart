@@ -190,16 +190,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           value: prefs.leadTimeMinutes,
                           items: const [
                             DropdownMenuItem(
+                              value: 60,
+                              child: Text('1 hour before'),
+                            ),
+                            DropdownMenuItem(
+                              value: 45,
+                              child: Text('45 minutes before'),
+                            ),
+                            DropdownMenuItem(
                               value: 30,
                               child: Text('30 minutes before'),
                             ),
                             DropdownMenuItem(
-                              value: 120,
-                              child: Text('2 hours before'),
-                            ),
-                            DropdownMenuItem(
-                              value: 24 * 60,
-                              child: Text('1 day before'),
+                              value: 15,
+                              child: Text('15 minutes before'),
                             ),
                           ],
                           onChanged: (value) {
