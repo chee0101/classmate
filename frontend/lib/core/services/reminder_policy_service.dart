@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../models/academic_session.dart';
+import '../models/class_slot_override.dart';
 import '../models/timetable_entry.dart';
 import '../models/task.dart';
 import '../utils/date_time_format.dart';
@@ -8,6 +9,7 @@ import '../utils/term_windows.dart';
 import '../utils/task_utils.dart';
 import 'academic_event_store.dart';
 import 'academic_session_store.dart';
+import 'class_slot_override_store.dart';
 import 'class_slot_store.dart';
 import 'notification_service.dart';
 import 'notification_preferences_store.dart';
@@ -28,6 +30,7 @@ class ReminderPolicyService {
     academicEventsNotifier.addListener(_scheduleFromTasksWithDebounce);
     timetablesNotifier.addListener(_scheduleFromTasksWithDebounce);
     academicSessionsNotifier.addListener(_scheduleFromTasksWithDebounce);
+    classSlotOverridesNotifier.addListener(_scheduleFromTasksWithDebounce);
     notificationPreferencesNotifier.addListener(_scheduleFromTasksWithDebounce);
     _scheduleFromTasksWithDebounce();
   }
@@ -71,6 +74,13 @@ class ReminderPolicyService {
           for (final session in academicSessionsNotifier.value) session.id: session,
         };
         final maxDate = now.add(const Duration(days: 21));
+        final overrides = classSlotOverridesNotifier.value;
+        final overrideById = <String, ClassSlotOverride>{
+          for (final o in overrides) o.id: o,
+        };
+        final overrideByOccurrence = <String, ClassSlotOverride>{
+          for (final o in overrides) o.occurrenceKey: o,
+        };
 
         for (final entry in timetablesNotifier.value) {
           final session = sessionsById[entry.sessionId];
@@ -93,6 +103,9 @@ class ReminderPolicyService {
               : _startOfDay(term.end);
           if (endDate.isBefore(startDate)) continue;
 
+          final termStartDay = _startOfDay(term.start);
+          final termEndDay = _startOfDay(term.end);
+
           for (final slot in entry.slots) {
             final weekdayIndex = _weekdayToDateTimeWeekday(slot.day);
             final startMinutes = parseTimeLabel12hToMinutes(slot.startTime);
@@ -104,12 +117,45 @@ class ReminderPolicyService {
               date = date.add(const Duration(days: 1))
             ) {
               if (date.weekday != weekdayIndex) continue;
+
+              final occurrenceKey = ClassSlotOverride.buildClassSlotOccurrenceKey(
+                classSlotId: slot.classSlotId,
+                occurrenceDate: date,
+              );
+              final overrideId = ClassSlotOverride.buildClassSlotOverrideId(
+                classSlotId: slot.classSlotId,
+                occurrenceDate: date,
+              );
+              final override =
+                  overrideById[overrideId] ?? overrideByOccurrence[occurrenceKey];
+              if (override?.action == ClassSlotOverrideAction.cancel) {
+                continue;
+              }
+
+              final overrideDate = override?.overrideDate;
+              final renderDate = overrideDate == null
+                  ? date
+                  : DateTime(
+                      overrideDate.year,
+                      overrideDate.month,
+                      overrideDate.day,
+                    );
+
+              if (renderDate.isBefore(termStartDay) || renderDate.isAfter(termEndDay)) {
+                continue;
+              }
+              if (renderDate.isBefore(startDate) || renderDate.isAfter(endDate)) {
+                continue;
+              }
+
+              final effectiveStartMinutes =
+                  override?.overrideStartMinutes ?? startMinutes;
               final classStart = DateTime(
-                date.year,
-                date.month,
-                date.day,
-                startMinutes ~/ 60,
-                startMinutes % 60,
+                renderDate.year,
+                renderDate.month,
+                renderDate.day,
+                effectiveStartMinutes ~/ 60,
+                effectiveStartMinutes % 60,
               );
               await NotificationService.instance.scheduleClassReminder(
                 classSlotId: slot.classSlotId,

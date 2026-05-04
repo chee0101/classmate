@@ -163,8 +163,18 @@ class NotificationService {
     required DateTime classStart,
     required Duration leadTime,
   }) async {
+    final now = DateTime.now();
     final remindAt = classStart.subtract(leadTime);
-    if (!remindAt.isAfter(DateTime.now())) return;
+    DateTime scheduledAt;
+    if (remindAt.isAfter(now)) {
+      scheduledAt = remindAt;
+    } else {
+      if (!classStart.isAfter(now)) return;
+      final oneMinuteBeforeStart = classStart.subtract(const Duration(minutes: 1));
+      scheduledAt = oneMinuteBeforeStart.isAfter(now)
+          ? oneMinuteBeforeStart
+          : now.add(const Duration(seconds: 5));
+    }
 
     final id = _classNotificationId(classSlotId, classStart);
     const androidDetails = AndroidNotificationDetails(
@@ -184,7 +194,7 @@ class NotificationService {
       id: id,
       title: 'Class starting soon: $courseCode',
       body: 'Starts in ${_formatLeadTime(leadTime)} at ${_formatTime(classStart)}',
-      scheduledDate: tz.TZDateTime.from(remindAt, tz.local),
+      scheduledDate: tz.TZDateTime.from(scheduledAt, tz.local),
       notificationDetails: details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       payload: 'class:$classSlotId:${classStart.toIso8601String()}',
