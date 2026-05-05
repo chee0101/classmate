@@ -130,6 +130,7 @@ class _UnifiedUpcomingCardState extends State<UnifiedUpcomingCard> {
                 ),
                 PopupMenuButton<UpcomingFilter>(
                   tooltip: 'Filter upcoming',
+                  color: Colors.white,
                   iconColor: appPrimarySwatch.shade700,
                   onSelected: (value) {
                     setState(() {
