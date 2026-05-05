@@ -561,9 +561,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                                                 ScheduleAppointmentMeta
                                                                     .typeTask;
 
-                                                        final isDisabled =
-                                                            isAcademicBreakOnVisibleDay;
-
                                                         return Listener(
                                                           behavior:
                                                               HitTestBehavior
@@ -593,19 +590,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                                             ),
                                                             child:
                                                                 isClassAppointment
-                                                                    ? Opacity(
-                                                                        opacity: isDisabled
-                                                                            ? 0.35
-                                                                            : 1.0,
-                                                                        child:
-                                                                            ScheduleClassAppointmentText(
-                                                                          subject:
-                                                                              appointment.subject,
-                                                                          textColor:
-                                                                              appointment.color,
-                                                                          maxLines:
-                                                                              maxAppointmentLines,
-                                                                        ),
+                                                                    ? ScheduleClassAppointmentText(
+                                                                        subject:
+                                                                            appointment.subject,
+                                                                        textColor:
+                                                                            appointment.color,
+                                                                        maxLines:
+                                                                            maxAppointmentLines,
                                                                       )
                                                                     : Text(
                                                                         appointment
@@ -693,20 +684,6 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                                             );
                                                             return;
                                                           }
-                                                        }
-
-                                                        // During academic breaks, prevent interaction
-                                                        // with class appointments.
-                                                        final allAreClasses =
-                                                            appointments.every(
-                                                          (appt) => (appt
-                                                                  .notes ==
-                                                              ScheduleAppointmentMeta
-                                                                  .typeClass),
-                                                        );
-                                                        if (isAcademicBreakOnVisibleDay &&
-                                                            allAreClasses) {
-                                                          return;
                                                         }
 
                                                         if (appointments

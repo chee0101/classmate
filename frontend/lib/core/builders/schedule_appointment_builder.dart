@@ -67,6 +67,7 @@ class ScheduleAppointmentBuilder {
           if (override?.action == ClassSlotOverrideAction.cancel) {
             continue;
           }
+          final hasOverride = override != null;
           final overrideDate = override?.overrideDate;
           final renderDate = overrideDate == null
               ? date
@@ -110,6 +111,23 @@ class ScheduleAppointmentBuilder {
                 innerStart: start,
                 innerEnd: end,
                 events: hideClassEventsForSlot,
+              )) {
+            continue;
+          }
+          final academicBreakEventsForSlot = events
+              .where(
+                (e) =>
+                    e.isAcademicBreak &&
+                    e.sessionId == slot.sessionId &&
+                    e.termId == slot.termId,
+              )
+              .toList(growable: false);
+          if (!hasOverride &&
+              academicBreakEventsForSlot.isNotEmpty &&
+              isFullyCoveredByAnyEvent(
+                innerStart: start,
+                innerEnd: end,
+                events: academicBreakEventsForSlot,
               )) {
             continue;
           }

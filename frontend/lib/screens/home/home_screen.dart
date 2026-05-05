@@ -210,6 +210,13 @@ class _HomeScreenState extends State<HomeScreen> {
                                   final todayName =
                                       weekdayOrder[today.weekday - 1];
 
+                                  final termTimetableEntries = timetables
+                                      .where(
+                                        (e) =>
+                                            e.sessionId == selectedSession.id &&
+                                            e.termId == selectedTerm.id,
+                                      )
+                                      .toList(growable: false);
                                   final overridesByOccurrenceKey =
                                       <String, ClassSlotOverride>{
                                     for (final o in classOverrides)
@@ -225,17 +232,82 @@ class _HomeScreenState extends State<HomeScreen> {
                                     termId: selectedTerm.id,
                                   );
 
+                                  final slotContextByClassSlotId =
+                                      <String, ({TimetableEntry entry, TimetableSlot slot})>{};
+                                  for (final entry in termTimetableEntries) {
+                                    for (final slot in entry.slots) {
+                                      slotContextByClassSlotId[slot.classSlotId] = (
+                                        entry: entry,
+                                        slot: slot,
+                                      );
+                                    }
+                                  }
+
+                                  TodayScheduleItem? buildTodayClassItem({
+                                    required TimetableEntry entry,
+                                    required TimetableSlot slot,
+                                    required ClassSlotOverride? override,
+                                  }) {
+                                    final startMinutes =
+                                        override?.overrideStartMinutes ??
+                                            parseTimeLabel12hToMinutes(
+                                              slot.startTime,
+                                            );
+                                    final endMinutes =
+                                        override?.overrideEndMinutes ??
+                                            parseTimeLabel12hToMinutes(
+                                              slot.endTime,
+                                            );
+                                    if (startMinutes == null ||
+                                        endMinutes == null ||
+                                        endMinutes <= startMinutes) {
+                                      return null;
+                                    }
+                                    final overrideMode =
+                                        (override?.overrideMode ?? '').trim();
+                                    final overrideVenue =
+                                        (override?.overrideVenue ?? '').trim();
+                                    final effectiveMode = overrideMode.isEmpty
+                                        ? slot.mode
+                                        : overrideMode;
+                                    final effectiveVenue = overrideVenue.isEmpty
+                                        ? slot.venue
+                                        : overrideVenue;
+                                    final isOnline = effectiveMode == 'Online';
+                                    final venueLabel = isOnline
+                                        ? 'Online'
+                                        : (() {
+                                            final raw = effectiveVenue?.trim();
+                                            return raw == null || raw.isEmpty
+                                                ? null
+                                                : raw;
+                                          })();
+                                    return TodayScheduleItem(
+                                      type: TodayScheduleItemType.classItem,
+                                      startMinutes: startMinutes,
+                                      endMinutes: endMinutes,
+                                      title: displayCourseCodeForTimetableEntry(
+                                        entry,
+                                        termCourses,
+                                      ),
+                                      color: displayCourseColorForTimetableEntry(
+                                        entry,
+                                        termCourses,
+                                      ),
+                                      isOnline: isOnline,
+                                      venueLabel: venueLabel,
+                                    );
+                                  }
+
                                   // -----------------------------
                                   // 1) Today's class items
                                   // -----------------------------
-                                  final todayClassItems = timetables
-                                      .where(
-                                        (e) =>
-                                            e.sessionId == selectedSession.id &&
-                                            e.termId == selectedTerm.id,
-                                      )
+                                  final todayRegularClassItems =
+                                      termTimetableEntries
                                       .expand((entry) => entry.slots
-                                              .where((slot) => slot.day == todayName)
+                                              .where(
+                                                (slot) => slot.day == todayName,
+                                              )
                                               .map((slot) {
                                             final overrideKey = ClassSlotOverride
                                                 .buildClassSlotOccurrenceKey(
@@ -250,71 +322,63 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 ClassSlotOverrideAction.cancel) {
                                               return null;
                                             }
-
-                                            final overrideMode =
-                                                (override?.overrideMode ?? '')
-                                                    .trim();
-                                            final overrideVenue =
-                                                (override?.overrideVenue ?? '')
-                                                    .trim();
-
-                                            final effectiveSlot = override == null
-                                                ? slot
-                                                : slot.copyWith(
-                                                    mode: overrideMode.isEmpty
-                                                        ? slot.mode
-                                                        : overrideMode,
-                                                    venue: overrideVenue.isEmpty
-                                                        ? slot.venue
-                                                        : overrideVenue,
-                                                  );
-
-                                            final startMinutes =
-                                                parseTimeLabel12hToMinutes(
-                                                    effectiveSlot.startTime);
-                                            final endMinutes =
-                                                parseTimeLabel12hToMinutes(
-                                                    effectiveSlot.endTime);
-                                            if (startMinutes == null ||
-                                                endMinutes == null ||
-                                                endMinutes <= startMinutes) {
+                                            if (override != null) {
                                               return null;
                                             }
-
-                                            final isOnline =
-                                                effectiveSlot.mode == 'Online';
-                                            final venueLabel = isOnline
-                                                ? 'Online'
-                                                : (() {
-                                                    final raw =
-                                                        effectiveSlot.venue
-                                                            ?.trim();
-                                                    return raw == null ||
-                                                            raw.isEmpty
-                                                        ? null
-                                                        : raw;
-                                                  })();
-
-                                            return TodayScheduleItem(
-                                              type:
-                                                  TodayScheduleItemType.classItem,
-                                              startMinutes: startMinutes,
-                                              endMinutes: endMinutes,
-                                              title: displayCourseCodeForTimetableEntry(
-                                                entry,
-                                                termCourses,
-                                              ),
-                                              color: displayCourseColorForTimetableEntry(
-                                                entry,
-                                                termCourses,
-                                              ),
-                                              isOnline: isOnline,
-                                              venueLabel: venueLabel,
+                                            return buildTodayClassItem(
+                                              entry: entry,
+                                              slot: slot,
+                                              override: null,
                                             );
                                           }))
                                       .whereType<TodayScheduleItem>()
-                                      .toList(growable: false)
-                                    ..sort(_compareTodayScheduleItems);
+                                      .toList(growable: false);
+
+                                  final todayOverrideClassItems =
+                                      classOverrides
+                                          .where((override) {
+                                            final isOccurrenceToday =
+                                                override.occurrenceDate.year ==
+                                                        today.year &&
+                                                    override.occurrenceDate
+                                                            .month ==
+                                                        today.month &&
+                                                    override
+                                                            .occurrenceDate.day ==
+                                                        today.day;
+                                            final overrideDate =
+                                                override.overrideDate;
+                                            final isOverrideDateToday =
+                                                overrideDate != null &&
+                                                    overrideDate.year ==
+                                                        today.year &&
+                                                    overrideDate.month ==
+                                                        today.month &&
+                                                    overrideDate.day ==
+                                                        today.day;
+                                            return isOccurrenceToday ||
+                                                isOverrideDateToday;
+                                          })
+                                          .map((override) {
+                                            if (override.action ==
+                                                ClassSlotOverrideAction.cancel) {
+                                              return null;
+                                            }
+                                            final contextEntry =
+                                                slotContextByClassSlotId[
+                                                    override.classSlotId];
+                                            if (contextEntry == null) {
+                                              return null;
+                                            }
+                                            return buildTodayClassItem(
+                                              entry: contextEntry.entry,
+                                              slot: contextEntry.slot,
+                                              override: override,
+                                            );
+                                          })
+                                          .whereType<TodayScheduleItem>()
+                                          .toList(growable: false)
+                                        ..sort(_compareTodayScheduleItems);
 
                                   final hideClassEventsForToday = events
                                       .where(
@@ -330,29 +394,43 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 .isAfter(todayEnd),
                                       )
                                       .toList(growable: false);
-                                  final todayClassItemsVisible =
-                                      todayClassItems
+                                  bool isCoveredByHideClassesEvent(
+                                    TodayScheduleItem classItem,
+                                  ) {
+                                    final innerStart = today.add(
+                                      Duration(
+                                        minutes: classItem.startMinutes,
+                                      ),
+                                    );
+                                    final innerEnd = today.add(
+                                      Duration(
+                                        minutes: classItem.endMinutes,
+                                      ),
+                                    );
+                                    return isFullyCoveredByAnyEvent(
+                                      innerStart: innerStart,
+                                      innerEnd: innerEnd,
+                                      events: hideClassEventsForToday,
+                                    );
+                                  }
+
+                                  final todayRegularClassItemsVisible =
+                                      todayRegularClassItems
                                           .where(
-                                            (classItem) {
-                                              final innerStart = today.add(
-                                                Duration(
-                                                  minutes:
-                                                      classItem.startMinutes,
-                                                ),
-                                              );
-                                              final innerEnd = today.add(
-                                                Duration(
-                                                  minutes:
-                                                      classItem.endMinutes,
-                                                ),
-                                              );
-                                              return !isFullyCoveredByAnyEvent(
-                                                innerStart: innerStart,
-                                                innerEnd: innerEnd,
-                                                events:
-                                                    hideClassEventsForToday,
-                                              );
-                                            },
+                                            (classItem) =>
+                                                !isCoveredByHideClassesEvent(
+                                              classItem,
+                                            ),
+                                          )
+                                          .toList(growable: false)
+                                        ..sort(_compareTodayScheduleItems);
+                                  final todayOverrideClassItemsVisible =
+                                      todayOverrideClassItems
+                                          .where(
+                                            (classItem) =>
+                                                !isCoveredByHideClassesEvent(
+                                              classItem,
+                                            ),
                                           )
                                           .toList(growable: false)
                                         ..sort(_compareTodayScheduleItems);
@@ -425,10 +503,22 @@ class _HomeScreenState extends State<HomeScreen> {
                                   // -----------------------------
                                   final academicBreakTitle =
                                       academicBreakEvent?.title;
+                                  final isAcademicBreakToday =
+                                      academicBreakEvent != null;
 
-                                  // Academic break without events: show the special empty state.
+                                  final scheduleClassItems = isAcademicBreakToday
+                                      ? [...todayOverrideClassItemsVisible]
+                                      : [
+                                          ...todayRegularClassItemsVisible,
+                                          ...todayOverrideClassItemsVisible,
+                                        ]
+                                    ..sort(_compareTodayScheduleItems);
+
+                                  // Academic break without non-break events or override classes:
+                                  // show the special empty state.
                                   if (academicBreakEvent != null &&
-                                      nonAcademicEventItems.isEmpty) {
+                                      nonAcademicEventItems.isEmpty &&
+                                      scheduleClassItems.isEmpty) {
                                     return Column(
                                       children: [
                                         Padding(
@@ -485,9 +575,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
                                   // Academic break with events: show events only.
                                   if (academicBreakEvent != null &&
-                                      nonAcademicEventItems.isNotEmpty) {
-                                    final scheduleItems = [...nonAcademicEventItems]
-                                      ..sort(_compareTodayScheduleItems);
+                                      (nonAcademicEventItems.isNotEmpty ||
+                                          scheduleClassItems.isNotEmpty)) {
+                                    final scheduleItems = [
+                                      ...nonAcademicEventItems,
+                                      ...scheduleClassItems,
+                                    ]..sort(_compareTodayScheduleItems);
 
                                     return Column(
                                       children: [
@@ -563,9 +656,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                     );
                                   }
 
-                                  final scheduleClassItems =
-                                      todayClassItemsVisible
-                                      .map((classItem) {
+                                  final scheduleClassItemsWithOverlap =
+                                      scheduleClassItems.map((classItem) {
                                     final overlappingEvents =
                                         nonAcademicEventItems.where((e) {
                                       return classItem.startMinutes <
@@ -588,7 +680,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                                   final scheduleItems = [
                                     ...nonAcademicEventItems,
-                                    ...scheduleClassItems,
+                                    ...scheduleClassItemsWithOverlap,
                                   ]..sort(_compareTodayScheduleItems);
 
                                   return Column(
