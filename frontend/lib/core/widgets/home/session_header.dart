@@ -85,6 +85,23 @@ class SessionHeader extends StatelessWidget {
           child: DropdownMenu<String>(
             width: constraints.maxWidth,
             initialSelection: initialKey,
+            menuStyle: MenuStyle(
+              elevation: const WidgetStatePropertyAll<double>(8),
+              backgroundColor: const WidgetStatePropertyAll<Color>(
+                Colors.white,
+              ),
+              surfaceTintColor: const WidgetStatePropertyAll<Color>(
+                Colors.transparent,
+              ),
+              shadowColor: WidgetStatePropertyAll<Color>(
+                Colors.black.withValues(alpha: 1),
+              ),
+              shape: WidgetStatePropertyAll<RoundedRectangleBorder>(
+                RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
             dropdownMenuEntries: entries,
             onSelected: (value) {
               if (value == null) return;

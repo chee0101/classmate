@@ -171,6 +171,23 @@ class DropdownField<T> extends StatelessWidget {
               width: constraints.maxWidth,
               hintText: hintText,
               initialSelection: value,
+              menuStyle: MenuStyle(
+                elevation: const WidgetStatePropertyAll<double>(8),
+                backgroundColor: const WidgetStatePropertyAll<Color>(
+                  Colors.white,
+                ),
+                surfaceTintColor: const WidgetStatePropertyAll<Color>(
+                  Colors.transparent,
+                ),
+                shadowColor: WidgetStatePropertyAll<Color>(
+                  Colors.black.withValues(alpha: 1),
+                ),
+                shape: WidgetStatePropertyAll<RoundedRectangleBorder>(
+                  RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
               dropdownMenuEntries: items,
               onSelected: onChanged,
               inputDecorationTheme: InputDecorationTheme(
