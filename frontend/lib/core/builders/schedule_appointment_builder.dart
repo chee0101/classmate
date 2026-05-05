@@ -268,6 +268,22 @@ class ScheduleAppointmentBuilder {
     }
     for (final group in groupedTimedEvents.values) {
       group.sort((a, b) => a.title.compareTo(b.title));
+      // In weekly/day rendering, keep timed events as individual appointments.
+      // This allows dense-overlap compression to compute a single +N that
+      // correctly counts classes + tasks + events together.
+      if (!forMonthlyAgenda) {
+        for (final event in group) {
+          appointments.add(
+            _buildEventAppointment(
+              event: event,
+              startTime: event.startDateTime,
+              endTime: event.endDateTime,
+              isAllDay: false,
+            ),
+          );
+        }
+        continue;
+      }
       if (group.length <= 2) {
         for (final event in group) {
           appointments.add(
@@ -301,6 +317,16 @@ class ScheduleAppointmentBuilder {
       );
     }
 
+    // Keep weekly/day output raw here; caller can merge extra sources
+    // (e.g. tasks) and run a single dense-overlap compression pass.
+    return appointments;
+  }
+
+  /// Public helper for screens that merge additional timed items (e.g. tasks)
+  /// after [build] and still need dense-overlap compression.
+  static List<Appointment> compressDenseOverlapsForDisplay(
+    List<Appointment> appointments,
+  ) {
     return _compressDenseOverlaps(appointments);
   }
 

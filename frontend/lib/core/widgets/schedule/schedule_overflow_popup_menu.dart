@@ -75,15 +75,25 @@ RelativeRect _buildOverflowMenuPosition({
   const popupMaxWidth = 340.0;
   const popupMaxHeight = 360.0;
   const edgePadding = 12.0;
+  double safeClamp(double value, double min, double max) {
+    if (!value.isFinite) return min;
+    if (!min.isFinite || !max.isFinite) return value;
+    if (max < min) return min;
+    return value.clamp(min, max).toDouble();
+  }
 
   if (overlay is! RenderBox) {
-    final dx = anchor.dx.clamp(
+    final maxDx = (screenSize.width - popupMaxWidth - edgePadding).toDouble();
+    final maxDy = (screenSize.height - popupMaxHeight - edgePadding).toDouble();
+    final dx = safeClamp(
+      anchor.dx,
       edgePadding,
-      screenSize.width - popupMaxWidth - edgePadding,
+      maxDx,
     );
-    final dy = anchor.dy.clamp(
+    final dy = safeClamp(
+      anchor.dy,
       edgePadding,
-      screenSize.height - popupMaxHeight - edgePadding,
+      maxDy,
     );
     return RelativeRect.fromLTRB(
       dx,
@@ -94,13 +104,17 @@ RelativeRect _buildOverflowMenuPosition({
   }
 
   final localInOverlay = overlay.globalToLocal(anchor);
-  final dx = localInOverlay.dx.clamp(
+  final maxDx = (overlay.size.width - popupMaxWidth - edgePadding).toDouble();
+  final maxDy = (overlay.size.height - popupMaxHeight - edgePadding).toDouble();
+  final dx = safeClamp(
+    localInOverlay.dx,
     edgePadding,
-    overlay.size.width - popupMaxWidth - edgePadding,
+    maxDx,
   );
-  final dy = localInOverlay.dy.clamp(
+  final dy = safeClamp(
+    localInOverlay.dy,
     edgePadding,
-    overlay.size.height - popupMaxHeight - edgePadding,
+    maxDy,
   );
   return RelativeRect.fromLTRB(
     dx,

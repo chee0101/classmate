@@ -14,72 +14,31 @@ bool isOverflowAppointment(Appointment appointment) {
 List<Appointment> expandAppointmentsForDetails(List<Appointment> appointments) {
   final output = <Appointment>[];
   for (final appointment in appointments) {
-    final meta = appointment.id;
-    if (meta is! ScheduleAppointmentMeta) {
-      output.add(appointment);
-      continue;
-    }
+    _expandAppointmentForDetails(appointment, output);
+  }
+  return output;
+}
 
-    if (meta.type == ScheduleAppointmentMeta.typeEventOverflow) {
-      for (final event in meta.events) {
-        output.add(
-          Appointment(
-            startTime: event.startDateTime,
-            endTime: event.endDateTime,
-            subject: event.title,
-            color: appPrimarySwatch.shade700,
-            isAllDay:
-                event.allDay || !isSameDate(event.startDateTime, event.endDateTime),
-            notes: ScheduleAppointmentMeta.typeEvent,
-            id: ScheduleAppointmentMeta(
-              type: ScheduleAppointmentMeta.typeEvent,
-              events: [event],
-            ),
-          ),
-        );
-      }
-      continue;
-    }
+void _expandAppointmentForDetails(
+  Appointment appointment,
+  List<Appointment> output,
+) {
+  final meta = appointment.id;
+  if (meta is! ScheduleAppointmentMeta) {
+    output.add(appointment);
+    return;
+  }
 
-    if (meta.type == ScheduleAppointmentMeta.typeDenseOverflow &&
-        meta.overflowAppointments.isNotEmpty) {
-      for (final hidden in meta.overflowAppointments) {
-        final hiddenMeta = hidden.id;
-        if (hiddenMeta is ScheduleAppointmentMeta &&
-            hiddenMeta.type == ScheduleAppointmentMeta.typeEventOverflow) {
-          for (final event in hiddenMeta.events) {
-            output.add(
-              Appointment(
-                startTime: event.startDateTime,
-                endTime: event.endDateTime,
-                subject: event.title,
-                color: appPrimarySwatch.shade700,
-                isAllDay: event.allDay ||
-                    !isSameDate(event.startDateTime, event.endDateTime),
-                notes: ScheduleAppointmentMeta.typeEvent,
-                id: ScheduleAppointmentMeta(
-                  type: ScheduleAppointmentMeta.typeEvent,
-                  events: [event],
-                ),
-              ),
-            );
-          }
-          continue;
-        }
-        output.add(hidden);
-      }
-      continue;
-    }
-
-    if (meta.type == ScheduleAppointmentMeta.typeEvent && meta.events.isNotEmpty) {
-      final event = meta.events.first;
+  if (meta.type == ScheduleAppointmentMeta.typeEventOverflow) {
+    for (final event in meta.events) {
       output.add(
         Appointment(
           startTime: event.startDateTime,
           endTime: event.endDateTime,
           subject: event.title,
-          color: appointment.color,
-          isAllDay: event.allDay || !isSameDate(event.startDateTime, event.endDateTime),
+          color: appPrimarySwatch.shade700,
+          isAllDay:
+              event.allDay || !isSameDate(event.startDateTime, event.endDateTime),
           notes: ScheduleAppointmentMeta.typeEvent,
           id: ScheduleAppointmentMeta(
             type: ScheduleAppointmentMeta.typeEvent,
@@ -87,12 +46,38 @@ List<Appointment> expandAppointmentsForDetails(List<Appointment> appointments) {
           ),
         ),
       );
-      continue;
     }
-
-    output.add(appointment);
+    return;
   }
-  return output;
+
+  if (meta.type == ScheduleAppointmentMeta.typeDenseOverflow &&
+      meta.overflowAppointments.isNotEmpty) {
+    for (final hidden in meta.overflowAppointments) {
+      _expandAppointmentForDetails(hidden, output);
+    }
+    return;
+  }
+
+  if (meta.type == ScheduleAppointmentMeta.typeEvent && meta.events.isNotEmpty) {
+    final event = meta.events.first;
+    output.add(
+      Appointment(
+        startTime: event.startDateTime,
+        endTime: event.endDateTime,
+        subject: event.title,
+        color: appointment.color,
+        isAllDay: event.allDay || !isSameDate(event.startDateTime, event.endDateTime),
+        notes: ScheduleAppointmentMeta.typeEvent,
+        id: ScheduleAppointmentMeta(
+          type: ScheduleAppointmentMeta.typeEvent,
+          events: [event],
+        ),
+      ),
+    );
+    return;
+  }
+
+  output.add(appointment);
 }
 
 String formatMonthlyAgendaSubtitle(Appointment appointment) {

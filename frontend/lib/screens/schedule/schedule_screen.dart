@@ -244,10 +244,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                       );
                                     }).toList(growable: false);
 
-                                    final allAppointments = [
+                                    final mergedAppointments = [
                                       ...appointments,
                                       ...taskAppointments,
                                     ];
+                                    final allAppointments = _showMonthly
+                                        ? mergedAppointments
+                                        : ScheduleAppointmentBuilder
+                                            .compressDenseOverlapsForDisplay(
+                                            mergedAppointments,
+                                          );
 
                                     return Column(
                                       children: [
@@ -344,8 +350,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                                           _calendarController,
                                                       allowedViews: const [
                                                         // CalendarView.day,
-                                                        CalendarView.week,
                                                         CalendarView.month,
+                                                        CalendarView.week,
                                                       ],
                                                       backgroundColor:
                                                           Colors.white,
@@ -686,17 +692,23 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                                           }
                                                         }
 
-                                                        if (appointments
-                                                                    .length ==
-                                                                1 &&
-                                                            isOverflowAppointment(
-                                                              appointments
-                                                                  .first,
-                                                            )) {
+                                                        final tappedOverflow = appointments
+                                                            .firstWhere(
+                                                          (appt) =>
+                                                              isOverflowAppointment(
+                                                            appt,
+                                                          ),
+                                                          orElse: () =>
+                                                              appointments.first,
+                                                        );
+                                                        if (isOverflowAppointment(
+                                                          tappedOverflow,
+                                                        )) {
                                                           await _showOverflowPicker(
-                                                            appointments.first,
+                                                            tappedOverflow,
                                                             selectedTerm:
                                                                 selectedTerm,
+                                                            taskById: taskById,
                                                           );
                                                           return;
                                                         }
@@ -1027,6 +1039,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   Future<void> _showOverflowPicker(
     Appointment overflowAppointment, {
     required TermWindow selectedTerm,
+    required Map<String, Task> taskById,
   }) async {
     final hiddenItems = expandAppointmentsForDetails([overflowAppointment]);
     if (hiddenItems.isEmpty || !mounted) return;
@@ -1039,6 +1052,23 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     );
 
     if (selected == null || !mounted) return;
+
+    final selectedMeta = selected.id;
+    if (selectedMeta is ScheduleAppointmentMeta &&
+        selectedMeta.type == ScheduleAppointmentMeta.typeTask &&
+        selectedMeta.taskId != null) {
+      final tappedTask = taskById[selectedMeta.taskId];
+      if (tappedTask == null || !mounted) return;
+      final task = tappedTask.parentTaskId == null
+          ? tappedTask
+          : taskById[tappedTask.parentTaskId!] ?? tappedTask;
+      Navigator.pushNamed(
+        context,
+        AppRoutes.taskDetail,
+        arguments: task,
+      );
+      return;
+    }
     _showAppointmentsBottomSheet(
       [selected],
       selectedTerm: selectedTerm,
