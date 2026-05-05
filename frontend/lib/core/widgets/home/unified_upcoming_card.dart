@@ -442,36 +442,41 @@ class _EmptyUpcomingState extends StatelessWidget {
         break;
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: AppSpacing.md),
-      child: Column(
-        children: [
-          Icon(icon, size: 28, color: Colors.grey.shade600),
-          const SizedBox(height: AppSpacing.xs),
-          Text(
-            title,
-            style: Theme.of(context).textTheme.titleSmall,
-          ),
-          const SizedBox(height: 2),
-          Text(
-            subtitle,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey.shade700,
-                ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          TextButton(
-            onPressed: () {
-              Navigator.pushNamed(
-                context,
-                AppRoutes.addNew,
-                arguments: addType,
-              );
-            },
-            child: Text(buttonText),
-          ),
-        ],
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.only(top: AppSpacing.md),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Icon(icon, size: 28, color: Colors.grey.shade600),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              title,
+              style: Theme.of(context).textTheme.titleSmall,
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.grey.shade700,
+                  ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            TextButton(
+              onPressed: () {
+                Navigator.pushNamed(
+                  context,
+                  AppRoutes.addNew,
+                  arguments: addType,
+                );
+              },
+              child: Text(buttonText),
+            ),
+          ],
+        ),
       ),
     );
   }
