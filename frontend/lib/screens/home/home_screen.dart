@@ -444,8 +444,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                             event.sessionId ==
                                                 selectedSession.id &&
                                             event.termId == selectedTerm.id &&
-                                            (isSameDate(event.startDateTime, today) ||
-                                                isSameDate(event.endDateTime, today)) &&
                                             !event.endDateTime
                                                 .isBefore(todayStart) &&
                                             !event.startDateTime
@@ -623,7 +621,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                                     scheduleItems,
                                                 academicBreakTitle:
                                                     academicBreakTitle,
-                                                showAcademicBreakChip: true,
+                                                showAcademicBreakChip: false,
                                                 upcomingTasks: upcomingTasks,
                                                 courses: courses,
                                                 upcomingEvents: upcomingEvents,
