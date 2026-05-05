@@ -99,6 +99,19 @@ int _busiestWeekCount(List<_WeekWorkloadBucket> buckets) {
   return counts.last;
 }
 
+String _termLabelWithWeek(TermWindow term, DateTime now) {
+  final day = DateTime(now.year, now.month, now.day);
+  if (day.isBefore(term.start) || day.isAfter(term.end)) {
+    return '${term.label} · Week -';
+  }
+  final weekNumber =
+      (day.difference(DateTime(term.start.year, term.start.month, term.start.day))
+                  .inDays ~/
+              7) +
+          1;
+  return '${term.label} · Week $weekNumber';
+}
+
 class TaskScreen extends StatefulWidget {
   const TaskScreen({super.key});
 
@@ -315,7 +328,10 @@ class _TaskScreenState extends State<TaskScreen> {
                                   ),
                                   child: SessionTermContextLabel(
                                     sessionName: selectedRef.session.name,
-                                    termLabel: selectedRef.term.label,
+                                    termLabel: _termLabelWithWeek(
+                                      selectedRef.term,
+                                      now,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -406,7 +422,10 @@ class _TaskScreenState extends State<TaskScreen> {
                               children: [
                                 SessionTermContextLabel(
                                   sessionName: selectedRef.session.name,
-                                  termLabel: selectedRef.term.label,
+                                  termLabel: _termLabelWithWeek(
+                                    selectedRef.term,
+                                    now,
+                                  ),
                                 ),
                                 const SizedBox(height: AppSpacing.sm),
                                 HomeOverviewCards(
