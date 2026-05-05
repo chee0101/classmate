@@ -485,6 +485,27 @@ class _AddNewScreenState extends State<AddNewScreen> {
                   selectedSession.id == currentSessionId
                       ? defaultTermId(buildTermWindows(selectedSession))
                       : null;
+              final selectedSessionTermKey =
+                  '${selectedSession.id}::${selectedTerm.id}';
+              final sessionTermItems = <DropdownMenuEntry<String>>[];
+              for (final s in sessions) {
+                final terms = buildTermWindows(s);
+                final currentTermForSession = s.id == currentSessionId
+                    ? defaultTermId(terms)
+                    : null;
+                for (final term in terms) {
+                  final isCurrent =
+                      s.id == currentSessionId && term.id == currentTermForSession;
+                  sessionTermItems.add(
+                    DropdownMenuEntry<String>(
+                      value: '${s.id}::${term.id}',
+                      label: isCurrent
+                          ? '${s.name} · ${term.label} (Current)'
+                          : '${s.name} · ${term.label}',
+                    ),
+                  );
+                }
+              }
               final persistedClassSlotsByCourse = {
                 for (final entry in timetablesNotifier.value.where(
                   (e) =>
@@ -644,61 +665,22 @@ class _AddNewScreenState extends State<AddNewScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             const _LabeledFieldHeader(
-                              label: 'Academic Session',
+                              label: 'Academic Session & Term',
                             ),
                             DropdownField<String>(
-                              label: 'Academic Session',
+                              label: 'Academic Session & Term',
                               showLabel: false,
-                              value: selectedSession.id,
-                              items: sessions
-                                  .map(
-                                    (s) => DropdownMenuEntry<String>(
-                                      value: s.id,
-                                      label: s.id == currentSessionId
-                                          ? '${s.name} (Current)'
-                                          : s.name,
-                                    ),
-                                  )
-                                  .toList(),
+                              value: selectedSessionTermKey,
+                              items: sessionTermItems,
                               onChanged: (value) {
                                 if (value == null) return;
-                                final nextSession = sessions.firstWhere(
-                                  (s) => s.id == value,
-                                  orElse: () => session,
-                                );
-                                final nextTerms = buildTermWindows(nextSession);
+                                final parts = value.split('::');
+                                if (parts.length != 2) return;
+                                final nextSessionId = parts[0];
+                                final nextTermId = parts[1];
                                 setState(() {
-                                  _selectedSessionId = value;
-                                  _selectedTermId = defaultTermId(nextTerms);
-                                  _taskCourseCode = null;
-                                  _classCourseCode = null;
-                                  _classSlots.clear();
-                                });
-                              },
-                            ),
-                            const SizedBox(height: AppSpacing.md),
-                            const _LabeledFieldHeader(
-                              label: 'Academic Term',
-                            ),
-                            DropdownField<String>(
-                              label: 'Academic Term',
-                              showLabel: false,
-                              value: selectedTerm.id,
-                              items: termWindows
-                                  .map(
-                                    (term) => DropdownMenuEntry<String>(
-                                      value: term.id,
-                                      label: term.id ==
-                                              currentTermIdForSelectedSession
-                                          ? '${term.label} (Current)'
-                                          : term.label,
-                                    ),
-                                  )
-                                  .toList(),
-                              onChanged: (value) {
-                                if (value == null) return;
-                                setState(() {
-                                  _selectedTermId = value;
+                                  _selectedSessionId = nextSessionId;
+                                  _selectedTermId = nextTermId;
                                   _taskCourseCode = null;
                                   _classCourseCode = null;
                                   _classSlots.clear();
