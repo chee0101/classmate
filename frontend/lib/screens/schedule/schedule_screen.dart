@@ -240,6 +240,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                           type:
                                               ScheduleAppointmentMeta.typeTask,
                                           taskId: t.id,
+                                          taskDueDateTime: t.dueDateTime,
                                         ),
                                       );
                                     }).toList(growable: false);

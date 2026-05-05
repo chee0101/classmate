@@ -569,6 +569,7 @@ class ScheduleAppointmentMeta {
     this.classSourceEndMinutes,
     this.classType,
     this.taskId,
+    this.taskDueDateTime,
   });
 
   static const String typeClass = 'class';
@@ -592,6 +593,7 @@ class ScheduleAppointmentMeta {
   final int? classSourceEndMinutes;
   final String? classType;
   final String? taskId;
+  final DateTime? taskDueDateTime;
 }
 
 enum ScheduleContentFilter {

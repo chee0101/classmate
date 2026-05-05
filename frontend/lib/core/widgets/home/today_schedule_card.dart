@@ -7,6 +7,7 @@ import '../../constants/app_spacing.dart';
 enum TodayScheduleItemType {
   classItem,
   eventItem,
+  taskItem,
 }
 
 class TodayScheduleItem {
@@ -90,6 +91,9 @@ class TodayScheduleCard extends StatelessWidget {
   }
 
   IconData _venueIcon(TodayScheduleItem item) {
+    if (item.type == TodayScheduleItemType.taskItem) {
+      return Icons.book_outlined;
+    }
     if (item.type == TodayScheduleItemType.classItem && item.isOnline) {
       return Icons.videocam_outlined;
     }
@@ -141,6 +145,7 @@ class TodayScheduleCard extends StatelessWidget {
   Widget _buildItemCard(TextTheme textTheme, TodayScheduleItem item) {
     const warningColor = Colors.orange;
     final isClass = item.type == TodayScheduleItemType.classItem;
+    final isTask = item.type == TodayScheduleItemType.taskItem;
 
     return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
@@ -160,7 +165,9 @@ class TodayScheduleCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Icon(
-                isClass ? Icons.school : Icons.event,
+                isClass
+                    ? Icons.school
+                    : (isTask ? Icons.task_alt : Icons.event),
                 size: 16,
                 color: item.color,
               ),
@@ -282,6 +289,7 @@ class TodayScheduleCard extends StatelessWidget {
     TextTheme textTheme,
     TodayScheduleItem item,
   ) {
+    final isTask = item.type == TodayScheduleItemType.taskItem;
     final startLabel = _formatMinutes24h(item.startMinutes);
     final endLabel = _formatMinutes24h(item.endMinutes);
     final timeStyle = _timeLabelStyle(textTheme);
@@ -295,11 +303,20 @@ class TodayScheduleCard extends StatelessWidget {
           SizedBox(
             width: 42,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: isTask
+                  ? CrossAxisAlignment.center
+                  : CrossAxisAlignment.end,
               children: [
                 Text(startLabel, style: timeStyle),
                 const SizedBox(height: 4),
-                Text(endLabel, style: timeStyle),
+                if (isTask)
+                  Icon(
+                    Icons.notifications_active_rounded,
+                    size: 14,
+                    color: Colors.orange.shade700,
+                  )
+                else
+                  Text(endLabel, style: timeStyle),
               ],
             ),
           ),

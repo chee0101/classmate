@@ -83,6 +83,11 @@ void _expandAppointmentForDetails(
 String formatMonthlyAgendaSubtitle(Appointment appointment) {
   final meta = appointment.id;
   if (meta is ScheduleAppointmentMeta &&
+      meta.type == ScheduleAppointmentMeta.typeTask) {
+    final due = meta.taskDueDateTime ?? appointment.endTime;
+    return '🔔 Due ${formatTime12h(due)}';
+  }
+  if (meta is ScheduleAppointmentMeta &&
       meta.type == ScheduleAppointmentMeta.typeEvent &&
       meta.events.isNotEmpty) {
     final event = meta.events.first;
@@ -105,6 +110,11 @@ String formatMonthlyAgendaSubtitle(Appointment appointment) {
 
 String formatAppointmentRange(Appointment appointment) {
   final meta = appointment.id;
+  if (meta is ScheduleAppointmentMeta &&
+      meta.type == ScheduleAppointmentMeta.typeTask) {
+    final due = meta.taskDueDateTime ?? appointment.endTime;
+    return '🔔 Due ${formatTime12h(due)}';
+  }
   if (appointment.notes == ScheduleAppointmentMeta.typeClass) {
     final start = appointment.startTime;
     final end = appointment.endTime;

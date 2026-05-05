@@ -495,6 +495,35 @@ class _HomeScreenState extends State<HomeScreen> {
                                         );
                                       })
                                       .toList(growable: false);
+                                  final todayTaskItems = tasks
+                                      .where(
+                                        (task) =>
+                                            task.parentTaskId == null &&
+                                            isInTerm(task.dueDateTime, selectedTerm) &&
+                                            !task.dueDateTime.isBefore(todayStart) &&
+                                            !task.dueDateTime.isAfter(todayEnd),
+                                      )
+                                      .map((task) {
+                                        final dueMinutes = (task.dueDateTime.hour * 60) +
+                                            task.dueDateTime.minute;
+                                        return TodayScheduleItem(
+                                          type: TodayScheduleItemType.taskItem,
+                                          startMinutes: dueMinutes,
+                                          endMinutes: dueMinutes,
+                                          title: task.title,
+                                          color: displayCourseColorForTask(
+                                            task,
+                                            termCourses,
+                                          ),
+                                          isOnline: false,
+                                          venueLabel: displayCourseCodeForTask(
+                                            task,
+                                            termCourses,
+                                          ),
+                                        );
+                                      })
+                                      .toList(growable: false)
+                                    ..sort(_compareTodayScheduleItems);
 
                                   // -----------------------------
                                   // 3) Apply academic break UI rules
@@ -516,7 +545,8 @@ class _HomeScreenState extends State<HomeScreen> {
                                   // show the special empty state.
                                   if (academicBreakEvent != null &&
                                       nonAcademicEventItems.isEmpty &&
-                                      scheduleClassItems.isEmpty) {
+                                      scheduleClassItems.isEmpty &&
+                                      todayTaskItems.isEmpty) {
                                     return Column(
                                       children: [
                                         Padding(
@@ -574,10 +604,12 @@ class _HomeScreenState extends State<HomeScreen> {
                                   // Academic break with events: show events only.
                                   if (academicBreakEvent != null &&
                                       (nonAcademicEventItems.isNotEmpty ||
-                                          scheduleClassItems.isNotEmpty)) {
+                                          scheduleClassItems.isNotEmpty ||
+                                          todayTaskItems.isNotEmpty)) {
                                     final scheduleItems = [
                                       ...nonAcademicEventItems,
                                       ...scheduleClassItems,
+                                      ...todayTaskItems,
                                     ]..sort(_compareTodayScheduleItems);
 
                                     return Column(
@@ -679,6 +711,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   final scheduleItems = [
                                     ...nonAcademicEventItems,
                                     ...scheduleClassItemsWithOverlap,
+                                    ...todayTaskItems,
                                   ]..sort(_compareTodayScheduleItems);
 
                                   return Column(
