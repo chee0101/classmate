@@ -37,6 +37,8 @@ class AutoExtractScreen extends StatefulWidget {
 }
 
 class _AutoExtractScreenState extends State<AutoExtractScreen> {
+  static const int _maxUploadBytes = 15 * 1024 * 1024;
+
   // Preferred: .env -> API_BASE_URL=http://your-ip:8000
   // Fallback: flutter run --dart-define=API_BASE_URL=http://your-ip:8000
   String get _apiBaseUrl {
@@ -130,6 +132,22 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
     });
   }
 
+  String get _maxUploadLabelMb => (_maxUploadBytes / (1024 * 1024)).toStringAsFixed(0);
+
+  Future<void> _showUploadSizeExceededMessage(List<String> fileNames) async {
+    if (!mounted) return;
+    final firstName = fileNames.first;
+    final hasMore = fileNames.length > 1;
+    final detail = hasMore ? '$firstName and ${fileNames.length - 1} more file(s)' : firstName;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          'Skipped $detail. Max file size is ${_maxUploadLabelMb}MB.',
+        ),
+      ),
+    );
+  }
+
   Future<void> _notImplementedYet(String feature) async {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -145,9 +163,25 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
       allowedExtensions: const ['pdf', 'docx', 'png', 'jpg', 'jpeg'],
     );
     if (result == null || result.files.isEmpty) return;
+    final accepted = <PlatformFile>[];
+    final rejectedNames = <String>[];
+    for (final file in result.files) {
+      if (file.size > _maxUploadBytes) {
+        rejectedNames.add(file.name);
+        continue;
+      }
+      accepted.add(file);
+    }
+    if (accepted.isEmpty) {
+      await _showUploadSizeExceededMessage(rejectedNames);
+      return;
+    }
     setState(() {
-      _selectedFiles = [..._selectedFiles, ...result.files];
+      _selectedFiles = [..._selectedFiles, ...accepted];
     });
+    if (rejectedNames.isNotEmpty) {
+      await _showUploadSizeExceededMessage(rejectedNames);
+    }
   }
 
   Future<void> _handleScanFromCamera() async {
@@ -194,6 +228,10 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
         bytes: bytes,
         path: imagePath,
       );
+      if (platformFile.size > _maxUploadBytes) {
+        await _showUploadSizeExceededMessage([platformFile.name]);
+        return;
+      }
 
       setState(() {
         _selectedFiles = [..._selectedFiles, platformFile];
@@ -727,7 +765,7 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(
-                    'Max file size: 10MB',
+                    'Max file size: ${_maxUploadLabelMb}MB',
                     style: textTheme.bodySmall?.copyWith(color: Colors.black45),
                   ),
                   if (_selectedFiles.isNotEmpty) ...[
