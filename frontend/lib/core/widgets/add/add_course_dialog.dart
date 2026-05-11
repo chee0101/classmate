@@ -258,7 +258,7 @@ class _CourseDialogState extends State<CourseDialog> {
             if (!widget.isEdit) ...[
               const SizedBox(height: 6),
               Text(
-                'Tip: Add multiple courses using commas or new lines.',
+                'Tip: Add multiple courses using commas.',
                 style: textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
               ),
             ],

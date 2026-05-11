@@ -15,6 +15,7 @@ import '../../core/widgets/extract/timetable_save_mode_sheet.dart';
 import '../../core/widgets/schedule/class_slot_sheet.dart';
 import '../../core/widgets/timetable/timetable_course_card.dart';
 import '../schedule/class_slot_editor_screen.dart';
+import '../../core/widgets/add/add_course_dialog.dart';
 
 enum _TimetableImportMode { merge, replace }
 
@@ -119,6 +120,21 @@ class _ReviewExtractedTimetableScreenState
     );
   }
 
+  final List<Color> _autoCourseColors = const [
+    Color(0xFF3B82F6),
+    Color(0xFF22C55E),
+    Color(0xFFF97316),
+    Color(0xFFEAB308),
+    Color(0xFF6366F1),
+    Color(0xFFEF4444),
+    Color(0xFF14B8A6),
+    Color(0xFFEC4899),
+  ];
+
+  String _toHex(Color color) {
+    return '#${color.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
+  }
+
   Future<void> _openCourseEditor(String courseCode) async {
     final current = _editableByCourse[courseCode] ?? const <TimetableSlot>[];
     final edited = await showModalBottomSheet<List<ClassSlotDraft>>(
@@ -130,6 +146,8 @@ class _ReviewExtractedTimetableScreenState
       builder: (_) => _ReviewCourseSlotsSheet(
         courseCode: courseCode,
         initialSlots: _toDrafts(current),
+        sessionId: widget.sessionId!,
+        termId: widget.termId!,
       ),
     );
     if (edited == null) return;
@@ -157,8 +175,45 @@ class _ReviewExtractedTimetableScreenState
       return;
     }
 
+    final existingCodes = coursesForSessionAndTerm(
+      sessionId: sessionId,
+      termId: termId,
+    )
+        .map(
+          (c) => c.courseCode.trim().toUpperCase(),
+        )
+        .toSet();
+
+    final unmatchedCodes = _selectedCourseCodes
+        .where(
+          (code) => !existingCodes.contains(
+            code.trim().toUpperCase(),
+          ),
+        )
+        .toList();
+
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
+
+    if (unmatchedCodes.isNotEmpty) {
+      final shouldCreate = await showConfirmDialog(
+        context,
+        title: 'Create missing courses?',
+        message: 'The following courses do not exist yet:\n\n'
+            '${unmatchedCodes.map((e) => '• $e').join('\n')}\n\n'
+            'They will be created automatically before saving timetable.',
+        confirmText: 'Create & Save',
+      );
+
+      if (!shouldCreate || !mounted) {
+        return;
+      }
+    }
+
+    final existingCourseCount = coursesForSessionAndTerm(
+      sessionId: sessionId,
+      termId: termId,
+    ).length;
 
     final confirmed = await showConfirmDialog(
       context,
@@ -188,13 +243,37 @@ class _ReviewExtractedTimetableScreenState
           termId: termId,
           normalizedCourseCode: code,
         );
+        // if (courseId == null) {
+        //   skipped++;
+        //   continue;
+        // }
+
         if (courseId == null) {
+          final color = _autoCourseColors[
+              (existingCourseCount + saved) % _autoCourseColors.length];
+
+          await addCourse(
+            sessionId: sessionId,
+            termId: termId,
+            courseCode: code,
+            courseColor: _toHex(color),
+          );
+        }
+
+        final resolvedCourseId = await findCourseIdBySessionTermCode(
+          uid: user.uid,
+          sessionId: sessionId,
+          termId: termId,
+          normalizedCourseCode: code,
+        );
+
+        if (resolvedCourseId == null) {
           skipped++;
           continue;
         }
 
         if (mode == _TimetableImportMode.replace) {
-          await deleteTimetableEntry(courseId);
+          await deleteTimetableEntry(resolvedCourseId);
           await upsertTimetableByCourse(
             sessionId: sessionId,
             termId: termId,
@@ -308,29 +387,89 @@ class _ReviewExtractedTimetableScreenState
       );
     }
 
+    // final hasEditableSlots = _editableByCourse.values.any((s) => s.isNotEmpty);
+    // if (!hasEditableSlots || parsed.documentKind == 'unknown') {
+    //   return Scaffold(
+    //     appBar: AppBar(title: const Text('Review timetable')),
+    //     body: Padding(
+    //       padding: const EdgeInsets.all(AppSpacing.md),
+    //       child: Column(
+    //         crossAxisAlignment: CrossAxisAlignment.start,
+    //         children: [
+    //           Text(
+    //             'No timetable slots were found.',
+    //             style: textTheme.titleMedium,
+    //           ),
+    //           if (parsed.warnings.isNotEmpty) ...[
+    //             const SizedBox(height: AppSpacing.md),
+    //             ...parsed.warnings.map(
+    //               (w) => Padding(
+    //                 padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+    //                 child: Text('• $w', style: textTheme.bodySmall),
+    //               ),
+    //             ),
+    //           ],
+    //         ],
+    //       ),
+    //     ),
+    //   );
+    // }
+
     final hasEditableSlots = _editableByCourse.values.any((s) => s.isNotEmpty);
+
     if (!hasEditableSlots || parsed.documentKind == 'unknown') {
       return Scaffold(
-        appBar: AppBar(title: const Text('Review timetable')),
-        body: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'No timetable slots were found.',
-                style: textTheme.titleMedium,
-              ),
-              if (parsed.warnings.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.md),
-                ...parsed.warnings.map(
-                  (w) => Padding(
-                    padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                    child: Text('• $w', style: textTheme.bodySmall),
-                  ),
+        appBar: AppBar(
+          title: const Text(
+            'Review Timetable',
+          ),
+        ),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(
+              AppSpacing.lg,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  size: 48,
+                ),
+                const SizedBox(
+                  height: AppSpacing.md,
+                ),
+                Text(
+                  'Could not extract data',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleMedium,
+                ),
+                const SizedBox(
+                  height: AppSpacing.sm,
+                ),
+                Text(
+                  'Please try another file, clearer image, or try again later.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(
+                        color: Colors.black54,
+                      ),
+                ),
+                const SizedBox(
+                  height: AppSpacing.lg,
+                ),
+                FilledButton(
+                  onPressed: () {
+                    dismissExtractionJobCard();
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Go back'),
                 ),
               ],
-            ],
+            ),
           ),
         ),
       );
@@ -371,136 +510,147 @@ class _ReviewExtractedTimetableScreenState
           ),
         ),
         body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.sm,
-              AppSpacing.md,
-              AppSpacing.xs,
-            ),
-            child: Text(
-              'Review what ClassMate detected and edit if needed before saving.',
-              style: textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-          ),
-          Expanded(
-            child: ValueListenableBuilder<List<Course>>(
-              valueListenable: coursesNotifier,
-              builder: (context, courses, _) {
-                final termCourses = coursesForSessionAndTerm(
-                  sessionId: selectedSessionId,
-                  termId: selectedTermId,
-                );
-                final colorByCode = <String, Color>{
-                  for (final c in termCourses)
-                    c.courseCode.trim().toUpperCase(): _parseCourseColorHex(
-                      c.courseColor,
-                    ),
-                };
-
-                return NotificationListener<ScrollNotification>(
-                  onNotification: (notification) {
-                    final shouldShow = notification.metrics.maxScrollExtent > 1;
-                    if (shouldShow != _showSaveBarShadow) {
-                      setState(() => _showSaveBarShadow = shouldShow);
-                    }
-                    return false;
-                  },
-                  child: ListView.builder(
-                    controller: _contentScrollController,
-                    padding: const EdgeInsets.all(AppSpacing.md),
-                    itemCount: _editableByCourse.length,
-                    itemBuilder: (context, index) {
-                      final code = _editableByCourse.keys.elementAt(index);
-                      final slots =
-                          _editableByCourse[code] ?? const <TimetableSlot>[];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.only(
-                                top: AppSpacing.sm,
-                                right: 0,
-                              ),
-                              child: Checkbox(
-                                value: _selectedCourseCodes.contains(code),
-                                onChanged: (value) {
-                                  setState(() {
-                                    if (value == true) {
-                                      _selectedCourseCodes.add(code);
-                                    } else {
-                                      _selectedCourseCodes.remove(code);
-                                    }
-                                  });
-                                },
-                              ),
-                            ),
-                            Expanded(
-                              child: TimetableCourseCard(
-                                courseCode: code,
-                                slots: slots,
-                                courseColor:
-                                    colorByCode[code] ?? const Color(0xFF6C4DD9),
-                                onTap: () => _openCourseEditor(code),
-                              ),
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
-                );
-              },
-            ),
-          ),
-          Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              boxShadow: _showSaveBarShadow
-                  ? const [
-                      BoxShadow(
-                        color: Color(0x26000000),
-                        blurRadius: 12,
-                        spreadRadius: 0,
-                        offset: Offset(0, -4),
-                      ),
-                    ]
-                  : const [],
-            ),
-            child: SafeArea(
-              top: false,
-              minimum: const EdgeInsets.fromLTRB(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
                 AppSpacing.md,
                 AppSpacing.sm,
                 AppSpacing.md,
-                AppSpacing.md,
+                AppSpacing.xs,
               ),
-              child: ElevatedButton(
-                onPressed: _saving
-                    ? null
-                    : _selectedCourseCodes.isEmpty
-                        ? null
-                        : () => _onSavePressed(
-                              sessionId: selectedSessionId,
-                              termId: selectedTermId,
-                            ),
-                child: _saving
-                    ? const SizedBox(
-                        height: 22,
-                        width: 22,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text('Save to timetable'),
+              child: Text(
+                'Review what ClassMate detected and edit if needed before saving.',
+                style: textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                ),
               ),
             ),
-          ),
-        ],
+            Expanded(
+              child: ValueListenableBuilder<List<Course>>(
+                valueListenable: coursesNotifier,
+                builder: (context, courses, _) {
+                  final termCourses = coursesForSessionAndTerm(
+                    sessionId: selectedSessionId,
+                    termId: selectedTermId,
+                  );
+                  final colorByCode = <String, Color>{
+                    for (final c in termCourses)
+                      c.courseCode.trim().toUpperCase(): _parseCourseColorHex(
+                        c.courseColor,
+                      ),
+                  };
+
+                  return NotificationListener<ScrollNotification>(
+                    onNotification: (notification) {
+                      final shouldShow =
+                          notification.metrics.maxScrollExtent > 1;
+                      if (shouldShow != _showSaveBarShadow) {
+                        setState(() => _showSaveBarShadow = shouldShow);
+                      }
+                      return false;
+                    },
+                    child: ListView.builder(
+                      controller: _contentScrollController,
+                      padding: const EdgeInsets.all(AppSpacing.md),
+                      itemCount: _editableByCourse.length,
+                      itemBuilder: (context, index) {
+                        final code = _editableByCourse.keys.elementAt(index);
+                        final slots =
+                            _editableByCourse[code] ?? const <TimetableSlot>[];
+                        final isMatched = colorByCode.containsKey(
+                          code.trim().toUpperCase(),
+                        );
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                  top: AppSpacing.sm,
+                                  right: 0,
+                                ),
+                                child: Checkbox(
+                                  value: _selectedCourseCodes.contains(code),
+                                  onChanged: (value) {
+                                    setState(() {
+                                      if (value == true) {
+                                        _selectedCourseCodes.add(code);
+                                      } else {
+                                        _selectedCourseCodes.remove(code);
+                                      }
+                                    });
+                                  },
+                                ),
+                              ),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.stretch,
+                                  children: [
+                                    TimetableCourseCard(
+                                      courseCode: code,
+                                      slots: slots,
+                                      courseColor:colorByCode[code] ??
+                                              const Color(0xFF6C4DD9),
+                                      courseNotFound: !isMatched,
+                                      onTap: () => _openCourseEditor(code),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  );
+                },
+              ),
+            ),
+            Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                boxShadow: _showSaveBarShadow
+                    ? const [
+                        BoxShadow(
+                          color: Color(0x26000000),
+                          blurRadius: 12,
+                          spreadRadius: 0,
+                          offset: Offset(0, -4),
+                        ),
+                      ]
+                    : const [],
+              ),
+              child: SafeArea(
+                top: false,
+                minimum: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                  AppSpacing.md,
+                  AppSpacing.md,
+                ),
+                child: ElevatedButton(
+                  onPressed: _saving
+                      ? null
+                      : _selectedCourseCodes.isEmpty
+                          ? null
+                          : () => _onSavePressed(
+                                sessionId: selectedSessionId,
+                                termId: selectedTermId,
+                              ),
+                  child: _saving
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Text('Save to timetable'),
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -511,17 +661,29 @@ class _ReviewCourseSlotsSheet extends StatefulWidget {
   const _ReviewCourseSlotsSheet({
     required this.courseCode,
     required this.initialSlots,
+    required this.sessionId,
+    required this.termId,
   });
 
   final String courseCode;
   final List<ClassSlotDraft> initialSlots;
+  final String sessionId;
+  final String termId;
 
   @override
-  State<_ReviewCourseSlotsSheet> createState() => _ReviewCourseSlotsSheetState();
+  State<_ReviewCourseSlotsSheet> createState() =>
+      _ReviewCourseSlotsSheetState();
 }
 
 class _ReviewCourseSlotsSheetState extends State<_ReviewCourseSlotsSheet> {
   late List<ClassSlotDraft> _slots;
+
+  List<String> _availableCourseCodes() {
+    return coursesForSessionAndTerm(
+      sessionId: widget.sessionId,
+      termId: widget.termId,
+    ).map((c) => c.courseCode).toList(growable: false);
+  }
 
   @override
   void initState() {
@@ -581,7 +743,10 @@ class _ReviewCourseSlotsSheetState extends State<_ReviewCourseSlotsSheet> {
             ),
             const SizedBox(height: AppSpacing.md),
             ClassForm(
-              courseCodes: [widget.courseCode],
+              courseCodes: [
+                widget.courseCode,
+                ..._availableCourseCodes(),
+              ].toSet().toList(),
               selectedCourseCode: widget.courseCode,
               slots: _slots,
               slotsByCourse: {widget.courseCode: _slots},
@@ -602,7 +767,13 @@ class _ReviewCourseSlotsSheetState extends State<_ReviewCourseSlotsSheet> {
                 if (!confirmed || !mounted) return;
                 setState(() => _slots.remove(slot));
               },
-              onAddCourseRequested: () async => null,
+              onAddCourseRequested: () async {
+                return CourseDialog.show(
+                  context,
+                  sessionId: widget.sessionId,
+                  termId: widget.termId,
+                );
+              },
             ),
             const SizedBox(height: AppSpacing.md),
             SizedBox(

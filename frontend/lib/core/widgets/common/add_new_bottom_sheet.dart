@@ -63,8 +63,8 @@ class AddNewBottomSheet extends StatelessWidget {
               Expanded(
                 child: _OptionCard(
                   icon: Icons.document_scanner_outlined,
-                  title: 'Auto Extract',
-                  subtitle: 'Auto-fill from documents',
+                  title: 'Smart Extract',
+                  subtitle: 'Upload files or describe naturally',
                   onTap: () {
                     Navigator.pop(context);
                     Navigator.pushNamed(context, AppRoutes.autoExtract);

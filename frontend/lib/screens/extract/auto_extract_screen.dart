@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
@@ -21,6 +22,23 @@ import '../../core/widgets/common/form_fields.dart';
 import '../../core/widgets/common/white_card.dart';
 import '../../core/widgets/add/add_course_dialog.dart';
 import '../../core/widgets/home/session_header.dart';
+
+import 'review_extracted_events_screen.dart';
+import 'review_extracted_tasks_screen.dart';
+import 'review_extracted_timetable_screen.dart';
+
+import '../../core/services/smart_extraction_service.dart';
+
+enum ExtractInputSource {
+  upload,
+  text,
+}
+
+enum TextExtractType {
+  task,
+  timetable,
+  academicEvent,
+}
 
 enum AutoExtractType { academicCalendar, timetable, task }
 
@@ -70,7 +88,8 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
     final current = selectedSessionTermNotifier.value;
     if (current != null &&
         refs.any(
-          (r) => r.session.id == current.sessionId && r.term.id == current.termId,
+          (r) =>
+              r.session.id == current.sessionId && r.term.id == current.termId,
         )) {
       return current;
     }
@@ -81,6 +100,168 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
     );
   }
 
+  ExtractInputSource _inputSource = ExtractInputSource.upload;
+
+  TextExtractType _textExtractType = TextExtractType.task;
+
+  final _textController = TextEditingController();
+
+  bool _isTextExtracting = false;
+
+  List<String> _selectedTermCourseCodes() {
+    final selection = _resolvedSessionTermSelection();
+
+    if (selection == null) {
+      return [];
+    }
+
+    return coursesForSessionAndTerm(
+      sessionId: selection.sessionId,
+      termId: selection.termId,
+    )
+        .map(
+          (c) => c.courseCode.trim().toUpperCase(),
+        )
+        .where(
+          (c) => c.isNotEmpty,
+        )
+        .toList()
+      ..sort();
+  }
+
+  Future<void> _extractFromText() async {
+    final text = _textController.text.trim();
+
+    if (text.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _isTextExtracting = true;
+    });
+
+    try {
+      final service = SmartExtractionService();
+
+      /// =========================
+      /// TASK
+      /// =========================
+
+      if (_textExtractType == TextExtractType.task) {
+        final result = await service.extractTask(
+          text,
+        );
+
+        if (result == null) {
+          throw Exception(
+            'Task extraction failed.',
+          );
+        }
+
+        if (!mounted) return;
+
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ReviewExtractedTasksScreen(
+              responseJson: jsonEncode(result),
+            ),
+          ),
+        );
+      }
+
+      /// =========================
+      /// TIMETABLE
+      /// =========================
+
+      else if (_textExtractType == TextExtractType.timetable) {
+        final result = await service.extractClass(
+          text,
+        );
+
+        if (result == null) {
+          throw Exception(
+            'Timetable extraction failed.',
+          );
+        }
+
+        final selection = _resolvedSessionTermSelection();
+
+        if (selection == null) {
+          throw Exception(
+            'Please select a valid session and term first.',
+          );
+        }
+
+        if (!mounted) return;
+
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ReviewExtractedTimetableScreen(
+              responseJson: jsonEncode(result),
+              sessionId: selection.sessionId,
+              termId: selection.termId,
+            ),
+          ),
+        );
+      }
+
+      /// =========================
+      /// ACADEMIC EVENT
+      /// =========================
+
+      else {
+        final result = await service.extractEvent(
+          text,
+        );
+
+        if (result == null) {
+          throw Exception(
+            'Event extraction failed.',
+          );
+        }
+
+        final selection = _resolvedSessionTermSelection();
+
+        if (selection == null) {
+          throw Exception(
+            'Please select a valid session and term first.',
+          );
+        }
+
+        if (!mounted) return;
+
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ReviewExtractedEventsScreen(
+              responseJson: jsonEncode(result),
+              sessionId: selection.sessionId,
+              termId: selection.termId,
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            e.toString(),
+          ),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isTextExtracting = false;
+        });
+      }
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -89,29 +270,34 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
 
   @override
   void dispose() {
-    _remarkFilterController.dispose();
+    // _remarkFilterController.dispose();
+    _textController.dispose();
     super.dispose();
   }
 
-  String get _title {
-    switch (_type) {
-      case AutoExtractType.academicCalendar:
-        return 'Academic calendar';
-      case AutoExtractType.timetable:
-        return 'Timetable';
-      case AutoExtractType.task:
-        return 'Task';
-    }
-  }
+  String get _dynamicDescription {
+    if (_inputSource == ExtractInputSource.upload) {
+      switch (_type) {
+        case AutoExtractType.academicCalendar:
+          return 'Upload academic calendar documents or screenshots.';
 
-  String get _subtitle {
-    switch (_type) {
-      case AutoExtractType.academicCalendar:
-        return 'Upload academic calendar document or screenshots.';
-      case AutoExtractType.timetable:
-        return 'Upload timetable document or screenshots.';
-      case AutoExtractType.task:
-        return 'Upload task documents or screenshots.';
+        case AutoExtractType.timetable:
+          return 'Upload timetable documents or screenshots.';
+
+        case AutoExtractType.task:
+          return 'Upload task documents or screenshots.';
+      }
+    }
+
+    switch (_textExtractType) {
+      case TextExtractType.task:
+        return 'Describe tasks naturally for AI extraction.';
+
+      case TextExtractType.timetable:
+        return 'Describe class schedules naturally for AI extraction.';
+
+      case TextExtractType.academicEvent:
+        return 'Describe academic events naturally for AI extraction.';
     }
   }
 
@@ -132,13 +318,16 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
     });
   }
 
-  String get _maxUploadLabelMb => (_maxUploadBytes / (1024 * 1024)).toStringAsFixed(0);
+  String get _maxUploadLabelMb =>
+      (_maxUploadBytes / (1024 * 1024)).toStringAsFixed(0);
 
   Future<void> _showUploadSizeExceededMessage(List<String> fileNames) async {
     if (!mounted) return;
     final firstName = fileNames.first;
     final hasMore = fileNames.length > 1;
-    final detail = hasMore ? '$firstName and ${fileNames.length - 1} more file(s)' : firstName;
+    final detail = hasMore
+        ? '$firstName and ${fileNames.length - 1} more file(s)'
+        : firstName;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(
@@ -244,7 +433,8 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Camera capture failed. Please try again.')),
+        const SnackBar(
+            content: Text('Camera capture failed. Please try again.')),
       );
     }
   }
@@ -294,9 +484,9 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
         return;
       }
       final codes = coursesForSessionAndTerm(
-            sessionId: sel.sessionId,
-            termId: sel.termId,
-          )
+        sessionId: sel.sessionId,
+        termId: sel.termId,
+      )
           .map((c) => c.courseCode.trim().toUpperCase())
           .where((c) => c.isNotEmpty)
           .toList()
@@ -321,9 +511,8 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
         typeLabel: typeLabel,
         files: _selectedFiles,
         useMultiFilesField: true,
-        assignedCourseCode: _type == AutoExtractType.task
-            ? _taskAssignedCourseCode
-            : null,
+        assignedCourseCode:
+            _type == AutoExtractType.task ? _taskAssignedCourseCode : null,
         courseCodesAllowedCsv: courseCodesAllowedCsv,
         aiNotes: aiNotes,
         sessionId: sessionId,
@@ -356,446 +545,631 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-            Text(
-              _subtitle,
-              style: textTheme.bodyMedium?.copyWith(
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            _ExtractTypeTabs(
-              value: _type,
-              onChanged: _isAnalyzing ? null : _handleTypeChanged,
-            ),
-            if (_type == AutoExtractType.timetable) ...[
-              const SizedBox(height: AppSpacing.md),
-              ValueListenableBuilder<List<AcademicSession>>(
-                valueListenable: academicSessionsNotifier,
-                builder: (context, sessionsList, _) {
-                  return ValueListenableBuilder<AcademicSession?>(
-                    valueListenable: currentAcademicSessionNotifier,
-                    builder: (context, activeSession, __) {
-                      return ValueListenableBuilder<SessionTermSelection?>(
-                        valueListenable: selectedSessionTermNotifier,
-                        builder: (context, selectedSelection, ___) {
-                          final sessions = <AcademicSession>[...sessionsList];
-                          if (activeSession != null &&
-                              !sessions.any((s) => s.id == activeSession.id)) {
-                            sessions.add(activeSession);
-                          }
-                          if (sessions.isEmpty) {
-                            return Text(
-                              'Add an academic session and courses first.',
-                              style: textTheme.bodySmall?.copyWith(
-                                color: Colors.black54,
-                              ),
-                            );
-                          }
-
-                          final allTermRefs = buildAllSessionTermRefs(sessions);
-                          if (allTermRefs.isEmpty) return const SizedBox.shrink();
-                          final resolvedDefaultRef = resolveDefaultSessionTermRef(
-                            allTermRefs,
-                            DateTime.now(),
-                          );
-                          var selectedSessionId =
-                              selectedSelection?.sessionId ?? resolvedDefaultRef.session.id;
-                          var selectedTermId =
-                              selectedSelection?.termId ?? resolvedDefaultRef.term.id;
-                          final isValidSelection = allTermRefs.any(
-                            (ref) =>
-                                ref.session.id == selectedSessionId &&
-                                ref.term.id == selectedTermId,
-                          );
-                          if (!isValidSelection) {
-                            selectedSessionId = resolvedDefaultRef.session.id;
-                            selectedTermId = resolvedDefaultRef.term.id;
-                          }
-                          if (selectedSelection == null ||
-                              selectedSelection.sessionId != selectedSessionId ||
-                              selectedSelection.termId != selectedTermId) {
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              setSelectedSessionTerm(
-                                sessionId: selectedSessionId,
-                                termId: selectedTermId,
-                              );
+                  Text(
+                    'Input Method',
+                    style: textTheme.titleSmall,
+                  ),
+                  const SizedBox(
+                    height: AppSpacing.sm,
+                  ),
+                  AnimatedSegmentedSwitch<ExtractInputSource>(
+                    options: const [
+                      SegmentedSwitchOption(
+                        value: ExtractInputSource.upload,
+                        label: 'Upload',
+                      ),
+                      SegmentedSwitchOption(
+                        value: ExtractInputSource.text,
+                        label: 'Text',
+                      ),
+                    ],
+                    value: _inputSource,
+                    onChanged: (value) {
+                      setState(() {
+                        _inputSource = value;
+                      });
+                    },
+                  ),
+                  Text(
+                    _dynamicDescription,
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  _inputSource == ExtractInputSource.upload
+                      ? _ExtractTypeTabs(
+                          value: _type,
+                          onChanged: _isAnalyzing ? null : _handleTypeChanged,
+                        )
+                      : _TextExtractTypeTabs(
+                          selected: _textExtractType,
+                          onChanged: (value) {
+                            setState(() {
+                              _textExtractType = value;
                             });
-                          }
+                          },
+                        ),
+                  if (_inputSource == ExtractInputSource.upload &&
+                      _type == AutoExtractType.timetable) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    ValueListenableBuilder<List<AcademicSession>>(
+                      valueListenable: academicSessionsNotifier,
+                      builder: (context, sessionsList, _) {
+                        return ValueListenableBuilder<AcademicSession?>(
+                          valueListenable: currentAcademicSessionNotifier,
+                          builder: (context, activeSession, __) {
+                            return ValueListenableBuilder<
+                                SessionTermSelection?>(
+                              valueListenable: selectedSessionTermNotifier,
+                              builder: (context, selectedSelection, ___) {
+                                final sessions = <AcademicSession>[
+                                  ...sessionsList
+                                ];
+                                if (activeSession != null &&
+                                    !sessions
+                                        .any((s) => s.id == activeSession.id)) {
+                                  sessions.add(activeSession);
+                                }
+                                if (sessions.isEmpty) {
+                                  return Text(
+                                    'Add an academic session and courses first.',
+                                    style: textTheme.bodySmall?.copyWith(
+                                      color: Colors.black54,
+                                    ),
+                                  );
+                                }
 
-                          return ValueListenableBuilder<List<Course>>(
-                            valueListenable: coursesNotifier,
-                            builder: (context, _, __) {
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  ValueListenableBuilder<List<AcademicSession>>(
-                                    valueListenable: academicSessionsNotifier,
-                                    builder: (context, sessionsList, _) {
-                                      return ValueListenableBuilder<AcademicSession?>(
-                                        valueListenable: currentAcademicSessionNotifier,
-                                        builder: (context, activeSession, __) {
-                                          return ValueListenableBuilder<SessionTermSelection?>(
-                                            valueListenable: selectedSessionTermNotifier,
-                                            builder: (context, selectedSelection, ___) {
-                                              final sessions = <AcademicSession>[...sessionsList];
+                                final allTermRefs =
+                                    buildAllSessionTermRefs(sessions);
+                                if (allTermRefs.isEmpty)
+                                  return const SizedBox.shrink();
+                                final resolvedDefaultRef =
+                                    resolveDefaultSessionTermRef(
+                                  allTermRefs,
+                                  DateTime.now(),
+                                );
+                                var selectedSessionId =
+                                    selectedSelection?.sessionId ??
+                                        resolvedDefaultRef.session.id;
+                                var selectedTermId =
+                                    selectedSelection?.termId ??
+                                        resolvedDefaultRef.term.id;
+                                final isValidSelection = allTermRefs.any(
+                                  (ref) =>
+                                      ref.session.id == selectedSessionId &&
+                                      ref.term.id == selectedTermId,
+                                );
+                                if (!isValidSelection) {
+                                  selectedSessionId =
+                                      resolvedDefaultRef.session.id;
+                                  selectedTermId = resolvedDefaultRef.term.id;
+                                }
+                                if (selectedSelection == null ||
+                                    selectedSelection.sessionId !=
+                                        selectedSessionId ||
+                                    selectedSelection.termId !=
+                                        selectedTermId) {
+                                  WidgetsBinding.instance
+                                      .addPostFrameCallback((_) {
+                                    setSelectedSessionTerm(
+                                      sessionId: selectedSessionId,
+                                      termId: selectedTermId,
+                                    );
+                                  });
+                                }
 
-                                              if (activeSession != null &&
-                                                  !sessions.any((s) => s.id == activeSession.id)) {
-                                                sessions.add(activeSession);
-                                              }
+                                return ValueListenableBuilder<List<Course>>(
+                                  valueListenable: coursesNotifier,
+                                  builder: (context, _, __) {
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        ValueListenableBuilder<
+                                            List<AcademicSession>>(
+                                          valueListenable:
+                                              academicSessionsNotifier,
+                                          builder: (context, sessionsList, _) {
+                                            return ValueListenableBuilder<
+                                                AcademicSession?>(
+                                              valueListenable:
+                                                  currentAcademicSessionNotifier,
+                                              builder:
+                                                  (context, activeSession, __) {
+                                                return ValueListenableBuilder<
+                                                    SessionTermSelection?>(
+                                                  valueListenable:
+                                                      selectedSessionTermNotifier,
+                                                  builder: (context,
+                                                      selectedSelection, ___) {
+                                                    final sessions =
+                                                        <AcademicSession>[
+                                                      ...sessionsList
+                                                    ];
 
-                                              if (sessions.isEmpty) {
-                                                return Text(
-                                                  'Add an academic session and courses first.',
-                                                  style: textTheme.bodySmall?.copyWith(
-                                                    color: Colors.black54,
-                                                  ),
-                                                );
-                                              }
+                                                    if (activeSession != null &&
+                                                        !sessions.any((s) =>
+                                                            s.id ==
+                                                            activeSession.id)) {
+                                                      sessions
+                                                          .add(activeSession);
+                                                    }
 
-                                              final allTermRefs = buildAllSessionTermRefs(sessions);
-                                              if (allTermRefs.isEmpty) return const SizedBox.shrink();
+                                                    if (sessions.isEmpty) {
+                                                      return Text(
+                                                        'Add an academic session and courses first.',
+                                                        style: textTheme
+                                                            .bodySmall
+                                                            ?.copyWith(
+                                                          color: Colors.black54,
+                                                        ),
+                                                      );
+                                                    }
 
-                                              final resolvedDefaultRef = resolveDefaultSessionTermRef(
-                                                allTermRefs,
-                                                DateTime.now(),
-                                              );
+                                                    final allTermRefs =
+                                                        buildAllSessionTermRefs(
+                                                            sessions);
+                                                    if (allTermRefs.isEmpty)
+                                                      return const SizedBox
+                                                          .shrink();
 
-                                              var selectedSessionId =
-                                                  selectedSelection?.sessionId ??
-                                                      resolvedDefaultRef.session.id;
+                                                    final resolvedDefaultRef =
+                                                        resolveDefaultSessionTermRef(
+                                                      allTermRefs,
+                                                      DateTime.now(),
+                                                    );
 
-                                              var selectedTermId =
-                                                  selectedSelection?.termId ??
-                                                      resolvedDefaultRef.term.id;
+                                                    var selectedSessionId =
+                                                        selectedSelection
+                                                                ?.sessionId ??
+                                                            resolvedDefaultRef
+                                                                .session.id;
 
-                                              final isValidSelection = allTermRefs.any(
-                                                (ref) =>
-                                                    ref.session.id == selectedSessionId &&
-                                                    ref.term.id == selectedTermId,
-                                              );
+                                                    var selectedTermId =
+                                                        selectedSelection
+                                                                ?.termId ??
+                                                            resolvedDefaultRef
+                                                                .term.id;
 
-                                              if (!isValidSelection) {
-                                                selectedSessionId = resolvedDefaultRef.session.id;
-                                                selectedTermId = resolvedDefaultRef.term.id;
-                                              }
+                                                    final isValidSelection =
+                                                        allTermRefs.any(
+                                                      (ref) =>
+                                                          ref.session.id ==
+                                                              selectedSessionId &&
+                                                          ref.term.id ==
+                                                              selectedTermId,
+                                                    );
 
-                                              if (selectedSelection == null ||
-                                                  selectedSelection.sessionId != selectedSessionId ||
-                                                  selectedSelection.termId != selectedTermId) {
-                                                WidgetsBinding.instance.addPostFrameCallback((_) {
-                                                  setSelectedSessionTerm(
-                                                    sessionId: selectedSessionId,
-                                                    termId: selectedTermId,
-                                                  );
-                                                });
-                                              }
+                                                    if (!isValidSelection) {
+                                                      selectedSessionId =
+                                                          resolvedDefaultRef
+                                                              .session.id;
+                                                      selectedTermId =
+                                                          resolvedDefaultRef
+                                                              .term.id;
+                                                    }
 
-                                              return ValueListenableBuilder<List<Course>>(
-                                                valueListenable: coursesNotifier,
-                                                builder: (context, _, __) {
-                                                  final courseCodes = coursesForSessionAndTerm(
-                                                    sessionId: selectedSessionId,
-                                                    termId: selectedTermId,
-                                                  )
-                                                      .map((c) => c.courseCode.trim().toUpperCase())
-                                                      .where((c) => c.isNotEmpty)
-                                                      .toList(growable: false)
-                                                    ..sort();
+                                                    if (selectedSelection ==
+                                                            null ||
+                                                        selectedSelection
+                                                                .sessionId !=
+                                                            selectedSessionId ||
+                                                        selectedSelection
+                                                                .termId !=
+                                                            selectedTermId) {
+                                                      WidgetsBinding.instance
+                                                          .addPostFrameCallback(
+                                                              (_) {
+                                                        setSelectedSessionTerm(
+                                                          sessionId:
+                                                              selectedSessionId,
+                                                          termId:
+                                                              selectedTermId,
+                                                        );
+                                                      });
+                                                    }
 
-                                                  return Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    children: [
-                                                      /// 🔹 Session Selector
-                                                      SessionHeader(
-                                                        sessions: sessions,
-                                                        selectedSessionId: selectedSessionId,
-                                                        selectedTermId: selectedTermId,
-                                                        onSelectionChanged: (sessionId, termId) {
-                                                          setSelectedSessionTerm(
-                                                            sessionId: sessionId,
-                                                            termId: termId,
-                                                          );
-                                                        },
-                                                      ),
-                                                      const SizedBox(height: AppSpacing.md),
-                                                      WhiteCard(
-                                                        padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
-                                                        child: Column(
-                                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                                    return ValueListenableBuilder<
+                                                        List<Course>>(
+                                                      valueListenable:
+                                                          coursesNotifier,
+                                                      builder:
+                                                          (context, _, __) {
+                                                        final courseCodes =
+                                                            coursesForSessionAndTerm(
+                                                          sessionId:
+                                                              selectedSessionId,
+                                                          termId:
+                                                              selectedTermId,
+                                                        )
+                                                                .map((c) => c
+                                                                    .courseCode
+                                                                    .trim()
+                                                                    .toUpperCase())
+                                                                .where((c) => c
+                                                                    .isNotEmpty)
+                                                                .toList(
+                                                                    growable:
+                                                                        false)
+                                                              ..sort();
+
+                                                        return Column(
+                                                          crossAxisAlignment:
+                                                              CrossAxisAlignment
+                                                                  .start,
                                                           children: [
-                                                            /// Header row
-                                                            Row(
-                                                              children: [
-                                                                Expanded(
-                                                                  child: Text(
-                                                                    'Courses to extract',
-                                                                    style: textTheme.titleSmall,
-                                                                  ),
-                                                                ),
-                                                                TextButton.icon(
-                                                                  onPressed: () async {
-                                                                    await CourseDialog.show(
-                                                                      context,
-                                                                      sessionId: selectedSessionId,
-                                                                      termId: selectedTermId,
-                                                                    );
-                                                                  },
-                                                                  icon: const Icon(Icons.add, size: 16),
-                                                                  label: const Text('Add course', style: TextStyle(fontSize: 14)),
-                                                                ),
-                                                              ],
+                                                            /// 🔹 Session Selector
+                                                            SessionHeader(
+                                                              sessions:
+                                                                  sessions,
+                                                              selectedSessionId:
+                                                                  selectedSessionId,
+                                                              selectedTermId:
+                                                                  selectedTermId,
+                                                              onSelectionChanged:
+                                                                  (sessionId,
+                                                                      termId) {
+                                                                setSelectedSessionTerm(
+                                                                  sessionId:
+                                                                      sessionId,
+                                                                  termId:
+                                                                      termId,
+                                                                );
+                                                              },
                                                             ),
-                                                            /// Empty state
-                                                            if (courseCodes.isEmpty)
-                                                              Text(
-                                                                'No courses added yet.',
-                                                                style: textTheme.bodySmall?.copyWith(
-                                                                  color: Colors.black54,
-                                                                ),
-                                                              )
-                                                            else
-                                                              Wrap(
-                                                                spacing: AppSpacing.sm,
+                                                            const SizedBox(
+                                                                height:
+                                                                    AppSpacing
+                                                                        .md),
+                                                            WhiteCard(
+                                                              padding:
+                                                                  const EdgeInsets
+                                                                      .fromLTRB(
+                                                                      AppSpacing
+                                                                          .md,
+                                                                      0,
+                                                                      AppSpacing
+                                                                          .md,
+                                                                      AppSpacing
+                                                                          .md),
+                                                              child: Column(
+                                                                crossAxisAlignment:
+                                                                    CrossAxisAlignment
+                                                                        .start,
                                                                 children: [
-                                                                  for (final code in courseCodes)
-                                                                    Chip(
-                                                                      label: Text(
-                                                                        code,
-                                                                        style: textTheme.bodySmall,
+                                                                  /// Header row
+                                                                  Row(
+                                                                    children: [
+                                                                      Expanded(
+                                                                        child:
+                                                                            Text(
+                                                                          'Courses to extract',
+                                                                          style:
+                                                                              textTheme.titleSmall,
+                                                                        ),
                                                                       ),
-                                                                      visualDensity:
-                                                                          VisualDensity.compact,
+                                                                      TextButton
+                                                                          .icon(
+                                                                        onPressed:
+                                                                            () async {
+                                                                          await CourseDialog
+                                                                              .show(
+                                                                            context,
+                                                                            sessionId:
+                                                                                selectedSessionId,
+                                                                            termId:
+                                                                                selectedTermId,
+                                                                          );
+                                                                        },
+                                                                        icon: const Icon(
+                                                                            Icons
+                                                                                .add,
+                                                                            size:
+                                                                                16),
+                                                                        label: const Text(
+                                                                            'Add course',
+                                                                            style:
+                                                                                TextStyle(fontSize: 14)),
+                                                                      ),
+                                                                    ],
+                                                                  ),
+
+                                                                  /// Empty state
+                                                                  if (courseCodes
+                                                                      .isEmpty)
+                                                                    Text(
+                                                                      'No courses added yet.',
+                                                                      style: textTheme
+                                                                          .bodySmall
+                                                                          ?.copyWith(
+                                                                        color: Colors
+                                                                            .black54,
+                                                                      ),
+                                                                    )
+                                                                  else
+                                                                    Wrap(
+                                                                      spacing:
+                                                                          AppSpacing
+                                                                              .sm,
+                                                                      children: [
+                                                                        for (final code
+                                                                            in courseCodes)
+                                                                          Chip(
+                                                                            label:
+                                                                                Text(
+                                                                              code,
+                                                                              style: textTheme.bodySmall,
+                                                                            ),
+                                                                            visualDensity:
+                                                                                VisualDensity.compact,
+                                                                          ),
+                                                                      ],
                                                                     ),
                                                                 ],
                                                               ),
+                                                            ),
                                                           ],
-                                                        ),
-                                                      ),
-                                                    ],
-                                                  );
-                                                },
-                                              );
-                                            },
-                                          );
-                                        },
-                                      );
-                                    },
-                                  ),
-                                ],
-                              );
-                            },
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              ),
-            ],
-            if (_type == AutoExtractType.task) ...[
-              const SizedBox(height: AppSpacing.md),
-              ValueListenableBuilder<List<AcademicSession>>(
-                valueListenable: academicSessionsNotifier,
-                builder: (context, sessionsList, _) {
-                  return ValueListenableBuilder<AcademicSession?>(
-                    valueListenable: currentAcademicSessionNotifier,
-                    builder: (context, activeSession, __) {
-                      return ValueListenableBuilder<SessionTermSelection?>(
-                        valueListenable: selectedSessionTermNotifier,
-                        builder: (context, selectedSelection, ___) {
-                          final sessions = <AcademicSession>[...sessionsList];
-                          if (activeSession != null &&
-                              !sessions.any((s) => s.id == activeSession.id)) {
-                            sessions.add(activeSession);
-                          }
-                          if (sessions.isEmpty) return const SizedBox.shrink();
-
-                          final allTermRefs = buildAllSessionTermRefs(sessions);
-                          if (allTermRefs.isEmpty) return const SizedBox.shrink();
-
-                          final resolvedDefaultRef = resolveDefaultSessionTermRef(
-                            allTermRefs,
-                            DateTime.now(),
-                          );
-                          var selectedSessionId =
-                              selectedSelection?.sessionId ?? resolvedDefaultRef.session.id;
-                          var selectedTermId =
-                              selectedSelection?.termId ?? resolvedDefaultRef.term.id;
-
-                          final isValidSelection = allTermRefs.any(
-                            (ref) =>
-                                ref.session.id == selectedSessionId &&
-                                ref.term.id == selectedTermId,
-                          );
-                          if (!isValidSelection) {
-                            selectedSessionId = resolvedDefaultRef.session.id;
-                            selectedTermId = resolvedDefaultRef.term.id;
-                          }
-
-                          // Keep the global selection valid so downstream task save
-                          // resolves course IDs in the intended session/term.
-                          if (selectedSelection == null ||
-                              selectedSelection.sessionId != selectedSessionId ||
-                              selectedSelection.termId != selectedTermId) {
-                            WidgetsBinding.instance.addPostFrameCallback((_) {
-                              setSelectedSessionTerm(
-                                sessionId: selectedSessionId,
-                                termId: selectedTermId,
-                              );
-                            });
-                          }
-
-                          return ValueListenableBuilder<List<Course>>(
-                            valueListenable: coursesNotifier,
-                            builder: (context, _, __) {
-                              final termCourses =
-                                  coursesForSessionAndTerm(
-                                sessionId: selectedSessionId,
-                                termId: selectedTermId,
-                              );
-                              final courseCodes = termCourses
-                                .map((c) => c.courseCode.trim().toUpperCase())
-                                .where((c) => c.isNotEmpty)
-                                .toList(growable: false)
-                              ..sort();
-
-                              const autoValue = '__auto__';
-                              final normalizedSelected =
-                                  _taskAssignedCourseCode
-                                      ?.trim()
-                                      .toUpperCase();
-                              final effectiveSelected =
-                                  normalizedSelected != null &&
-                                          courseCodes.contains(normalizedSelected)
-                                      ? normalizedSelected
-                                      : null;
-                              final dropdownValue =
-                                  effectiveSelected ?? autoValue;
-
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  SessionHeader(
-                                    sessions: sessions,
-                                    selectedSessionId: selectedSessionId,
-                                    selectedTermId: selectedTermId,
-                                    onSelectionChanged: (sessionId, termId) {
-                                      setSelectedSessionTerm(
-                                        sessionId: sessionId,
-                                        termId: termId,
-                                      );
-                                      setState(() => _taskAssignedCourseCode = null);
-                                    },
-                                  ),
-                                  const SizedBox(height: AppSpacing.sm),
-                                  if (courseCodes.isNotEmpty)
-                                    DropdownField<String>(
-                                      label:
-                                          'Assign extracted tasks to course (optional)',
-                                      showLabel: true,
-                                      hintText: 'Select course code',
-                                      value: dropdownValue,
-                                      items: [
-                                        const DropdownMenuEntry<String>(
-                                          value: autoValue,
-                                          label:
-                                              'Auto (use extracted course codes)',
-                                        ),
-                                        ...courseCodes.map(
-                                          (code) => DropdownMenuEntry<String>(
-                                            value: code,
-                                            label: code,
-                                          ),
+                                                        );
+                                                      },
+                                                    );
+                                                  },
+                                                );
+                                              },
+                                            );
+                                          },
                                         ),
                                       ],
-                                      onChanged: (value) {
-                                        if (!mounted) return;
-                                        setState(() {
-                                          _taskAssignedCourseCode =
-                                              (value == autoValue)
-                                                  ? null
-                                                  : value;
-                                        });
-                                      },
-                                    ),
-                                ],
-                              );
-                            },
-                          );
-                        },
-                      );
-                    },
-                  );
-                },
-              ),
-            ],
-            const SizedBox(height: AppSpacing.md),
-            WhiteCard(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Upload Method', style: textTheme.titleSmall),
-                  const SizedBox(height: AppSpacing.sm),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: AppOutlinedIconButton(
-                          expand: false,
-                          onPressed: _isAnalyzing ? null : _handleChooseFile,
-                          icon: const Icon(Icons.upload_file_outlined),
-                          label: const Text('File', style: TextStyle(fontSize: 14)),
-                        ),
-                      ),
-                      const SizedBox(width: AppSpacing.sm),
-                      Expanded(
-                        child: AppOutlinedIconButton(
-                          expand: false,
-                          onPressed: _isAnalyzing ? null : _handleScanFromCamera,
-                          icon: const Icon(Icons.photo_camera_outlined),
-                          label: const Text('Camera', style: TextStyle(fontSize: 14)),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Text(
-                    'Supported formats: PDF, DOCX, PNG, JPEG',
-                    style: textTheme.bodySmall?.copyWith(color: Colors.black45),
-                  ),
-                  const SizedBox(height: AppSpacing.xs),
-                  Text(
-                    'Max file size: ${_maxUploadLabelMb}MB',
-                    style: textTheme.bodySmall?.copyWith(color: Colors.black45),
-                  ),
-                  if (_selectedFiles.isNotEmpty) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      'Selected file(s)',
-                      style: textTheme.bodySmall?.copyWith(color: Colors.black54),
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Wrap(
-                      spacing: AppSpacing.xs,
-                      children: [
-                        for (var i = 0; i < _selectedFiles.length; i++)
-                          Chip(
-                            label: Text(
-                              _selectedFiles[i].name,
-                              style: textTheme.bodySmall,
-                            ),
-                            onDeleted: _isAnalyzing
-                                ? null
-                                : () => _removeSelectedFileAt(i),
-                            deleteIcon: const Icon(Icons.close, size: 16),
-                          ),
-                      ],
+                                    );
+                                  },
+                                );
+                              },
+                            );
+                          },
+                        );
+                      },
                     ),
                   ],
-                ],
-              ),
-            ),
-                  if (_type == AutoExtractType.timetable) ...[
+                  if (_inputSource == ExtractInputSource.upload &&
+                      _type == AutoExtractType.task) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    ValueListenableBuilder<List<AcademicSession>>(
+                      valueListenable: academicSessionsNotifier,
+                      builder: (context, sessionsList, _) {
+                        return ValueListenableBuilder<AcademicSession?>(
+                          valueListenable: currentAcademicSessionNotifier,
+                          builder: (context, activeSession, __) {
+                            return ValueListenableBuilder<
+                                SessionTermSelection?>(
+                              valueListenable: selectedSessionTermNotifier,
+                              builder: (context, selectedSelection, ___) {
+                                final sessions = <AcademicSession>[
+                                  ...sessionsList
+                                ];
+                                if (activeSession != null &&
+                                    !sessions
+                                        .any((s) => s.id == activeSession.id)) {
+                                  sessions.add(activeSession);
+                                }
+                                if (sessions.isEmpty)
+                                  return const SizedBox.shrink();
+
+                                final allTermRefs =
+                                    buildAllSessionTermRefs(sessions);
+                                if (allTermRefs.isEmpty)
+                                  return const SizedBox.shrink();
+
+                                final resolvedDefaultRef =
+                                    resolveDefaultSessionTermRef(
+                                  allTermRefs,
+                                  DateTime.now(),
+                                );
+                                var selectedSessionId =
+                                    selectedSelection?.sessionId ??
+                                        resolvedDefaultRef.session.id;
+                                var selectedTermId =
+                                    selectedSelection?.termId ??
+                                        resolvedDefaultRef.term.id;
+
+                                final isValidSelection = allTermRefs.any(
+                                  (ref) =>
+                                      ref.session.id == selectedSessionId &&
+                                      ref.term.id == selectedTermId,
+                                );
+                                if (!isValidSelection) {
+                                  selectedSessionId =
+                                      resolvedDefaultRef.session.id;
+                                  selectedTermId = resolvedDefaultRef.term.id;
+                                }
+
+                                // Keep the global selection valid so downstream task save
+                                // resolves course IDs in the intended session/term.
+                                if (selectedSelection == null ||
+                                    selectedSelection.sessionId !=
+                                        selectedSessionId ||
+                                    selectedSelection.termId !=
+                                        selectedTermId) {
+                                  WidgetsBinding.instance
+                                      .addPostFrameCallback((_) {
+                                    setSelectedSessionTerm(
+                                      sessionId: selectedSessionId,
+                                      termId: selectedTermId,
+                                    );
+                                  });
+                                }
+
+                                return ValueListenableBuilder<List<Course>>(
+                                  valueListenable: coursesNotifier,
+                                  builder: (context, _, __) {
+                                    final termCourses =
+                                        coursesForSessionAndTerm(
+                                      sessionId: selectedSessionId,
+                                      termId: selectedTermId,
+                                    );
+                                    final courseCodes = termCourses
+                                        .map((c) =>
+                                            c.courseCode.trim().toUpperCase())
+                                        .where((c) => c.isNotEmpty)
+                                        .toList(growable: false)
+                                      ..sort();
+
+                                    const autoValue = '__auto__';
+                                    final normalizedSelected =
+                                        _taskAssignedCourseCode
+                                            ?.trim()
+                                            .toUpperCase();
+                                    final effectiveSelected =
+                                        normalizedSelected != null &&
+                                                courseCodes.contains(
+                                                    normalizedSelected)
+                                            ? normalizedSelected
+                                            : null;
+                                    final dropdownValue =
+                                        effectiveSelected ?? autoValue;
+
+                                    return Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        SessionHeader(
+                                          sessions: sessions,
+                                          selectedSessionId: selectedSessionId,
+                                          selectedTermId: selectedTermId,
+                                          onSelectionChanged:
+                                              (sessionId, termId) {
+                                            setSelectedSessionTerm(
+                                              sessionId: sessionId,
+                                              termId: termId,
+                                            );
+                                            setState(() =>
+                                                _taskAssignedCourseCode = null);
+                                          },
+                                        ),
+                                        const SizedBox(height: AppSpacing.sm),
+                                        if (courseCodes.isNotEmpty)
+                                          DropdownField<String>(
+                                            label:
+                                                'Assign extracted tasks to course (optional)',
+                                            showLabel: true,
+                                            hintText: 'Select course code',
+                                            value: dropdownValue,
+                                            items: [
+                                              const DropdownMenuEntry<String>(
+                                                value: autoValue,
+                                                label:
+                                                    'Auto (use extracted course codes)',
+                                              ),
+                                              ...courseCodes.map(
+                                                (code) =>
+                                                    DropdownMenuEntry<String>(
+                                                  value: code,
+                                                  label: code,
+                                                ),
+                                              ),
+                                            ],
+                                            onChanged: (value) {
+                                              if (!mounted) return;
+                                              setState(() {
+                                                _taskAssignedCourseCode =
+                                                    (value == autoValue)
+                                                        ? null
+                                                        : value;
+                                              });
+                                            },
+                                          ),
+                                      ],
+                                    );
+                                  },
+                                );
+                              },
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ],
+                  if (_inputSource == ExtractInputSource.upload) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    WhiteCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Upload Method', style: textTheme.titleSmall),
+                          const SizedBox(height: AppSpacing.sm),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: AppOutlinedIconButton(
+                                  expand: false,
+                                  onPressed:
+                                      _isAnalyzing ? null : _handleChooseFile,
+                                  icon: const Icon(Icons.upload_file_outlined),
+                                  label: const Text('File',
+                                      style: TextStyle(fontSize: 14)),
+                                ),
+                              ),
+                              const SizedBox(width: AppSpacing.sm),
+                              Expanded(
+                                child: AppOutlinedIconButton(
+                                  expand: false,
+                                  onPressed: _isAnalyzing
+                                      ? null
+                                      : _handleScanFromCamera,
+                                  icon: const Icon(Icons.photo_camera_outlined),
+                                  label: const Text('Camera',
+                                      style: TextStyle(fontSize: 14)),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: AppSpacing.sm),
+                          Text(
+                            'Supported formats: PDF, DOCX, PNG, JPEG',
+                            style: textTheme.bodySmall
+                                ?.copyWith(color: Colors.black45),
+                          ),
+                          const SizedBox(height: AppSpacing.xs),
+                          Text(
+                            'Max file size: ${_maxUploadLabelMb}MB',
+                            style: textTheme.bodySmall
+                                ?.copyWith(color: Colors.black45),
+                          ),
+                          if (_selectedFiles.isNotEmpty) ...[
+                            const SizedBox(height: AppSpacing.sm),
+                            Text(
+                              'Selected file(s)',
+                              style: textTheme.bodySmall
+                                  ?.copyWith(color: Colors.black54),
+                            ),
+                            const SizedBox(height: AppSpacing.xs),
+                            Wrap(
+                              spacing: AppSpacing.xs,
+                              children: [
+                                for (var i = 0; i < _selectedFiles.length; i++)
+                                  Chip(
+                                    label: Text(
+                                      _selectedFiles[i].name,
+                                      style: textTheme.bodySmall,
+                                    ),
+                                    onDeleted: _isAnalyzing
+                                        ? null
+                                        : () => _removeSelectedFileAt(i),
+                                    deleteIcon:
+                                        const Icon(Icons.close, size: 16),
+                                  ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    )
+                  ],
+                  if (_inputSource == ExtractInputSource.text) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    _buildTextExtractSection(),
+                  ],
+                  if (_inputSource == ExtractInputSource.upload &&
+                      _type == AutoExtractType.timetable) ...[
                     const SizedBox(height: AppSpacing.md),
                     LabeledTextField(
                       label: 'Remark filter (optional)',
@@ -806,7 +1180,8 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
                     const SizedBox(height: AppSpacing.xs),
                     Text(
                       'Only keep classes whose remarks contain this text (case-insensitive).',
-                      style: textTheme.bodySmall?.copyWith(color: Colors.black45),
+                      style:
+                          textTheme.bodySmall?.copyWith(color: Colors.black45),
                     ),
                   ],
                 ],
@@ -835,10 +1210,14 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
               child: SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _isAnalyzing ? null : _handleContinue,
-                  child: _isAnalyzing
+                  onPressed: _inputSource == ExtractInputSource.upload
+                      ? (_isAnalyzing ? null : _handleContinue)
+                      : (_isTextExtracting ? null : _extractFromText),
+                  child: (_inputSource == ExtractInputSource.upload
+                          ? _isAnalyzing
+                          : _isTextExtracting)
                       ? const _AnalyzingInline()
-                      : Text('Continue ($_title)'),
+                      : const Text('Extract'),
                 ),
               ),
             ),
@@ -846,6 +1225,126 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildTextExtractSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSessionSelector(),
+        const SizedBox(
+          height: AppSpacing.md,
+        ),
+        TextField(
+          controller: _textController,
+          maxLines: 10,
+          decoration: InputDecoration(
+            hintText: _textHintText,
+            border: const OutlineInputBorder(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSessionSelector() {
+    return ValueListenableBuilder<List<AcademicSession>>(
+      valueListenable: academicSessionsNotifier,
+      builder: (context, sessionsList, _) {
+        return ValueListenableBuilder<AcademicSession?>(
+          valueListenable: currentAcademicSessionNotifier,
+          builder: (context, activeSession, __) {
+            return ValueListenableBuilder<SessionTermSelection?>(
+              valueListenable: selectedSessionTermNotifier,
+              builder: (
+                context,
+                selectedSelection,
+                ___,
+              ) {
+                final sessions = <AcademicSession>[
+                  ...sessionsList,
+                ];
+
+                if (activeSession != null &&
+                    !sessions.any(
+                      (s) => s.id == activeSession.id,
+                    )) {
+                  sessions.add(
+                    activeSession,
+                  );
+                }
+
+                if (sessions.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+
+                final allTermRefs = buildAllSessionTermRefs(
+                  sessions,
+                );
+
+                if (allTermRefs.isEmpty) {
+                  return const SizedBox.shrink();
+                }
+
+                final resolvedDefaultRef = resolveDefaultSessionTermRef(
+                  allTermRefs,
+                  DateTime.now(),
+                );
+
+                var selectedSessionId = selectedSelection?.sessionId ??
+                    resolvedDefaultRef.session.id;
+
+                var selectedTermId =
+                    selectedSelection?.termId ?? resolvedDefaultRef.term.id;
+
+                final isValidSelection = allTermRefs.any(
+                  (ref) =>
+                      ref.session.id == selectedSessionId &&
+                      ref.term.id == selectedTermId,
+                );
+
+                if (!isValidSelection) {
+                  selectedSessionId = resolvedDefaultRef.session.id;
+
+                  selectedTermId = resolvedDefaultRef.term.id;
+                }
+
+                return SessionHeader(
+                  sessions: sessions,
+                  selectedSessionId: selectedSessionId,
+                  selectedTermId: selectedTermId,
+                  onSelectionChanged: (
+                    sessionId,
+                    termId,
+                  ) {
+                    setSelectedSessionTerm(
+                      sessionId: sessionId,
+                      termId: termId,
+                    );
+                  },
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String get _textHintText {
+    switch (_textExtractType) {
+      case TextExtractType.task:
+        return 'Example:\n\n'
+            'CAT404 Assignment 2 due next Friday 11:59PM';
+
+      case TextExtractType.timetable:
+        return 'Example:\n\n'
+            'CSC404 Monday 10AM - 12PM DK G31 Lecture';
+
+      case TextExtractType.academicEvent:
+        return 'Example:\n\n'
+            'Labour day next week Monday';
+    }
   }
 }
 
@@ -913,3 +1412,43 @@ class _ExtractTypeTabs extends StatelessWidget {
   }
 }
 
+class _TextExtractTypeTabs extends StatelessWidget {
+  const _TextExtractTypeTabs({
+    required this.selected,
+    required this.onChanged,
+  });
+
+  final TextExtractType selected;
+
+  final ValueChanged<TextExtractType> onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Extract Type', style: textTheme.titleSmall),
+        const SizedBox(height: AppSpacing.sm),
+        AnimatedSegmentedSwitch<TextExtractType>(
+          options: const [
+            SegmentedSwitchOption(
+              value: TextExtractType.task,
+              label: 'Task',
+            ),
+            SegmentedSwitchOption(
+              value: TextExtractType.timetable,
+              label: 'Timetable',
+            ),
+            SegmentedSwitchOption(
+              value: TextExtractType.academicEvent,
+              label: 'Event',
+            ),
+          ],
+          value: selected,
+          onChanged: onChanged,
+        ),
+      ],
+    );
+  }
+}

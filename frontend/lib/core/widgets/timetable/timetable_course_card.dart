@@ -20,6 +20,7 @@ class _TimetableCardShell extends StatelessWidget {
     this.headerLeading,
     this.onTap,
     this.onDelete,
+    this.courseNotFound = false,
   });
 
   final String courseCode;
@@ -28,6 +29,7 @@ class _TimetableCardShell extends StatelessWidget {
   final Widget? headerLeading;
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
+  final bool courseNotFound;
 
   @override
   Widget build(BuildContext context) {
@@ -72,9 +74,39 @@ class _TimetableCardShell extends StatelessWidget {
                     ),
                     const SizedBox(width: AppSpacing.sm),
                     Expanded(
-                      child: Text(
-                        courseCode,
-                        style: Theme.of(context).textTheme.titleMedium,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            courseCode,
+                            style: Theme.of(context).textTheme.titleMedium,
+                          ),
+                          if (courseNotFound) ...[
+                            const SizedBox(height: 2),
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.warning_amber_rounded,
+                                  size: 14,
+                                  color: Colors.orange.shade700,
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: Text(
+                                    'Not found in selected term',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          color: Colors.orange.shade700,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                     if (onDelete != null)
@@ -161,6 +193,7 @@ class TimetableCourseCard extends StatelessWidget {
     this.headerLeading,
     this.onTap,
     this.onDelete,
+    this.courseNotFound = false,
   });
 
   final String courseCode;
@@ -169,6 +202,7 @@ class TimetableCourseCard extends StatelessWidget {
   final Widget? headerLeading;
   final VoidCallback? onTap;
   final VoidCallback? onDelete;
+  final bool courseNotFound;
 
   int _slotStartMinutes(TimetableSlot slot) {
     return parseTimeLabel12hToMinutes(slot.startTime.trim()) ?? 0;
@@ -211,6 +245,7 @@ class TimetableCourseCard extends StatelessWidget {
       headerLeading: headerLeading,
       onTap: onTap,
       onDelete: onDelete,
+      courseNotFound: courseNotFound,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: List.generate(days.length, (index) {

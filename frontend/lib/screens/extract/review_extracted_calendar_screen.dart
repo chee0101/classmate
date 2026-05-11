@@ -64,11 +64,9 @@ class _ReviewExtractedCalendarScreenState
   ) {
     for (final existing in existingEvents) {
       if (existing.isAcademicBreak && candidate.isAcademicBreak) {
-        final sameTerm =
-            existing.termId.trim().toLowerCase() ==
+        final sameTerm = existing.termId.trim().toLowerCase() ==
             candidate.termId.trim().toLowerCase();
-        final sameTitle =
-            existing.title.trim().toLowerCase() ==
+        final sameTitle = existing.title.trim().toLowerCase() ==
             candidate.title.trim().toLowerCase();
         if (!sameTerm || !sameTitle) continue;
 
@@ -419,7 +417,8 @@ class _ReviewExtractedCalendarScreenState
       if (!skipOverlapWarning) {
         final overlaps = _findOverlappingSessions(
           targetSession,
-          excludeSessionId: saveMode == _SaveMode.replace ? targetSession.id : null,
+          excludeSessionId:
+              saveMode == _SaveMode.replace ? targetSession.id : null,
         );
         if (overlaps.isNotEmpty) {
           final proceed = await _confirmOverlapWarning(overlaps);
@@ -516,7 +515,7 @@ class _ReviewExtractedCalendarScreenState
   Widget build(BuildContext context) {
     if (_parsed == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Review Extracted Calendar')),
+        appBar: AppBar(title: const Text('Review Calendar')),
         body: Center(
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.lg),
@@ -532,7 +531,10 @@ class _ReviewExtractedCalendarScreenState
                 ),
                 const SizedBox(height: AppSpacing.lg),
                 FilledButton(
-                  onPressed: () => Navigator.pop(context),
+                  onPressed: () {
+                    dismissExtractionJobCard();
+                    Navigator.pop(context);
+                  },
                   child: const Text('Go back'),
                 ),
               ],
@@ -556,7 +558,7 @@ class _ReviewExtractedCalendarScreenState
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Review Extracted Calendar'),
+          title: const Text('Review Calendar'),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back),
             onPressed: () async {
@@ -568,170 +570,173 @@ class _ReviewExtractedCalendarScreenState
           ),
         ),
         body: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.sm,
-              AppSpacing.md,
-              0,
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Review what ClassMate detected and edit if needed before saving.',
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Scrollbar(
-              controller: _contentScrollController,
-              thumbVisibility: true,
-              child: SingleChildScrollView(
-                controller: _contentScrollController,
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  AppSpacing.md,
-                  AppSpacing.md,
-                  AppSpacing.md,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Academic Session ${_parsed!.sessionName}',
-                      style: textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.sm,
+                AppSpacing.md,
+                0,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Review what ClassMate detected and edit if needed before saving.',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: Theme.of(context).colorScheme.primary,
                     ),
-                    const SizedBox(height: AppSpacing.xs),
-                    WhiteCard(
-                      padding: EdgeInsets.zero,
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: _editSessionRange,
-                          borderRadius: BorderRadius.circular(20),
-                          child: Padding(
-                            padding: const EdgeInsets.all(AppSpacing.md),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Session start',
-                                        style: textTheme.bodySmall?.copyWith(
-                                          color: Colors.grey.shade700,
+                  ),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Scrollbar(
+                controller: _contentScrollController,
+                thumbVisibility: true,
+                child: SingleChildScrollView(
+                  controller: _contentScrollController,
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.md,
+                    AppSpacing.md,
+                    AppSpacing.md,
+                    AppSpacing.md,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Academic Session ${_parsed!.sessionName}',
+                        style: textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      WhiteCard(
+                        padding: EdgeInsets.zero,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: _editSessionRange,
+                            borderRadius: BorderRadius.circular(20),
+                            child: Padding(
+                              padding: const EdgeInsets.all(AppSpacing.md),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Session start',
+                                          style: textTheme.bodySmall?.copyWith(
+                                            color: Colors.grey.shade700,
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        formatDateDdMmYyyy(_parsed!.sessionStart),
-                                        style: textTheme.titleSmall?.copyWith(
-                                          fontWeight: FontWeight.w600,
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          formatDateDdMmYyyy(
+                                              _parsed!.sessionStart),
+                                          style: textTheme.titleSmall?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: AppSpacing.md),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Session end',
-                                        style: textTheme.bodySmall?.copyWith(
-                                          color: Colors.grey.shade700,
+                                  const SizedBox(width: AppSpacing.md),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          'Session end',
+                                          style: textTheme.bodySmall?.copyWith(
+                                            color: Colors.grey.shade700,
+                                          ),
                                         ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        formatDateDdMmYyyy(_parsed!.sessionEnd),
-                                        style: textTheme.titleSmall?.copyWith(
-                                          fontWeight: FontWeight.w600,
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          formatDateDdMmYyyy(
+                                              _parsed!.sessionEnd),
+                                          style: textTheme.titleSmall?.copyWith(
+                                            fontWeight: FontWeight.w600,
+                                          ),
                                         ),
-                                      ),
-                                    ],
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(width: AppSpacing.xs),
-                                Icon(
-                                  Icons.edit,
-                                  size: 18,
-                                  color: appPrimarySwatch.shade700,
-                                ),
-                              ],
+                                  const SizedBox(width: AppSpacing.xs),
+                                  Icon(
+                                    Icons.edit,
+                                    size: 18,
+                                    color: appPrimarySwatch.shade700,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text('Public holidays', style: textTheme.titleMedium),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      '$holidayCount public holiday${holidayCount == 1 ? '' : 's'} extracted',
-                      style: textTheme.bodyMedium?.copyWith(
-                        color: Theme.of(context).colorScheme.primary,
-                        fontWeight: FontWeight.w600,
+                      const SizedBox(height: AppSpacing.sm),
+                      Text('Public holidays', style: textTheme.titleMedium),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        '$holidayCount public holiday${holidayCount == 1 ? '' : 's'} extracted',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    _HolidaysPage(
-                      holidays: _holidays,
-                      onEdit: (e) => _editParsedEventPeriod(e, allowEditTitle: true),
-                      onAdd: _addHoliday,
-                    ),
-                  ],
+                      const SizedBox(height: AppSpacing.sm),
+                      _HolidaysPage(
+                        holidays: _holidays,
+                        onEdit: (e) =>
+                            _editParsedEventPeriod(e, allowEditTitle: true),
+                        onAdd: _addHoliday,
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.sm,
-              AppSpacing.md,
-              AppSpacing.md,
-            ),
-            child: Column(
-              children: [
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _saving
-                        ? null
-                        : _saveCalendar,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: appPrimarySwatch.shade700,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.fromHeight(52),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.sm,
+                AppSpacing.md,
+                AppSpacing.md,
+              ),
+              child: Column(
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: _saving ? null : _saveCalendar,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: appPrimarySwatch.shade700,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size.fromHeight(52),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
                       ),
+                      child: _saving
+                          ? const SizedBox(
+                              height: 22,
+                              width: 22,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Text('Confirm & Save'),
                     ),
-                    child: _saving
-                        ? const SizedBox(
-                            height: 22,
-                            width: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Text('Confirm & Save'),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
         ),
       ),
     );

@@ -32,7 +32,8 @@ class ReviewExtractedTasksScreen extends StatefulWidget {
       _ReviewExtractedTasksScreenState();
 }
 
-class _ReviewExtractedTasksScreenState extends State<ReviewExtractedTasksScreen> {
+class _ReviewExtractedTasksScreenState
+    extends State<ReviewExtractedTasksScreen> {
   ParsedTaskExtractionEnvelope? _parsed;
   late List<ParsedExtractedTask> _tasks;
   final ScrollController _contentScrollController = ScrollController();
@@ -88,10 +89,9 @@ class _ReviewExtractedTasksScreenState extends State<ReviewExtractedTasksScreen>
   void initState() {
     super.initState();
     _parsed = tryParseTaskExtractionEnvelope(widget.responseJson);
-    _tasks =
-        _parsed == null
-            ? <ParsedExtractedTask>[]
-            : List<ParsedExtractedTask>.from(_parsed!.tasks);
+    _tasks = _parsed == null
+        ? <ParsedExtractedTask>[]
+        : List<ParsedExtractedTask>.from(_parsed!.tasks);
     final normalizedAssigned = widget.assignedCourseCode?.trim().toUpperCase();
     if (normalizedAssigned != null && normalizedAssigned.isNotEmpty) {
       for (final task in _tasks) {
@@ -123,8 +123,7 @@ class _ReviewExtractedTasksScreenState extends State<ReviewExtractedTasksScreen>
   void _updateSaveBarShadow() {
     if (!_contentScrollController.hasClients) return;
     final position = _contentScrollController.position;
-    final shouldShow =
-        position.maxScrollExtent > 0 &&
+    final shouldShow = position.maxScrollExtent > 0 &&
         position.pixels < (position.maxScrollExtent - 1);
     if (shouldShow == _showSaveBarShadow) return;
     setState(() {
@@ -265,7 +264,8 @@ class _ReviewExtractedTasksScreenState extends State<ReviewExtractedTasksScreen>
           courseCode: task.courseCode,
           courseColor: resolvedCourseColor,
           title: task.title.trim(),
-          description: task.note?.trim().isEmpty ?? true ? null : task.note!.trim(),
+          description:
+              task.note?.trim().isEmpty ?? true ? null : task.note!.trim(),
           dueDateTime: parentDue,
           status: TaskStatus.ongoing,
         );
@@ -291,8 +291,9 @@ class _ReviewExtractedTasksScreenState extends State<ReviewExtractedTasksScreen>
             courseCode: task.courseCode,
             courseColor: resolvedCourseColor,
             title: subtask.title.trim(),
-            description:
-                subtask.note?.trim().isEmpty ?? true ? null : subtask.note!.trim(),
+            description: subtask.note?.trim().isEmpty ?? true
+                ? null
+                : subtask.note!.trim(),
             dueDateTime: resolvedSubDue,
             status: TaskStatus.ongoing,
             parentTaskId: parentId,
@@ -317,14 +318,56 @@ class _ReviewExtractedTasksScreenState extends State<ReviewExtractedTasksScreen>
   Widget build(BuildContext context) {
     if (_parsed == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Add Task')),
+        appBar: AppBar(
+          title: const Text(
+            'Review Tasks',
+          ),
+        ),
         body: Center(
           child: Padding(
-            padding: const EdgeInsets.all(AppSpacing.lg),
-            child: Text(
-              'Could not read extracted task data.',
-              style: Theme.of(context).textTheme.bodyLarge,
-              textAlign: TextAlign.center,
+            padding: const EdgeInsets.all(
+              AppSpacing.lg,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.error_outline,
+                  size: 48,
+                ),
+                const SizedBox(
+                  height: AppSpacing.md,
+                ),
+                Text(
+                  'Could not extract data',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleMedium,
+                ),
+                const SizedBox(
+                  height: AppSpacing.sm,
+                ),
+                Text(
+                  'Please try another file, clearer image/instructions, or try again later.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(
+                        color: Colors.black54,
+                      ),
+                ),
+                const SizedBox(
+                  height: AppSpacing.lg,
+                ),
+                FilledButton(
+                  onPressed: () {
+                    dismissExtractionJobCard();
+                    Navigator.pop(context);
+                  },
+                  child: const Text('Go back'),
+                ),
+              ],
             ),
           ),
         ),
@@ -355,332 +398,413 @@ class _ReviewExtractedTasksScreenState extends State<ReviewExtractedTasksScreen>
         ),
         body: Column(
           children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.md,
-              AppSpacing.sm,
-              AppSpacing.md,
-              0,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                AppSpacing.sm,
+                AppSpacing.md,
+                0,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Review Tasks',
+                    style: Theme.of(context).textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: AppSpacing.xs),
+                  Text(
+                    'Review what ClassMate detected and edit if needed before saving.',
+                    style: Theme.of(
+                      context,
+                    )
+                        .textTheme
+                        .bodyMedium
+                        ?.copyWith(color: appPrimarySwatch.shade700),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                ],
+              ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Review Extracted Tasks',
-                  style: Theme.of(context).textTheme.headlineMedium,
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  'Review what ClassMate detected and edit if needed before saving.',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.bodyMedium?.copyWith(color: appPrimarySwatch.shade700),
-                ),
-                const SizedBox(height: AppSpacing.md),
-              ],
-            ),
-          ),
-          Expanded(
-            child: Scrollbar(
-              controller: _contentScrollController,
-              thumbVisibility: true,
-              child: SingleChildScrollView(
+            Expanded(
+              child: Scrollbar(
                 controller: _contentScrollController,
-                padding: const EdgeInsets.fromLTRB(
-                  AppSpacing.md,
-                  0,
-                  AppSpacing.md,
-                  0,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_tasks.isEmpty)
-                      WhiteCard(
-                        child: Text(
-                          'No tasks detected from this extraction.',
-                          style: Theme.of(context).textTheme.bodyMedium,
-                        ),
-                      )
-                    else
-                      ...List.generate(_tasks.length, (taskIndex) {
-                        final task = _tasks[taskIndex];
-                        final expanded = _expandedTaskIndexes.contains(taskIndex);
-                        final taskSelected = _selectedTaskIndexes.contains(taskIndex);
-                        final selectedSubtasks =
-                            _selectedSubtaskIndexesByTask[taskIndex] ?? const <int>{};
+                thumbVisibility: true,
+                child: SingleChildScrollView(
+                  controller: _contentScrollController,
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.md,
+                    0,
+                    AppSpacing.md,
+                    0,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (_tasks.isEmpty)
+                        WhiteCard(
+                          child: Text(
+                            'No tasks detected from this extraction.',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                        )
+                      else
+                        ...List.generate(_tasks.length, (taskIndex) {
+                          final task = _tasks[taskIndex];
+                          final expanded =
+                              _expandedTaskIndexes.contains(taskIndex);
+                          final taskSelected =
+                              _selectedTaskIndexes.contains(taskIndex);
+                          final selectedSubtasks =
+                              _selectedSubtaskIndexesByTask[taskIndex] ??
+                                  const <int>{};
 
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                          child: WhiteCard(
-                            padding: const EdgeInsets.fromLTRB(0, AppSpacing.sm, 0, AppSpacing.sm),
-                            borderRadius: 16,
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                              Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                  children: [
-                                    Checkbox(
-                                      value: taskSelected,
-                                      onChanged: (checked) {
-                                        setState(() {
-                                          if (checked ?? false) {
-                                            _selectedTaskIndexes.add(taskIndex);
-                                          } else {
-                                            _selectedTaskIndexes.remove(taskIndex);
-                                          }
-                                        });
-                                      },
-                                    ),
-                                    Expanded(
-                                      child: Material(
-                                        color: Colors.transparent,
-                                        child: InkWell(
-                                          onTap: () => _editTask(taskIndex),
-                                          borderRadius: BorderRadius.circular(10),
-                                          splashColor: appPrimarySwatch.shade100.withValues(alpha: 0.45),
-                                          highlightColor: appPrimarySwatch.shade100.withValues(alpha: 0.25),
-                                          child: Padding(
-                                            padding: const EdgeInsets.only(
-                                              top: AppSpacing.xs,
-                                              right: AppSpacing.xs,
-                                              bottom: AppSpacing.xs,
-                                            ),
-                                            child: Row(
-                                              crossAxisAlignment: CrossAxisAlignment.center,
-                                              children: [
-                                                Expanded(
-                                                  child: Column(
-                                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                                    children: [
-                                              Padding(
-                                                padding: const EdgeInsets.only(
-                                                  bottom: AppSpacing.xs,
-                                                ),
-                                                child: task.courseCode.trim().isNotEmpty
-                                                    ? LabelChip(
-                                                        label: task.courseCode,
-                                                        color: (() {
-                                                          final matchedCourse =
-                                                              _courseByCode(task.courseCode);
-                                                          return matchedCourse ==
-                                                                  null
-                                                              ? appPrimarySwatch.shade700
-                                                              : _colorFromCourseHex(
-                                                                  matchedCourse
-                                                                      .courseColor,
-                                                                );
-                                                        })(),
-                                                      )
-                                                    : const LabelChip(
-                                                        label: 'COURSE REQUIRED',
-                                                        background: Color(0xFFFFE5E5),
-                                                        foreground: Color(0xFFD32F2F),
-                                                      ),
+                          return Padding(
+                            padding:
+                                const EdgeInsets.only(bottom: AppSpacing.sm),
+                            child: WhiteCard(
+                              padding: const EdgeInsets.fromLTRB(
+                                  0, AppSpacing.sm, 0, AppSpacing.sm),
+                              borderRadius: 16,
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      Checkbox(
+                                        value: taskSelected,
+                                        onChanged: (checked) {
+                                          setState(() {
+                                            if (checked ?? false) {
+                                              _selectedTaskIndexes
+                                                  .add(taskIndex);
+                                            } else {
+                                              _selectedTaskIndexes
+                                                  .remove(taskIndex);
+                                            }
+                                          });
+                                        },
+                                      ),
+                                      Expanded(
+                                        child: Material(
+                                          color: Colors.transparent,
+                                          child: InkWell(
+                                            onTap: () => _editTask(taskIndex),
+                                            borderRadius:
+                                                BorderRadius.circular(10),
+                                            splashColor: appPrimarySwatch
+                                                .shade100
+                                                .withValues(alpha: 0.45),
+                                            highlightColor: appPrimarySwatch
+                                                .shade100
+                                                .withValues(alpha: 0.25),
+                                            child: Padding(
+                                              padding: const EdgeInsets.only(
+                                                top: AppSpacing.xs,
+                                                right: AppSpacing.xs,
+                                                bottom: AppSpacing.xs,
                                               ),
-                                              Text(
-                                                task.title,
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .titleMedium
-                                                    ?.copyWith(fontWeight: FontWeight.w600),
-                                              ),
-                                              const SizedBox(height: 2),
-                                              Text(
-                                                _dueLabel(task.dueDateTime),
-                                                style: Theme.of(context)
-                                                    .textTheme
-                                                    .bodyMedium
-                                                    ?.copyWith(
-                                                      color: appPrimarySwatch.shade700,
+                                              child: Row(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.center,
+                                                children: [
+                                                  Expanded(
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Padding(
+                                                          padding:
+                                                              const EdgeInsets
+                                                                  .only(
+                                                            bottom:
+                                                                AppSpacing.xs,
+                                                          ),
+                                                          child: task.courseCode
+                                                                  .trim()
+                                                                  .isNotEmpty
+                                                              ? LabelChip(
+                                                                  label: task
+                                                                      .courseCode,
+                                                                  color: (() {
+                                                                    final matchedCourse =
+                                                                        _courseByCode(
+                                                                            task.courseCode);
+                                                                    return matchedCourse ==
+                                                                            null
+                                                                        ? appPrimarySwatch
+                                                                            .shade700
+                                                                        : _colorFromCourseHex(
+                                                                            matchedCourse.courseColor,
+                                                                          );
+                                                                  })(),
+                                                                )
+                                                              : const LabelChip(
+                                                                  label:
+                                                                      'COURSE REQUIRED',
+                                                                  background: Color(
+                                                                      0xFFFFE5E5),
+                                                                  foreground: Color(
+                                                                      0xFFD32F2F),
+                                                                ),
+                                                        ),
+                                                        Text(
+                                                          task.title,
+                                                          style: Theme.of(
+                                                                  context)
+                                                              .textTheme
+                                                              .titleMedium
+                                                              ?.copyWith(
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w600),
+                                                        ),
+                                                        const SizedBox(
+                                                            height: 2),
+                                                        Text(
+                                                          _dueLabel(
+                                                              task.dueDateTime),
+                                                          style:
+                                                              Theme.of(context)
+                                                                  .textTheme
+                                                                  .bodyMedium
+                                                                  ?.copyWith(
+                                                                    color: appPrimarySwatch
+                                                                        .shade700,
+                                                                  ),
+                                                        ),
+                                                        if ((task.note ?? '')
+                                                            .trim()
+                                                            .isNotEmpty) ...[
+                                                          const SizedBox(
+                                                              height: 4),
+                                                          Text(
+                                                            task.note!.trim(),
+                                                            maxLines: 1,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                            style: Theme.of(
+                                                                    context)
+                                                                .textTheme
+                                                                .bodySmall
+                                                                ?.copyWith(
+                                                                  color: Colors
+                                                                      .grey
+                                                                      .shade700,
+                                                                ),
+                                                          ),
+                                                        ],
+                                                        if (task.courseCode
+                                                            .trim()
+                                                            .isEmpty) ...[
+                                                          const SizedBox(
+                                                              height: 4),
+                                                          Text(
+                                                            'Add/select a course before saving this task.',
+                                                            style: Theme.of(
+                                                                    context)
+                                                                .textTheme
+                                                                .bodySmall
+                                                                ?.copyWith(
+                                                                  color: Colors
+                                                                      .red
+                                                                      .shade700,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w500,
+                                                                ),
+                                                          ),
+                                                        ],
+                                                      ],
                                                     ),
+                                                  ),
+                                                  Padding(
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                      left: AppSpacing.xs,
+                                                      right: AppSpacing.xs,
+                                                    ),
+                                                    child: Icon(
+                                                      Icons
+                                                          .arrow_forward_ios_rounded,
+                                                      size: 18,
+                                                      color: appPrimarySwatch
+                                                          .shade700,
+                                                    ),
+                                                  ),
+                                                ],
                                               ),
-                                              if ((task.note ?? '').trim().isNotEmpty) ...[
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  task.note!.trim(),
-                                                  maxLines: 1,
-                                                  overflow: TextOverflow.ellipsis,
-                                                  style: Theme.of(context)
-                                                      .textTheme
-                                                      .bodySmall
-                                                      ?.copyWith(
-                                                        color: Colors.grey.shade700,
-                                                      ),
-                                                ),
-                                              ],
-                                              if (task.courseCode.trim().isEmpty) ...[
-                                                const SizedBox(height: 4),
-                                                Text(
-                                                  'Add/select a course before saving this task.',
-                                                  style: Theme.of(context)
-                                                      .textTheme
-                                                      .bodySmall
-                                                      ?.copyWith(
-                                                        color: Colors.red.shade700,
-                                                        fontWeight: FontWeight.w500,
-                                                      ),
-                                                ),
-                                              ],
-                                                    ],
-                                                  ),
-                                                ),
-                                                Padding(
-                                                  padding: const EdgeInsets.only(
-                                                    left: AppSpacing.xs,
-                                                    right: AppSpacing.xs,
-                                                  ),
-                                                  child: Icon(
-                                                    Icons.arrow_forward_ios_rounded,
-                                                    size: 18,
-                                                    color: appPrimarySwatch.shade700,
-                                                  ),
-                                                ),
-                                              ],
                                             ),
                                           ),
                                         ),
                                       ),
-                                    ),
-                                    if (task.subtasks.isNotEmpty)
-                                      IconButton(
-                                        tooltip: expanded ? 'Collapse' : 'Expand',
-                                        onPressed: () {
-                                          setState(() {
-                                            if (expanded) {
-                                              _expandedTaskIndexes.remove(taskIndex);
-                                            } else {
-                                              _expandedTaskIndexes.add(taskIndex);
-                                            }
-                                          });
-                                        },
-                                        icon: Icon(
-                                          expanded
-                                              ? Icons.keyboard_arrow_up_rounded
-                                              : Icons.keyboard_arrow_down_rounded,
-                                          color: appPrimarySwatch.shade700,
+                                      if (task.subtasks.isNotEmpty)
+                                        IconButton(
+                                          tooltip:
+                                              expanded ? 'Collapse' : 'Expand',
+                                          onPressed: () {
+                                            setState(() {
+                                              if (expanded) {
+                                                _expandedTaskIndexes
+                                                    .remove(taskIndex);
+                                              } else {
+                                                _expandedTaskIndexes
+                                                    .add(taskIndex);
+                                              }
+                                            });
+                                          },
+                                          icon: Icon(
+                                            expanded
+                                                ? Icons
+                                                    .keyboard_arrow_up_rounded
+                                                : Icons
+                                                    .keyboard_arrow_down_rounded,
+                                            color: appPrimarySwatch.shade700,
+                                          ),
                                         ),
-                                      ),
-                                  ],
-                                ),
-                                if (expanded && task.subtasks.isNotEmpty) ...[
-                                  const SizedBox(height: AppSpacing.xs),
-                                  ...List.generate(task.subtasks.length, (subIndex) {
-                                    final subtask = task.subtasks[subIndex];
-                                    final selected =
-                                        taskSelected &&
-                                        selectedSubtasks.contains(subIndex);
-                                    return Padding(
-                                      padding: const EdgeInsets.only(
-                                        left: AppSpacing.md,
-                                        right: AppSpacing.sm,
-                                        bottom: AppSpacing.sm,
-                                      ),
-                                      child: Row(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Checkbox(
-                                            value: selected,
-                                            onChanged:
-                                                taskSelected
-                                                    ? (checked) {
+                                    ],
+                                  ),
+                                  if (expanded && task.subtasks.isNotEmpty) ...[
+                                    const SizedBox(height: AppSpacing.xs),
+                                    ...List.generate(task.subtasks.length,
+                                        (subIndex) {
+                                      final subtask = task.subtasks[subIndex];
+                                      final selected = taskSelected &&
+                                          selectedSubtasks.contains(subIndex);
+                                      return Padding(
+                                        padding: const EdgeInsets.only(
+                                          left: AppSpacing.md,
+                                          right: AppSpacing.sm,
+                                          bottom: AppSpacing.sm,
+                                        ),
+                                        child: Row(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Checkbox(
+                                              value: selected,
+                                              onChanged: taskSelected
+                                                  ? (checked) {
                                                       setState(() {
                                                         final set =
-                                                            _selectedSubtaskIndexesByTask[taskIndex] ??
-                                                            <int>{};
+                                                            _selectedSubtaskIndexesByTask[
+                                                                    taskIndex] ??
+                                                                <int>{};
                                                         if (checked ?? false) {
                                                           set.add(subIndex);
                                                         } else {
                                                           set.remove(subIndex);
                                                         }
-                                                        _selectedSubtaskIndexesByTask[taskIndex] =
-                                                            set;
+                                                        _selectedSubtaskIndexesByTask[
+                                                            taskIndex] = set;
                                                       });
                                                     }
-                                                    : null,
-                                          ),
-                                          Expanded(
-                                            child: Material(
-                                              color: Colors.transparent,
-                                              child: InkWell(
-                                                onTap: () => _editSubtask(task, subtask),
-                                                borderRadius: BorderRadius.circular(10),
-                                                splashColor: appPrimarySwatch.shade100.withValues(alpha: 0.45),
-                                                highlightColor: appPrimarySwatch.shade100.withValues(alpha: 0.25),
-                                                child: Padding(
-                                                  padding: const EdgeInsets.symmetric(
-                                                    vertical: AppSpacing.xs,
-                                                  ),
-                                                  child: Column(
-                                                    crossAxisAlignment:
-                                                        CrossAxisAlignment.start,
-                                                    children: [
-                                                    Text(
-                                                      subtask.title,
-                                                      style: Theme.of(context)
-                                                          .textTheme
-                                                          .titleSmall
-                                                          ?.copyWith(
-                                                            fontWeight: FontWeight.w500,
-                                                          ),
+                                                  : null,
+                                            ),
+                                            Expanded(
+                                              child: Material(
+                                                color: Colors.transparent,
+                                                child: InkWell(
+                                                  onTap: () => _editSubtask(
+                                                      task, subtask),
+                                                  borderRadius:
+                                                      BorderRadius.circular(10),
+                                                  splashColor: appPrimarySwatch
+                                                      .shade100
+                                                      .withValues(alpha: 0.45),
+                                                  highlightColor:
+                                                      appPrimarySwatch.shade100
+                                                          .withValues(
+                                                              alpha: 0.25),
+                                                  child: Padding(
+                                                    padding: const EdgeInsets
+                                                        .symmetric(
+                                                      vertical: AppSpacing.xs,
                                                     ),
-                                                    const SizedBox(height: 2),
-                                                    Text(
-                                                      _dueLabel(subtask.dueDateTime),
-                                                      style: Theme.of(context)
-                                                          .textTheme
-                                                          .bodySmall
-                                                          ?.copyWith(
-                                                            color:
-                                                                appPrimarySwatch.shade700,
+                                                    child: Column(
+                                                      crossAxisAlignment:
+                                                          CrossAxisAlignment
+                                                              .start,
+                                                      children: [
+                                                        Text(
+                                                          subtask.title,
+                                                          style:
+                                                              Theme.of(context)
+                                                                  .textTheme
+                                                                  .titleSmall
+                                                                  ?.copyWith(
+                                                                    fontWeight:
+                                                                        FontWeight
+                                                                            .w500,
+                                                                  ),
+                                                        ),
+                                                        const SizedBox(
+                                                            height: 2),
+                                                        Text(
+                                                          _dueLabel(subtask
+                                                              .dueDateTime),
+                                                          style:
+                                                              Theme.of(context)
+                                                                  .textTheme
+                                                                  .bodySmall
+                                                                  ?.copyWith(
+                                                                    color: appPrimarySwatch
+                                                                        .shade700,
+                                                                  ),
+                                                        ),
+                                                        if ((subtask.note ?? '')
+                                                            .trim()
+                                                            .isNotEmpty) ...[
+                                                          const SizedBox(
+                                                              height: 2),
+                                                          Text(
+                                                            subtask.note!
+                                                                .trim(),
+                                                            maxLines: 1,
+                                                            overflow:
+                                                                TextOverflow
+                                                                    .ellipsis,
+                                                            style: Theme.of(
+                                                                    context)
+                                                                .textTheme
+                                                                .bodySmall
+                                                                ?.copyWith(
+                                                                  color: Colors
+                                                                      .grey
+                                                                      .shade700,
+                                                                ),
                                                           ),
+                                                        ],
+                                                      ],
                                                     ),
-                                                    if ((subtask.note ?? '')
-                                                        .trim()
-                                                        .isNotEmpty) ...[
-                                                      const SizedBox(height: 2),
-                                                      Text(
-                                                        subtask.note!.trim(),
-                                                        maxLines: 1,
-                                                        overflow:
-                                                            TextOverflow.ellipsis,
-                                                        style: Theme.of(context)
-                                                            .textTheme
-                                                            .bodySmall
-                                                            ?.copyWith(
-                                                              color:
-                                                                  Colors.grey.shade700,
-                                                            ),
-                                                      ),
-                                                    ],
-                                                    ],
                                                   ),
                                                 ),
                                               ),
                                             ),
-                                          ),
-                                        ],
-                                      ),
-                                    );
-                                  }),
+                                          ],
+                                        ),
+                                      );
+                                    }),
+                                  ],
                                 ],
-                              ],
+                              ),
                             ),
-                          ),
-                        );
-                      }),
-                  ],
+                          );
+                        }),
+                    ],
+                  ),
                 ),
               ),
             ),
-          ),
-          Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).scaffoldBackgroundColor,
-              boxShadow:
-                  _showSaveBarShadow
-                      ? const [
+            Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).scaffoldBackgroundColor,
+                boxShadow: _showSaveBarShadow
+                    ? const [
                         BoxShadow(
                           color: Color(0x26000000),
                           blurRadius: 12,
@@ -688,53 +812,56 @@ class _ReviewExtractedTasksScreenState extends State<ReviewExtractedTasksScreen>
                           offset: Offset(0, -4),
                         ),
                       ]
-                      : const [],
-            ),
-            child: SafeArea(
-              top: false,
-              minimum: const EdgeInsets.fromLTRB(
-                AppSpacing.md,
-                AppSpacing.sm,
-                AppSpacing.md,
-                AppSpacing.md,
+                    : const [],
               ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (_hasSelectedTasksMissingCourseCode)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                      child: Text(
-                        'Please add a course for selected tasks before saving.',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.red.shade700,
-                              fontWeight: FontWeight.w500,
-                            ),
-                        textAlign: TextAlign.center,
+              child: SafeArea(
+                top: false,
+                minimum: const EdgeInsets.fromLTRB(
+                  AppSpacing.md,
+                  AppSpacing.sm,
+                  AppSpacing.md,
+                  AppSpacing.md,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (_hasSelectedTasksMissingCourseCode)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                        child: Text(
+                          'Please add a course for selected tasks before saving.',
+                          style:
+                              Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Colors.red.shade700,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                          textAlign: TextAlign.center,
+                        ),
                       ),
-                    ),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed:
-                          (_saving || _hasSelectedTasksMissingCourseCode) ? null : _saveTasks,
-                      child:
-                          _saving
-                              ? const SizedBox(
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton(
+                        onPressed:
+                            (_saving || _hasSelectedTasksMissingCourseCode)
+                                ? null
+                                : _saveTasks,
+                        child: _saving
+                            ? const SizedBox(
                                 width: 20,
                                 height: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               )
-                              : const Text('Save Tasks'),
+                            : const Text('Save Tasks'),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
-    ),
     );
   }
 }

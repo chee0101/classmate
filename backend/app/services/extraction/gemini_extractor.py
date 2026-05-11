@@ -9,7 +9,7 @@ from time import perf_counter
 from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
-from app.schemas.extraction import ClassSlotExtract, TaskExtract, TaskSubtaskExtract
+from app.schemas.extraction import ClassSlotExtract, TaskExtract, TaskSubtaskExtract, EventExtract
 
 
 class GeminiFullCalendarEvent(BaseModel):
@@ -110,12 +110,40 @@ def slice_english_calendar_section_with_debug(
     }
 
 
-def _extract_json_blob(text: str) -> str | None:
-    m = re.search(r"```json\s*(\{.*?\})\s*```", text, flags=re.DOTALL | re.IGNORECASE)
+# def _extract_json_blob(text: str) -> str | None:
+#     m = re.search(r"```json\s*(\{.*?\})\s*```", text, flags=re.DOTALL | re.IGNORECASE)
+#     if m:
+#         return m.group(1)
+#     m = re.search(r"(\{.*\})", text, flags=re.DOTALL)
+#     return m.group(1) if m else None
+
+def _extract_json_blob(
+    text: str,
+) -> str | None:
+
+    m = re.search(
+        r"```json\s*(\{.*?\}|\[.*?\])\s*```",
+        text,
+        flags=(
+            re.DOTALL
+            | re.IGNORECASE
+        ),
+    )
+
     if m:
         return m.group(1)
-    m = re.search(r"(\{.*\})", text, flags=re.DOTALL)
-    return m.group(1) if m else None
+
+    m = re.search(
+        r"(\{.*\}|\[.*\])",
+        text,
+        flags=re.DOTALL,
+    )
+
+    return (
+        m.group(1)
+        if m
+        else None
+    )
 
 
 def _parse_english_date_time(text: str) -> datetime | None:
@@ -442,6 +470,8 @@ async def extract_full_academic_calendar_with_gemini(
 
 async def extract_task_with_gemini(
     doc_text: str,
+    *,
+    current_datetime: str | None = None,
 ) -> tuple[list[TaskExtract], float, str, str, str]:
     """
     Extract one or more tasks (with optional subtasks) from a document.
@@ -476,6 +506,14 @@ async def extract_task_with_gemini(
         "- course_code should be uppercase when known (e.g. CST312); else null.\n"
         "- Put ambiguous/alternate detected codes in course_code_candidates.\n"
         "- due_datetime must be ISO-8601 when known; if only date known, use 23:59:00. If unknown, use null.\n"
+        "- Resolve ALL relative dates/times using the provided current datetime.\n"
+        "- Examples of relative dates:\n"
+        "  * next Friday\n"
+        "  * tomorrow\n"
+        "  * next week\n"
+        "  * Monday\n"
+        "- Convert relative dates into exact ISO8601 datetime values.\n"
+        "- Never return null for due_datetime if a recognizable date/time exists.\n"
         "- If a row includes two task phrases and two dates (e.g., Test + Submission), split into two tasks.\n"
         "- In such mixed rows, map the earlier date to test/quiz and the later date/time to submission/deadline.\n"
         "- For phased project schedules (Phase 1/2/3...), use the PHASE END date as due_datetime\n"
@@ -489,6 +527,12 @@ async def extract_task_with_gemini(
         "Input text:\n"
         f"{raw}"
     )
+
+    if current_datetime:
+        prompt += (
+            f"\nCurrent datetime:\n"
+            f"{current_datetime}\n"
+        )
 
     model_name = settings.gemini_model
     t0 = perf_counter()
@@ -694,3 +738,352 @@ async def extract_timetable_with_gemini(
     if not out:
         return [], gemini_ms, "empty_result", "", model_name
     return out, gemini_ms, "ok", "", model_name
+
+async def extract_event_with_gemini(
+    text: str,
+    *,
+    current_datetime: str | None = None,
+) -> tuple[list[EventExtract], float, str, str, str]:
+    """
+    Extract academic/student event information from natural text.
+
+    Returns:
+      (
+        events,
+        gemini_ms,
+        status,
+        error_message,
+        model_used,
+      )
+    """
+
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    logger.debug(
+        "extract_event_with_gemini started"
+    )
+
+    settings = get_settings()
+
+    if not settings.gemini_api_key:
+        logger.error(
+            "Gemini API key missing"
+        )
+
+        return (
+            [],
+            0.0,
+            "no_api_key",
+            "",
+            "",
+        )
+
+    try:
+        from google import genai  # type: ignore
+
+    except Exception as e:
+        logger.exception(
+            "Failed importing google genai"
+        )
+
+        return (
+            [],
+            0.0,
+            "import_error",
+            f"{type(e).__name__}: {e}",
+            "",
+        )
+
+    raw = (text or "").strip()
+
+    logger.debug(
+        "Raw input: %s",
+        raw,
+    )
+
+    if not raw:
+        logger.warning(
+            "Empty input text"
+        )
+
+        return (
+            [],
+            0.0,
+            "empty_input",
+            "",
+            "",
+        )
+
+    if len(raw) > _FULL_CALENDAR_MAX_CHARS:
+        raw = raw[
+            :_FULL_CALENDAR_MAX_CHARS
+        ]
+
+    # Normalize multiline casual input into clearer separators
+    normalized_text = ", ".join(
+        line.strip()
+        for line in raw.splitlines()
+        if line.strip()
+    )
+
+    prompt = (
+        "Extract event information from the text.\n\n"
+
+        "Return STRICT JSON ONLY.\n"
+
+        "No markdown.\n"
+        "No explanation.\n"
+        "No code fences.\n\n"
+
+        "Schema:\n"
+
+        '{'
+        '"events":['
+        '{'
+        '"title":"string",'
+        '"location":"string|null",'
+        '"start_datetime":"YYYY-MM-DDTHH:MM:SS|null",'
+        '"end_datetime":"YYYY-MM-DDTHH:MM:SS|null",'
+        '"all_day":false'
+        '}'
+        ']'
+        '}\n\n'
+
+        "Rules:\n"
+
+        "- Extract ALL identifiable events, activities, "
+        "appointments, celebrations, holidays, or scheduled occasions.\n"
+
+        "- Examples include:\n"
+        "  * meetings\n"
+        "  * workshops\n"
+        "  * seminars\n"
+        "  * classes\n"
+        "  * hackathons\n"
+        "  * competitions\n"
+        "  * briefings\n"
+        "  * appointments\n"
+        "  * birthdays\n"
+        "  * public holidays\n"
+        "  * celebrations\n"
+        "  * gatherings\n"
+        "  * dinners\n"
+        "  * conferences\n"
+
+        "- The following are valid events and MUST be extracted:\n"
+
+        '  * "tomorrow is labour day"\n'
+        '  * "next week Tuesday is presentation 8-10"\n'
+        '  * "tunku birthday holiday next week friday"\n'
+        '  * "meeting with john tomorrow"\n'
+        '  * "birthday dinner friday"\n'
+
+        "- Holiday mentions are valid standalone events.\n"
+
+        "- If a line contains a holiday name with a date reference, "
+        "it MUST be extracted as an event.\n"
+
+        "- Resolve relative dates/times "
+        "using current datetime.\n"
+
+        "- Examples:\n"
+        '  * "tomorrow"\n'
+        '  * "next week"\n'
+        '  * "this Friday"\n'
+        '  * "next month"\n'
+
+        "- start_datetime and end_datetime MUST NEVER be null.\n"
+
+        "- If exact time is unknown but a date is known:\n"
+        "  assume an all-day event.\n"
+
+        "- If only date exists:\n"
+        "  set all_day=true.\n"
+
+        "- If only start time exists:\n"
+        "  infer a reasonable end time.\n"
+
+        "- Use ISO8601 datetime format.\n"
+        
+        "- Convert titles into proper letter casing.\n"
+
+        "- Multiple independent events may exist in the same input.\n"
+
+        "- Extract events even if they are written casually, briefly, or without punctuation.\n"
+
+        "- Do not ignore standalone holiday mentions.\n"
+
+        "- Return empty array if no events found.\n"
+        )
+
+    if current_datetime:
+        prompt += (
+            "\nCurrent datetime:\n"
+            f"{current_datetime}\n"
+        )
+
+    prompt += (
+        "\nInput text:\n"
+        f"{normalized_text}"
+    )
+
+    model_name = settings.gemini_model
+
+    t0 = perf_counter()
+
+    try:
+        client = genai.Client(
+            api_key=settings.gemini_api_key,
+        )
+
+        logger.debug(
+            "Calling Gemini model: %s",
+            model_name,
+        )
+
+        response = await asyncio.to_thread(
+            client.models.generate_content,
+            model=model_name,
+            contents=prompt,
+        )
+
+    except Exception as e:
+        gemini_ms_err = (
+            perf_counter() - t0
+        ) * 1000.0
+
+        logger.exception(
+            "Gemini API error"
+        )
+
+        return (
+            [],
+            gemini_ms_err,
+            "api_error",
+            f"{type(e).__name__}: {e}",
+            "",
+        )
+
+    gemini_ms = (
+        perf_counter() - t0
+    ) * 1000.0
+
+    raw_text = (
+        getattr(response, "text", "")
+        or ""
+    )
+
+    logger.debug(
+        "Raw Gemini response: %s",
+        raw_text,
+    )
+
+    blob = _extract_json_blob(
+        raw_text,
+    )
+
+    logger.debug(
+        "Extracted JSON blob: %s",
+        blob,
+    )
+
+    if not blob:
+        logger.warning(
+            "No JSON blob extracted"
+        )
+
+        return (
+            [],
+            gemini_ms,
+            "no_json_blob",
+            raw_text,
+            model_name,
+        )
+
+    try:
+        parsed = json.loads(blob)
+
+        logger.debug(
+            "Parsed JSON: %s",
+            parsed,
+        )
+
+        events_data = parsed.get(
+            "events",
+            [],
+        )
+
+        if not isinstance(
+            events_data,
+            list,
+        ):
+            logger.warning(
+                "events field is not list"
+            )
+
+            return (
+                [],
+                gemini_ms,
+                "invalid_events_format",
+                "events is not a list",
+                model_name,
+            )
+
+        events: list[
+            EventExtract
+        ] = []
+
+        for item in events_data:
+            try:
+                event = (
+                    EventExtract
+                    .model_validate(item)
+                )
+
+                events.append(event)
+
+            except Exception:
+                logger.exception(
+                    "Event validation failed"
+                )
+
+    except Exception as e:
+        logger.exception(
+            "JSON parse error"
+        )
+
+        return (
+            [],
+            gemini_ms,
+            "json_parse_error",
+            f"{type(e).__name__}: {e}",
+            model_name,
+        )
+
+    logger.debug(
+        "Final extracted events: %s",
+        events,
+    )
+
+    if not events:
+        logger.warning(
+            "No events extracted"
+        )
+
+        return (
+            [],
+            gemini_ms,
+            "empty_result",
+            "",
+            model_name,
+        )
+
+    return (
+        events,
+        gemini_ms,
+        "ok",
+        "",
+        model_name,
+    )

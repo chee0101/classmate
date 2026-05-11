@@ -7,7 +7,7 @@ from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, Field
-
+from typing import Optional
 
 class DocumentKind(StrEnum):
     academic_session = "academic_session"
@@ -147,3 +147,10 @@ class AcademicExtractionEnvelope(BaseModel):
         default_factory=dict,
         description="Rough stage timings in milliseconds (docling, parse, gemini, etc.)",
     )
+
+class EventExtract(BaseModel):
+    title: str
+    location: Optional[str] = None
+    start_datetime: Optional[datetime] = None
+    end_datetime: Optional[datetime] = None
+    all_day: bool = False

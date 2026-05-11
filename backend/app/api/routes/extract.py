@@ -4,6 +4,7 @@ import time
 from datetime import datetime, timezone
 from typing import Any
 from uuid import uuid4
+from pydantic import BaseModel
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 
@@ -16,11 +17,24 @@ from app.services.extraction import (
     run_timetable_pipeline,
 )
 
+from app.services.extraction.gemini_extractor import (
+    extract_task_with_gemini,
+    extract_timetable_with_gemini,
+    extract_event_with_gemini,
+)
+
 router = APIRouter()
 logger = logging.getLogger("uvicorn.error")
 
 _extraction_jobs: dict[str, dict[str, Any]] = {}
 
+class TextExtractionRequest(BaseModel):
+    text: str
+    current_datetime: str | None = None
+    session_name: str | None = None
+    term_id: str | None = None
+    term_start_date: str | None = None
+    term_end_date: str | None = None
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -294,3 +308,241 @@ async def get_extraction_job(job_id: str) -> dict[str, Any]:
     if job is None:
         raise HTTPException(status_code=404, detail="Job not found")
     return job
+
+@router.post('/extract/task-text')
+async def extract_task_text(
+    request: TextExtractionRequest,
+):
+    tasks, _, _, _, _ = (
+        await extract_task_with_gemini(
+            request.text,
+            current_datetime=request.current_datetime,
+        )
+    )
+
+    if not tasks:
+        return {}
+
+    return {
+        "document_kind": "assignment",
+
+        "source_filename": "text_input",
+
+        "markdown_from_docling": request.text,
+
+        "sliced_text_for_gemini": request.text,
+
+        "remark_text_for_gemini": "",
+
+        "extraction": {
+            "kind": "assignment",
+
+            "confidence": 0.9,
+
+            "academic_session": None,
+
+            "assignment": None,
+
+            "tasks": [
+                {
+                    "title": task.title,
+
+                    "description":
+                        task.description,
+
+                    "due_datetime":
+                        task.due_datetime.isoformat()
+                        if task.due_datetime
+                        else None,
+
+                    "course_code":
+                        task.course_code,
+
+                    "course_code_candidates": [],
+
+                    "course_id": None,
+
+                    "subtasks": [],
+                }
+                for task in tasks
+            ],
+
+            "timetable": None,
+
+            "notes": "source=text_input",
+        },
+
+        "warnings": [],
+
+        "timing_ms": {},
+    }
+
+
+@router.post('/extract/timetable-text')
+async def extract_timetable_text(
+    request: TextExtractionRequest,
+):
+    slots, _, _, _, _ = (
+        await extract_timetable_with_gemini(
+            request.text,
+        )
+    )
+
+    return {
+        "document_kind": "timetable",
+
+        "source_filename": "text_input",
+
+        "markdown_from_docling": request.text,
+
+        "sliced_text_for_gemini": request.text,
+
+        "remark_text_for_gemini": "",
+
+        "extraction": {
+            "kind": "timetable",
+
+            "confidence": 0.9,
+
+            "academic_session": None,
+
+            "assignment": None,
+
+            "tasks": [],
+
+            "timetable": {
+                "slots": [
+                    {
+                        "course_code":
+                            slot.course_code,
+
+                        "day":
+                            slot.day,
+
+                        "start_minutes":
+                            slot.start_minutes,
+
+                        "end_minutes":
+                            slot.end_minutes,
+
+                        "mode":
+                            slot.mode,
+
+                        "venue":
+                            slot.venue,
+
+                        "class_type":
+                            slot.class_type,
+
+                        "course_id": None,
+                    }
+                    for slot in slots
+                ]
+            },
+
+            "notes": "source=text_input",
+        },
+
+        "warnings": [],
+
+        "timing_ms": {},
+    }
+
+@router.post('/extract/event-text')
+async def extract_event_text(
+    request: TextExtractionRequest,
+):
+    events, gemini_ms, status, error, model = (
+        await extract_event_with_gemini(
+            request.text,
+            current_datetime=request.current_datetime,
+        )
+    )
+
+    if status != "ok":
+        return {
+            "success": False,
+
+            "error": {
+                "status": status,
+                "message": error,
+            },
+
+            "extraction": {
+                "academic_session": {
+                    "events": [],
+                }
+            },
+        }
+
+    return {
+        "source_filename":
+            "text_input",
+
+        "markdown_from_docling":
+            request.text,
+
+        "sliced_text_for_gemini":
+            request.text,
+
+        "remark_text_for_gemini":
+            "",
+
+        "extraction": {
+            "confidence": 0.9,
+
+            "academic_session": {
+                "name":
+                    "Selected Session",
+
+                "start_date":
+                    None,
+
+                "end_date":
+                    None,
+
+                "terms": [],
+
+                "events": [
+                    {
+                        "title":
+                            event.title,
+
+                        "start_datetime": (
+                            event.start_datetime
+                            .isoformat()
+                            if event.start_datetime
+                            else None
+                        ),
+
+                        "end_datetime": (
+                            event.end_datetime
+                            .isoformat()
+                            if event.end_datetime
+                            else None
+                        ),
+
+                        "all_day":
+                            event.all_day,
+
+                        "location":
+                            event.location,
+
+                        "hide_classes_during_event":
+                            True,
+
+                        "is_academic_break":
+                            False,
+                    }
+                    for event in events
+                ],
+            },
+
+            "notes":
+                "source=text_input",
+        },
+
+        "warnings": [],
+
+        "timing_ms": {},
+    }
