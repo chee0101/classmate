@@ -4,7 +4,8 @@ from typing import AsyncIterator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import extract, health
+# from app.api.routes import extract, health
+from app.api.routes import gemini, health, extract
 from app.core.config import get_settings, reload_settings
 
 
@@ -39,6 +40,7 @@ def create_app() -> FastAPI:
     )
     application.include_router(health.router, prefix=settings.api_prefix, tags=["health"])
     application.include_router(extract.router, prefix=settings.api_prefix, tags=["extract"])
+    application.include_router(gemini.router, prefix=settings.api_prefix, tags=["gemini"])
     return application
 
 

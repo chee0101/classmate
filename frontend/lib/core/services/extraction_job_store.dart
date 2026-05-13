@@ -1,7 +1,11 @@
+import 'dart:async';
+
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+
+import '../utils/extraction_user_messages.dart';
 
 enum ExtractionJobStatus { queued, running, success, failed }
 
@@ -9,7 +13,7 @@ class ExtractionJobState {
   const ExtractionJobState({
     required this.typeLabel,
     required this.fileCount,
-    required this.endpoint,
+    required this.apiPath,
     required this.status,
     required this.startedAt,
     this.assignedCourseCode,
@@ -26,7 +30,8 @@ class ExtractionJobState {
 
   final String typeLabel;
   final int fileCount;
-  final String endpoint;
+  /// Path under `/api/` (no leading slash), e.g. `gemini/calendar`.
+  final String apiPath;
   final ExtractionJobStatus status;
   final DateTime startedAt;
   final DateTime? finishedAt;
@@ -60,7 +65,7 @@ class ExtractionJobState {
     return ExtractionJobState(
       typeLabel: typeLabel,
       fileCount: fileCount,
-      endpoint: endpoint,
+      apiPath: apiPath,
       status: status ?? this.status,
       startedAt: startedAt,
       finishedAt: finishedAt ?? this.finishedAt,
@@ -95,9 +100,27 @@ void cancelRunningExtractionJob() {
   extractionJobNotifier.value = null;
 }
 
+String _normApiPath(String raw) {
+  var s = raw.trim();
+  if (s.startsWith('/api/')) s = s.substring(5);
+  if (s.startsWith('api/')) s = s.substring(4);
+  while (s.startsWith('/')) {
+    s = s.substring(1);
+  }
+  return s;
+}
+
+String _baseUrl(String apiBaseUrl) => apiBaseUrl.trim().replaceAll(RegExp(r'/+$'), '');
+
+/// Runs a multipart extraction against `POST /api/{apiPath}` (Gemini routes).
+///
+/// Previously this used `/extract/submit/...` + polling so long docling runs
+/// would not block an HTTP worker. Gemini extraction is handled in-process with
+/// its own timeout; a single long-lived request is simpler and matches the
+/// `/gemini/...` API surface.
 Future<void> startExtractionJob({
   required String apiBaseUrl,
-  required String endpoint,
+  required String apiPath,
   required String typeLabel,
   required List<PlatformFile> files,
   required bool useMultiFilesField,
@@ -115,6 +138,8 @@ Future<void> startExtractionJob({
     throw StateError('Another extraction job is currently running.');
   }
 
+  final path = _normApiPath(apiPath);
+
   _extractionCancelled = false;
   final client = http.Client();
   _activeExtractionClient = client;
@@ -122,7 +147,7 @@ Future<void> startExtractionJob({
   extractionJobNotifier.value = ExtractionJobState(
     typeLabel: typeLabel,
     fileCount: files.length,
-    endpoint: endpoint,
+    apiPath: path,
     status: ExtractionJobStatus.queued,
     startedAt: DateTime.now(),
     message: 'Queued',
@@ -131,9 +156,8 @@ Future<void> startExtractionJob({
     termId: termId,
   );
 
-  final kind = endpoint.split('/').last;
-  final submitUri = Uri.parse('$apiBaseUrl/api/extract/submit/$kind');
-  final req = http.MultipartRequest('POST', submitUri);
+  final uri = Uri.parse('${_baseUrl(apiBaseUrl)}/api/$path');
+  final req = http.MultipartRequest('POST', uri);
   final fileField = useMultiFilesField ? 'files' : 'file';
 
   for (final file in files) {
@@ -155,107 +179,126 @@ Future<void> startExtractionJob({
   );
 
   try {
-    final submitStreamed = await client.send(req);
-    final submitRes = await http.Response.fromStream(submitStreamed);
+    final streamed = await client
+        .send(req)
+        .timeout(const Duration(seconds: 300));
+    final res = await http.Response.fromStream(streamed);
     if (_extractionCancelled) {
       return;
     }
-    if (submitRes.statusCode < 200 || submitRes.statusCode >= 300) {
-      extractionJobNotifier.value = extractionJobNotifier.value?.copyWith(
-        status: ExtractionJobStatus.failed,
-        finishedAt: DateTime.now(),
-        statusCode: submitRes.statusCode,
-        message: 'Failed (${submitRes.statusCode})',
-        responseBody: submitRes.body,
-      );
-      return;
-    }
-    final submitJson = jsonDecode(submitRes.body) as Map<String, dynamic>;
-    final jobId = (submitJson['job_id'] as String?)?.trim();
-    if (jobId == null || jobId.isEmpty) {
-      extractionJobNotifier.value = extractionJobNotifier.value?.copyWith(
-        status: ExtractionJobStatus.failed,
-        finishedAt: DateTime.now(),
-        message: 'Failed (missing job id)',
-        responseBody: submitRes.body,
-      );
-      return;
-    }
-    while (!_extractionCancelled) {
-      final pollUri = Uri.parse('$apiBaseUrl/api/extract/job/$jobId');
-      final pollRes = await client.get(pollUri);
-      if (_extractionCancelled) return;
-      if (pollRes.statusCode < 200 || pollRes.statusCode >= 300) {
-        extractionJobNotifier.value = extractionJobNotifier.value?.copyWith(
-          status: ExtractionJobStatus.failed,
-          finishedAt: DateTime.now(),
-          statusCode: pollRes.statusCode,
-          message: 'Failed polling (${pollRes.statusCode})',
-          responseBody: pollRes.body,
-        );
-        return;
-      }
-      final pollJson = jsonDecode(pollRes.body) as Map<String, dynamic>;
-      final status = (pollJson['status'] as String?)?.trim().toLowerCase() ?? '';
-      if (status == 'queued' || status == 'running') {
-        await Future<void>.delayed(const Duration(seconds: 2));
-        continue;
-      }
-      final now = DateTime.now();
-      final startedAt = extractionJobNotifier.value?.startedAt ?? now;
-      if (status == 'success') {
-        final resultObj = pollJson['result'];
-        final resultBody = resultObj == null ? '' : jsonEncode(resultObj);
-        final warnings = switch (resultObj) {
-          Map<String, dynamic> m => (m['warnings'] as List<dynamic>? ?? const []),
-          _ => const <dynamic>[],
-        };
-        final warningTexts = warnings
-            .map((w) => w.toString().trim())
-            .where((w) => w.isNotEmpty)
-            .toList(growable: false);
-        final hasMemoryLikeWarnings = warningTexts.any(
-          (w) {
-            final t = w.toLowerCase();
-            return t.contains('bad_alloc') ||
-                t.contains('out of memory') ||
-                t.contains('preprocess failed') ||
-                t.contains('failed for run');
-          },
-        );
-        final durationMs = pollJson['duration_ms'] is num
-            ? (pollJson['duration_ms'] as num).round()
-            : now.difference(startedAt).inMilliseconds;
-        debugPrint(
-          '[extract] Completed kind=$kind job_id=$jobId duration_ms=$durationMs warnings=${warningTexts.length}',
-        );
-        extractionJobNotifier.value = extractionJobNotifier.value?.copyWith(
-          status: ExtractionJobStatus.success,
-          finishedAt: now,
-          statusCode: 200,
-          message: hasMemoryLikeWarnings ? 'Completed with warnings' : 'Completed',
-          responseBody: resultBody,
-          hasWarnings: hasMemoryLikeWarnings,
-          warningMessage: hasMemoryLikeWarnings
-              ? 'Some pages could not be processed due to memory limits, but partial results were extracted.'
-              : null,
-          durationMs: durationMs,
-        );
-        return;
-      }
-      final error = (pollJson['error'] as String?) ?? 'Unknown job error';
+
+    final now = DateTime.now();
+    final startedAt = extractionJobNotifier.value?.startedAt ?? now;
+    final durationMs = now.difference(startedAt).inMilliseconds;
+    final body = res.body;
+
+    if (res.statusCode < 200 || res.statusCode >= 300) {
       extractionJobNotifier.value = extractionJobNotifier.value?.copyWith(
         status: ExtractionJobStatus.failed,
         finishedAt: now,
-        statusCode: 500,
-        message: error,
-        responseBody: error,
-        durationMs: pollJson['duration_ms'] is num
-            ? (pollJson['duration_ms'] as num).round()
-            : now.difference(startedAt).inMilliseconds,
+        statusCode: res.statusCode,
+        message: friendlyExtractionErrorMessage(
+          technicalMessage: 'HTTP ${res.statusCode}',
+          responseBody: body,
+          httpStatusCode: res.statusCode,
+        ),
+        responseBody: body,
+        durationMs: durationMs,
       );
       return;
     }
+
+    Map<String, dynamic>? decoded;
+    try {
+      decoded = jsonDecode(body) as Map<String, dynamic>?;
+    } catch (_) {
+      extractionJobNotifier.value = extractionJobNotifier.value?.copyWith(
+        status: ExtractionJobStatus.failed,
+        finishedAt: now,
+        statusCode: res.statusCode,
+        message: friendlyExtractionErrorMessage(
+          technicalMessage: 'Invalid JSON response',
+          responseBody: body,
+        ),
+        responseBody: body,
+        durationMs: durationMs,
+      );
+      return;
+    }
+
+    if (decoded == null) {
+      extractionJobNotifier.value = extractionJobNotifier.value?.copyWith(
+        status: ExtractionJobStatus.failed,
+        finishedAt: now,
+        message: friendlyExtractionErrorMessage(technicalMessage: 'Empty response'),
+        responseBody: body,
+        durationMs: durationMs,
+      );
+      return;
+    }
+
+    final statusField = (decoded['status'] as String?)?.trim().toLowerCase();
+    if (statusField != null && statusField.isNotEmpty && statusField != 'ok') {
+      final warnings = decoded['warnings'];
+      String? firstWarning;
+      if (warnings is List && warnings.isNotEmpty) {
+        firstWarning = warnings.first?.toString().trim();
+      }
+      extractionJobNotifier.value = extractionJobNotifier.value?.copyWith(
+        status: ExtractionJobStatus.failed,
+        finishedAt: now,
+        statusCode: res.statusCode,
+        message: friendlyExtractionErrorMessage(
+          technicalMessage: firstWarning ?? statusField,
+          responseBody: body,
+        ),
+        responseBody: body,
+        durationMs: durationMs,
+      );
+      return;
+    }
+
+    final warnings = decoded['warnings'] as List<dynamic>? ?? const [];
+    final warningTexts = warnings
+        .map((w) => w.toString().trim())
+        .where((w) => w.isNotEmpty)
+        .toList(growable: false);
+    final hasMemoryLikeWarnings = warningTexts.any(
+      (w) {
+        final t = w.toLowerCase();
+        return t.contains('bad_alloc') ||
+            t.contains('out of memory') ||
+            t.contains('preprocess failed') ||
+            t.contains('failed for run');
+      },
+    );
+
+    debugPrint(
+      '[extract] Completed path=$path duration_ms=$durationMs warnings=${warningTexts.length}',
+    );
+
+    extractionJobNotifier.value = extractionJobNotifier.value?.copyWith(
+      status: ExtractionJobStatus.success,
+      finishedAt: now,
+      statusCode: res.statusCode,
+      message: hasMemoryLikeWarnings ? 'Completed with warnings' : 'Completed',
+      responseBody: body,
+      hasWarnings: hasMemoryLikeWarnings,
+      warningMessage: hasMemoryLikeWarnings
+          ? 'Some pages could not be processed due to memory limits, but partial results were extracted.'
+          : null,
+      durationMs: durationMs,
+    );
+  } on TimeoutException catch (_) {
+    if (_extractionCancelled) {
+      return;
+    }
+    extractionJobNotifier.value = extractionJobNotifier.value?.copyWith(
+      status: ExtractionJobStatus.failed,
+      finishedAt: DateTime.now(),
+      message: friendlyExtractionErrorMessage(technicalMessage: 'timeout'),
+      responseBody: null,
+    );
   } catch (e) {
     if (_extractionCancelled) {
       return;
@@ -263,8 +306,8 @@ Future<void> startExtractionJob({
     extractionJobNotifier.value = extractionJobNotifier.value?.copyWith(
       status: ExtractionJobStatus.failed,
       finishedAt: DateTime.now(),
-      message: 'Error: $e',
-      responseBody: '$e',
+      message: friendlyExtractionErrorMessage(technicalMessage: e.toString()),
+      responseBody: e.toString(),
     );
   } finally {
     _activeExtractionClient = null;
@@ -287,4 +330,3 @@ Future<http.MultipartFile> _toMultipartFile(String field, PlatformFile file) asy
   }
   return http.MultipartFile.fromBytes(field, bytes, filename: file.name);
 }
-

@@ -3,48 +3,8 @@ import 'package:flutter/material.dart';
 import '../../constants/app_spacing.dart';
 import '../../constants/routes.dart';
 import '../../services/extraction_job_store.dart';
+import '../../utils/extraction_user_messages.dart';
 import 'confirm_dialog.dart';
-
-String _friendlyExtractionErrorMessage(ExtractionJobState job) {
-  final raw = (job.message ?? '').trim();
-  final body = (job.responseBody ?? '').trim();
-  final combined = '$raw\n$body'.toLowerCase();
-
-  if (combined.contains('std::bad_alloc') ||
-      combined.contains('out of memory') ||
-      combined.contains('memory')) {
-    return 'The file is too large or complex to process right now. '
-        'Try a smaller file, lower-quality PDF/image, or fewer pages.';
-  }
-  if (combined.contains('413') || combined.contains('exceeds max size')) {
-    return 'This file is too large to upload. Please choose a smaller file.';
-  }
-  if (combined.contains('timeout') ||
-      combined.contains('timed out') ||
-      combined.contains('connection')) {
-    return 'Connection issue while extracting. Please check internet and try again.';
-  }
-  if (combined.contains('service unavailable') ||
-      combined.contains('temporarily unavailable') ||
-      combined.contains('503') ||
-      combined.contains('resource_exhausted') ||
-      combined.contains('try again later')) {
-    return 'AI service is temporarily unavailable. Please try again shortly.';
-  }
-  if (combined.contains('500') ||
-      combined.contains('internal server error') ||
-      combined.contains('preprocess failed')) {
-    return 'We could not process this file. Please try again with a clearer file.';
-  }
-  if (combined.contains('400') ||
-      combined.contains('no file uploaded') ||
-      combined.contains('empty file')) {
-    return 'The selected file could not be read. Please choose another file.';
-  }
-
-  return 'Extraction failed. Please try again. '
-      '${raw.isNotEmpty ? '($raw)' : ''}'.trim();
-}
 
 class ExtractionProgressFloatingCard extends StatelessWidget {
   const ExtractionProgressFloatingCard({super.key});
@@ -72,7 +32,11 @@ class ExtractionProgressFloatingCard extends StatelessWidget {
           ExtractionJobStatus.success => job.hasWarnings
               ? (job.warningMessage ?? 'Tap for review')
               : 'Tap for review',
-          ExtractionJobStatus.failed => _friendlyExtractionErrorMessage(job),
+          ExtractionJobStatus.failed => friendlyExtractionErrorMessage(
+              technicalMessage: job.message,
+              responseBody: job.responseBody,
+              httpStatusCode: job.statusCode,
+            ),
         };
         final icon = switch (job.status) {
           ExtractionJobStatus.queued || ExtractionJobStatus.running => const SizedBox(

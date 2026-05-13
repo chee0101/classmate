@@ -457,10 +457,10 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
       return;
     }
 
-    final endpoint = switch (_type) {
-      AutoExtractType.academicCalendar => '/api/extract/academic-calendar',
-      AutoExtractType.timetable => '/api/extract/timetable',
-      AutoExtractType.task => '/api/extract/task',
+    final apiPath = switch (_type) {
+      AutoExtractType.academicCalendar => 'gemini/calendar',
+      AutoExtractType.timetable => 'gemini/timetable',
+      AutoExtractType.task => 'gemini/task',
     };
     final typeLabel = switch (_type) {
       AutoExtractType.academicCalendar => 'Academic calendar',
@@ -507,7 +507,7 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
     unawaited(
       startExtractionJob(
         apiBaseUrl: _apiBaseUrl,
-        endpoint: endpoint,
+        apiPath: apiPath,
         typeLabel: typeLabel,
         files: _selectedFiles,
         useMultiFilesField: true,

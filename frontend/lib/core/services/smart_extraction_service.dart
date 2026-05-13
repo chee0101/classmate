@@ -18,7 +18,7 @@ class SmartExtractionService {
     ).trim();
   }
 
-  Map<String, dynamic> _body(
+  Map<String, String> _fields(
     String text,
   ) {
     return {
@@ -30,88 +30,76 @@ class SmartExtractionService {
   }
 
   Future<Map<String, dynamic>?>
-      extractTask(
-    String text,
-  ) async {
+      _postMultipart({
+    required String endpoint,
+    required Map<String, String>
+    fields,
+  }) async {
     try {
-      final response = await http.post(
-        Uri.parse(
-          '$_apiBaseUrl/api/extract/task-text',
-        ),
-        headers: {
-          'Content-Type':
-              'application/json',
-        },
-        body: jsonEncode(
-          {
-            ..._body(text)
-          },
-        ),
-      );
+      final request =
+          http.MultipartRequest(
+            'POST',
+            Uri.parse(
+              '$_apiBaseUrl/api$endpoint',
+            ),
+          );
+
+      request.fields.addAll(fields);
+
+      final streamed =
+          await request.send();
+
+      final response =
+          await http.Response.fromStream(
+            streamed,
+          );
 
       if (response.statusCode != 200) {
         return null;
       }
 
-      return jsonDecode(response.body);
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        return null;
+      }
+      final status = (decoded['status'] as String?)?.trim().toLowerCase();
+      if (status != null && status.isNotEmpty && status != 'ok') {
+        return null;
+      }
+      return decoded;
+
     } catch (_) {
       return null;
     }
+  }
+
+  Future<Map<String, dynamic>?>
+      extractTask(
+    String text,
+  ) async {
+    return _postMultipart(
+      endpoint: '/gemini/task',
+      fields: _fields(text),
+    );
   }
 
   Future<Map<String, dynamic>?>
       extractClass(
     String text,
   ) async {
-    try {
-      final response = await http.post(
-        Uri.parse(
-          '$_apiBaseUrl/api/extract/timetable-text',
-        ),
-        headers: {
-          'Content-Type':
-              'application/json',
-        },
-        body: jsonEncode(
-          _body(text),
-        ),
-      );
-
-      if (response.statusCode != 200) {
-        return null;
-      }
-
-      return jsonDecode(response.body);
-    } catch (_) {
-      return null;
-    }
+    return _postMultipart(
+      endpoint: '/gemini/timetable',
+      fields: _fields(text),
+    );
   }
 
   Future<Map<String, dynamic>?>
       extractEvent(
     String text,
   ) async {
-    try {
-      final response = await http.post(
-        Uri.parse(
-          '$_apiBaseUrl/api/extract/event-text',
-        ),
-        headers: {
-          'Content-Type':
-              'application/json',
-        },
-        body: jsonEncode(
-          _body(text),
-        ),
-      );
-
-      if (response.statusCode != 200) {
-        return null;
-      }
-
-      return jsonDecode(response.body);
-    } catch (_) {
-      return null;
-    }
+    return _postMultipart(
+      endpoint: '/gemini/event',
+      fields: _fields(text),
+    );
   }
 }
