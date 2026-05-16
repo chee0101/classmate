@@ -5,11 +5,15 @@ import '../../core/constants/weekdays.dart';
 import '../../core/services/academic_session_store.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/models/class_type.dart';
+import '../../core/models/session_term_ref.dart';
+import '../../core/models/academic_session.dart';
 import '../../core/models/timetable_entry.dart';
 import '../../core/utils/course_display.dart';
 import '../../core/utils/date_time_format.dart';
 import '../../core/services/class_slot_store.dart';
 import '../../core/services/course_store.dart';
+import '../../core/services/session_term_selection_store.dart';
+import '../../core/utils/session_term_resolver.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/widgets/add/add_course_dialog.dart';
 import '../../core/widgets/add/class_form.dart';
@@ -34,9 +38,6 @@ class TimetablesScreen extends StatefulWidget {
 }
 
 class _TimetablesScreenState extends State<TimetablesScreen> {
-  String? _selectedSessionId;
-  String? _selectedTermId;
-
   _TimetableViewMode _viewMode = _TimetableViewMode.byDay;
 
   bool _sameTimetableSlot(TimetableSlot a, TimetableSlot b) {
@@ -99,343 +100,359 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Timetable'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () => Navigator.pop(context),
-        ),
-        actions: [
-          if (currentAcademicSessionNotifier.value != null)
-            IconButton(
-              tooltip: 'Import from file',
-              icon: const Icon(Icons.upload_file_outlined),
-              onPressed: () {
-                Navigator.of(context).pushNamed(
-                  AppRoutes.autoExtract,
-                  arguments: AutoExtractType.timetable,
-                );
-              },
-            ),
-        ],
-      ),
-      body: ValueListenableBuilder<List<AcademicSession>>(
-        valueListenable: academicSessionsNotifier,
-        builder: (context, sessionsList, _) {
-          final activeSession = currentAcademicSessionNotifier.value;
-          final sessions = <AcademicSession>[...sessionsList];
-          if (activeSession != null &&
-              !sessions.any((s) => s.id == activeSession.id)) {
-            sessions.add(activeSession);
-          }
-
-          if (sessions.isEmpty) {
-            return Center(
-              child: Padding(
-                padding: const EdgeInsets.all(AppSpacing.md),
-                child: EmptyStateCard(
-                  title: 'No academic session',
-                  subtitle:
-                      'Set up an academic session first to manage timetable slots',
-                  buttonText: 'Add session',
-                  icon: Icons.calendar_today_outlined,
-                  onPressed: () {
-                    AddNewBottomSheet.show(context);
-                  },
-                ),
-              ),
-            );
-          }
-
-          final refs = <({AcademicSession session, TermWindow term})>[];
-          for (final session in sessions) {
-            for (final term in buildTermWindows(session)) {
-              refs.add((session: session, term: term));
-            }
-          }
-
-          final now = DateTime.now();
-          var selectedRef = refs.first;
-          final current = refs.where(
-            (ref) =>
-                !now.isBefore(ref.term.start) && !now.isAfter(ref.term.end),
-          );
-          if (current.isNotEmpty) selectedRef = current.first;
-
-          final selectedSessionId =
-              _selectedSessionId ?? selectedRef.session.id;
-          final selectedTermId = _selectedTermId ?? selectedRef.term.id;
-          final exact = refs.where(
-            (ref) =>
-                ref.session.id == selectedSessionId &&
-                ref.term.id == selectedTermId,
-          );
-          if (exact.isNotEmpty) selectedRef = exact.first;
-
-          final selectedSession = selectedRef.session;
-          final selectedTerm = selectedRef.term;
-
-          return ValueListenableBuilder<List<TimetableEntry>>(
-            valueListenable: timetablesNotifier,
-            builder: (context, entries, _) {
-              final header = Padding(
-                padding: const EdgeInsets.only(
-                  top: 0,
-                  left: AppSpacing.md,
-                  right: AppSpacing.md,
-                  bottom: AppSpacing.sm,
-                ),
-                child: SessionHeader(
-                  sessions: sessions,
-                  selectedSessionId: selectedSession.id,
-                  selectedTermId: selectedTerm.id,
-                  onSelectionChanged: (sessionId, termId) {
-                    setState(() {
-                      _selectedSessionId = sessionId;
-                      _selectedTermId = termId;
-                    });
-                  },
-                ),
-              );
-
-              if (entries
-                  .where(
-                    (e) =>
-                        e.sessionId == selectedSession.id &&
-                        e.termId == selectedTerm.id,
-                  )
-                  .isEmpty) {
-                return Stack(
-                  children: [
-                    Column(
-                      children: [
-                        header,
-                        const Expanded(child: SizedBox()),
-                      ],
-                    ),
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.all(AppSpacing.md),
-                        child: EmptyStateCard(
-                          title: 'No timetable in ${selectedTerm.label}',
-                          subtitle:
-                              'Add class slots for courses in ${selectedSession.name}.',
-                          buttonText: 'Add timetable',
-                          icon: Icons.access_time_outlined,
-                          onPressed: () => _openEditor(
-                            selectedSession: selectedSession,
-                            selectedTerm: selectedTerm,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              }
-
-              return ValueListenableBuilder<List<Course>>(
-                valueListenable: coursesNotifier,
-                builder: (context, courses, _) {
-                  final termCourses = courses
-                      .where(
-                        (c) =>
-                            c.sessionId == selectedSession.id &&
-                            c.termId == selectedTerm.id,
-                      )
-                      .toList(growable: false);
-
-                  final filtered = entries
-                      .where(
-                        (e) =>
-                            e.sessionId == selectedSession.id &&
-                            e.termId == selectedTerm.id,
-                      )
-                      .toList(growable: false);
-
-                  final dayBuckets = <String, List<_DayCourseSlot>>{};
-                  for (final entry in filtered) {
-                    final color =
-                        displayCourseColorForTimetableEntry(entry, termCourses);
-                    final displayCode =
-                        displayCourseCodeForTimetableEntry(entry, termCourses);
-                    for (final slot in entry.slots) {
-                      dayBuckets
-                          .putIfAbsent(slot.day, () => <_DayCourseSlot>[])
-                          .add(
-                            _DayCourseSlot(
-                              courseCode: displayCode,
-                              entry: entry,
-                              slot: slot,
-                              courseColor: color,
-                            ),
-                          );
-                    }
-                  }
-
-                  return Column(
-                    children: [
-                      header,
-                      Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: AppSpacing.md,
-                          vertical: AppSpacing.sm,
-                        ),
-                        child: SizedBox(
-                          child: AnimatedSegmentedSwitch<_TimetableViewMode>(
-                            value: _viewMode,
-                            onChanged: (value) {
-                              setState(() {
-                                _viewMode = value;
-                              });
-                            },
-                            options: const [
-                              SegmentedSwitchOption<_TimetableViewMode>(
-                                value: _TimetableViewMode.byDay,
-                                label: 'By day',
-                              ),
-                              SegmentedSwitchOption<_TimetableViewMode>(
-                                value: _TimetableViewMode.byCourse,
-                                label: 'By course',
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.only(
-                          left: AppSpacing.md,
-                          right: AppSpacing.md,
-                          bottom: AppSpacing.xs,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.info_outline,
-                              size: 14,
-                              color: Colors.grey.shade600,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              'Tap a schedule to edit',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: Colors.grey.shade600,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: ListView.builder(
-                          padding: const EdgeInsets.only(
-                            left: AppSpacing.md,
-                            right: AppSpacing.md,
-                            bottom: AppSpacing.md,
-                          ),
-                          itemCount: _viewMode == _TimetableViewMode.byCourse
-                              ? filtered.length + 1
-                              : _sortedDays(dayBuckets.keys).length + 1,
-                          itemBuilder: (context, index) {
-                            final isLast = _viewMode ==
-                                    _TimetableViewMode.byCourse
-                                ? index == filtered.length
-                                : index == _sortedDays(dayBuckets.keys).length;
-                            if (isLast) {
-                              return Padding(
-                                padding:
-                                    const EdgeInsets.only(top: AppSpacing.md),
-                                child: SizedBox(
-                                  width: double.infinity,
-                                  child: OutlinedButton.icon(
-                                    onPressed: () => _openEditor(
-                                      selectedSession: selectedSession,
-                                      selectedTerm: selectedTerm,
-                                    ),
-                                    icon: const Icon(Icons.add),
-                                    label: const Text('Add schedule'),
-                                    style: OutlinedButton.styleFrom(
-                                      side: BorderSide(
-                                        color: Theme.of(context)
-                                            .colorScheme
-                                            .primary
-                                            .withValues(alpha: 0.45),
-                                      ),
-                                      padding: const EdgeInsets.symmetric(
-                                          vertical: 14),
-                                      shape: const StadiumBorder(),
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }
-
-                            if (_viewMode == _TimetableViewMode.byCourse) {
-                              final entry = filtered[index];
-                              final displayCode =
-                                  displayCourseCodeForTimetableEntry(
-                                entry,
-                                termCourses,
-                              );
-                              final courseColor =
-                                  displayCourseColorForTimetableEntry(
-                                entry,
-                                termCourses,
-                              );
-                              return TimetableCourseCard(
-                                courseCode: displayCode,
-                                slots: entry.slots,
-                                courseColor: courseColor,
-                                onTap: () => _openEditor(
-                                  selectedSession: selectedSession,
-                                  selectedTerm: selectedTerm,
-                                  initial: entry,
-                                ),
-                                onDelete: () {
-                                  showConfirmDeleteDialog(
-                                    context,
-                                    title: 'Delete schedule',
-                                    message:
-                                        'Delete classes for ${displayCourseCodeForTimetableEntry(entry, termCourses)}?',
-                                  ).then((confirmed) async {
-                                    if (!confirmed) return;
-                                    await deleteTimetableEntry(entry.id);
-                                  });
-                                },
-                              );
-                            }
-
-                            final sortedDayKeys = _sortedDays(dayBuckets.keys);
-                            final day = sortedDayKeys[index];
-                            final slots =
-                                dayBuckets[day] ?? const <_DayCourseSlot>[];
-                            return _TimetableDaySection(
-                              dayLabel: day,
-                              slots: slots,
-                              onEntryTap: (entry) => _openEditor(
-                                selectedSession: selectedSession,
-                                selectedTerm: selectedTerm,
-                                initial: entry,
-                              ),
-                              onSlotDelete: (item) =>
-                                  _confirmAndDeleteSingleSlot(
-                                entry: item.entry,
-                                slot: item.slot,
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
+        appBar: AppBar(
+          title: const Text('Timetable'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => Navigator.pop(context),
+          ),
+          actions: [
+            if (currentAcademicSessionNotifier.value != null)
+              IconButton(
+                tooltip: 'Import from file',
+                icon: const Icon(Icons.upload_file_outlined),
+                onPressed: () {
+                  Navigator.of(context).pushNamed(
+                    AppRoutes.autoExtract,
+                    arguments: AutoExtractType.timetable,
                   );
                 },
+              ),
+          ],
+        ),
+        body: ValueListenableBuilder<List<AcademicSession>>(
+          valueListenable: academicSessionsNotifier,
+          builder: (context, sessionsList, _) {
+            final activeSession = currentAcademicSessionNotifier.value;
+            final sessions = <AcademicSession>[...sessionsList];
+            if (activeSession != null &&
+                !sessions.any((s) => s.id == activeSession.id)) {
+              sessions.add(activeSession);
+            }
+
+            if (sessions.isEmpty) {
+              return Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(AppSpacing.md),
+                  child: EmptyStateCard(
+                    title: 'No academic session',
+                    subtitle:
+                        'Set up an academic session first to manage timetable slots',
+                    buttonText: 'Add session',
+                    icon: Icons.calendar_today_outlined,
+                    onPressed: () {
+                      AddNewBottomSheet.show(context);
+                    },
+                  ),
+                ),
               );
-            },
-          );
-        },
-      ),
-    );
+            }
+
+            final now = DateTime.now();
+            final allTermRefs = buildAllSessionTermRefs(sessions);
+            final resolvedDefaultRef =
+                resolveDefaultSessionTermRef(allTermRefs, now);
+
+            return ValueListenableBuilder<SessionTermSelection?>(
+              valueListenable: selectedSessionTermNotifier,
+              builder: (context, selection, _) {
+                String selectedSessionId =
+                    selection?.sessionId ?? resolvedDefaultRef.session.id;
+                String selectedTermId =
+                    selection?.termId ?? resolvedDefaultRef.term.id;
+
+                SessionTermRef selectedRef = resolvedDefaultRef;
+                for (final ref in allTermRefs) {
+                  if (ref.session.id == selectedSessionId &&
+                      ref.term.id == selectedTermId) {
+                    selectedRef = ref;
+                    break;
+                  }
+                }
+
+                selectedSessionId = selectedRef.session.id;
+                selectedTermId = selectedRef.term.id;
+                String semesterName =
+                    selectedTermId == 'sem1' ? 'Semester 1' : 'Semester 2';
+                final selectedSession = selectedRef.session;
+                final selectedTerm = selectedRef.term;
+
+                if (selection == null ||
+                    selection.sessionId != selectedSessionId ||
+                    selection.termId != selectedTermId) {
+                  setSelectedSessionTerm(
+                    sessionId: selectedSessionId,
+                    termId: selectedTermId,
+                  );
+                }
+                return ValueListenableBuilder<List<TimetableEntry>>(
+                  valueListenable: timetablesNotifier,
+                  builder: (context, entries, _) {
+                    final header = Padding(
+                      padding: const EdgeInsets.only(
+                        top: 0,
+                        left: AppSpacing.md,
+                        right: AppSpacing.md,
+                        bottom: AppSpacing.sm,
+                      ),
+                      child: SessionHeader(
+                        sessions: sessions,
+                        selectedSessionId: selectedSessionId,
+                        selectedTermId: selectedTermId,
+                        onSelectionChanged: (sessionId, termId) {
+                          setSelectedSessionTerm(
+                            sessionId: sessionId,
+                            termId: termId,
+                          );
+                        },
+                      ),
+                    );
+
+                    if (entries
+                        .where(
+                          (e) =>
+                              e.sessionId == selectedSessionId &&
+                              e.termId == selectedTermId,
+                        )
+                        .isEmpty) {
+                      return Stack(
+                        children: [
+                          Column(
+                            children: [
+                              header,
+                              const Expanded(child: SizedBox()),
+                            ],
+                          ),
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.all(AppSpacing.md),
+                              child: EmptyStateCard(
+                                title: 'No timetable added',
+                                subtitle:
+                                    'Add class slots for courses in Academic Session ${activeSession?.name} $semesterName.',
+                                buttonText: 'Add timetable',
+                                icon: Icons.access_time_outlined,
+                                onPressed: () => _openEditor(
+                                  selectedSession: selectedSession,
+                                  selectedTerm: selectedTerm,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      );
+                    }
+
+                    return ValueListenableBuilder<List<Course>>(
+                      valueListenable: coursesNotifier,
+                      builder: (context, courses, _) {
+                        final termCourses = courses
+                            .where(
+                              (c) =>
+                                  c.sessionId == selectedSessionId &&
+                                  c.termId == selectedTermId,
+                            )
+                            .toList(growable: false);
+
+                        final filtered = entries
+                            .where(
+                              (e) =>
+                                  e.sessionId == selectedSessionId &&
+                                  e.termId == selectedTermId,
+                            )
+                            .toList(growable: false);
+
+                        final dayBuckets = <String, List<_DayCourseSlot>>{};
+                        for (final entry in filtered) {
+                          final color = displayCourseColorForTimetableEntry(
+                              entry, termCourses);
+                          final displayCode =
+                              displayCourseCodeForTimetableEntry(
+                                  entry, termCourses);
+                          for (final slot in entry.slots) {
+                            dayBuckets
+                                .putIfAbsent(slot.day, () => <_DayCourseSlot>[])
+                                .add(
+                                  _DayCourseSlot(
+                                    courseCode: displayCode,
+                                    entry: entry,
+                                    slot: slot,
+                                    courseColor: color,
+                                  ),
+                                );
+                          }
+                        }
+
+                        return Column(
+                          children: [
+                            header,
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: AppSpacing.md,
+                                vertical: AppSpacing.sm,
+                              ),
+                              child: SizedBox(
+                                child:
+                                    AnimatedSegmentedSwitch<_TimetableViewMode>(
+                                  value: _viewMode,
+                                  onChanged: (value) {
+                                    setState(() {
+                                      _viewMode = value;
+                                    });
+                                  },
+                                  options: const [
+                                    SegmentedSwitchOption<_TimetableViewMode>(
+                                      value: _TimetableViewMode.byDay,
+                                      label: 'By day',
+                                    ),
+                                    SegmentedSwitchOption<_TimetableViewMode>(
+                                      value: _TimetableViewMode.byCourse,
+                                      label: 'By course',
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            Padding(
+                              padding: const EdgeInsets.only(
+                                left: AppSpacing.md,
+                                right: AppSpacing.md,
+                                bottom: AppSpacing.xs,
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.info_outline,
+                                    size: 14,
+                                    color: Colors.grey.shade600,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Tap a schedule to edit',
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodySmall
+                                        ?.copyWith(
+                                          color: Colors.grey.shade600,
+                                        ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Expanded(
+                              child: ListView.builder(
+                                padding: const EdgeInsets.only(
+                                  left: AppSpacing.md,
+                                  right: AppSpacing.md,
+                                  bottom: AppSpacing.md,
+                                ),
+                                itemCount: _viewMode ==
+                                        _TimetableViewMode.byCourse
+                                    ? filtered.length + 1
+                                    : _sortedDays(dayBuckets.keys).length + 1,
+                                itemBuilder: (context, index) {
+                                  final isLast = _viewMode ==
+                                          _TimetableViewMode.byCourse
+                                      ? index == filtered.length
+                                      : index ==
+                                          _sortedDays(dayBuckets.keys).length;
+                                  if (isLast) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(
+                                          top: AppSpacing.md),
+                                      child: SizedBox(
+                                        width: double.infinity,
+                                        child: OutlinedButton.icon(
+                                          onPressed: () => _openEditor(
+                                            selectedSession: selectedSession,
+                                            selectedTerm: selectedTerm,
+                                          ),
+                                          icon: const Icon(Icons.add),
+                                          label: const Text('Add schedule'),
+                                          style: OutlinedButton.styleFrom(
+                                            side: BorderSide(
+                                              color: Theme.of(context)
+                                                  .colorScheme
+                                                  .primary
+                                                  .withValues(alpha: 0.45),
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                                vertical: 14),
+                                            shape: const StadiumBorder(),
+                                          ),
+                                        ),
+                                      ),
+                                    );
+                                  }
+
+                                  if (_viewMode ==
+                                      _TimetableViewMode.byCourse) {
+                                    final entry = filtered[index];
+                                    final displayCode =
+                                        displayCourseCodeForTimetableEntry(
+                                      entry,
+                                      termCourses,
+                                    );
+                                    final courseColor =
+                                        displayCourseColorForTimetableEntry(
+                                      entry,
+                                      termCourses,
+                                    );
+                                    return TimetableCourseCard(
+                                      courseCode: displayCode,
+                                      slots: entry.slots,
+                                      courseColor: courseColor,
+                                      onTap: () => _openEditor(
+                                        selectedSession: selectedSession,
+                                        selectedTerm: selectedTerm,
+                                        initial: entry,
+                                      ),
+                                      onDelete: () {
+                                        showConfirmDeleteDialog(
+                                          context,
+                                          title: 'Delete schedule',
+                                          message:
+                                              'Delete classes for ${displayCourseCodeForTimetableEntry(entry, termCourses)}?',
+                                        ).then((confirmed) async {
+                                          if (!confirmed) return;
+                                          await deleteTimetableEntry(entry.id);
+                                        });
+                                      },
+                                    );
+                                  }
+
+                                  final sortedDayKeys =
+                                      _sortedDays(dayBuckets.keys);
+                                  final day = sortedDayKeys[index];
+                                  final slots = dayBuckets[day] ??
+                                      const <_DayCourseSlot>[];
+                                  return _TimetableDaySection(
+                                    dayLabel: day,
+                                    slots: slots,
+                                    onEntryTap: (entry) => _openEditor(
+                                      selectedSession: selectedSession,
+                                      selectedTerm: selectedTerm,
+                                      initial: entry,
+                                    ),
+                                    onSlotDelete: (item) =>
+                                        _confirmAndDeleteSingleSlot(
+                                      entry: item.entry,
+                                      slot: item.slot,
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        );
+                      },
+                    );
+                  },
+                );
+              },
+            );
+          },
+        ));
   }
 
   Future<void> _openEditor({
