@@ -46,9 +46,11 @@ class AutoExtractScreen extends StatefulWidget {
   const AutoExtractScreen({
     super.key,
     this.initialType,
+    this.sessionOnly = false,
   });
 
   final AutoExtractType? initialType;
+  final bool sessionOnly;
 
   @override
   State<AutoExtractScreen> createState() => _AutoExtractScreenState();
@@ -265,7 +267,13 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
   @override
   void initState() {
     super.initState();
-    _type = widget.initialType ?? AutoExtractType.academicCalendar;
+    if (widget.sessionOnly) {
+      // Force it to upload and academic calendar if sessionOnly is true
+      _type = AutoExtractType.academicCalendar;
+      _inputSource = ExtractInputSource.upload;
+    } else {
+      _type = widget.initialType ?? AutoExtractType.academicCalendar;
+    }
   }
 
   @override
@@ -279,6 +287,9 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
     if (_inputSource == ExtractInputSource.upload) {
       switch (_type) {
         case AutoExtractType.academicCalendar:
+          if (widget.sessionOnly) {
+            return 'No academic session found. Please set up an academic session to extract timetables.';
+          }
           return 'Upload academic calendar documents or screenshots.';
 
         case AutoExtractType.timetable:
@@ -545,51 +556,62 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'Input Method',
-                    style: textTheme.titleSmall,
-                  ),
-                  const SizedBox(
-                    height: AppSpacing.sm,
-                  ),
-                  AnimatedSegmentedSwitch<ExtractInputSource>(
-                    options: const [
-                      SegmentedSwitchOption(
-                        value: ExtractInputSource.upload,
-                        label: 'Upload',
-                      ),
-                      SegmentedSwitchOption(
-                        value: ExtractInputSource.text,
-                        label: 'Text',
-                      ),
-                    ],
-                    value: _inputSource,
-                    onChanged: (value) {
-                      setState(() {
-                        _inputSource = value;
-                      });
-                    },
-                  ),
+                  if (widget.sessionOnly) ...[
+                    Text(
+                      'Session Setup',
+                      style: textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                  ],
+                  if (!widget.sessionOnly) ...[
+                    Text(
+                      'Input Method',
+                      style: textTheme.titleSmall,
+                    ),
+                    const SizedBox(
+                      height: AppSpacing.sm,
+                    ),
+                    AnimatedSegmentedSwitch<ExtractInputSource>(
+                      options: const [
+                        SegmentedSwitchOption(
+                          value: ExtractInputSource.upload,
+                          label: 'Upload',
+                        ),
+                        SegmentedSwitchOption(
+                          value: ExtractInputSource.text,
+                          label: 'Text',
+                        ),
+                      ],
+                      value: _inputSource,
+                      onChanged: (value) {
+                        setState(() {
+                          _inputSource = value;
+                        });
+                      },
+                    ),
+                  ],
                   Text(
                     _dynamicDescription,
                     style: textTheme.bodyMedium?.copyWith(
                       color: Theme.of(context).colorScheme.primary,
                     ),
                   ),
+                  if (!widget.sessionOnly) ...[
                   const SizedBox(height: AppSpacing.sm),
-                  _inputSource == ExtractInputSource.upload
-                      ? _ExtractTypeTabs(
-                          value: _type,
-                          onChanged: _isAnalyzing ? null : _handleTypeChanged,
-                        )
-                      : _TextExtractTypeTabs(
-                          selected: _textExtractType,
-                          onChanged: (value) {
-                            setState(() {
-                              _textExtractType = value;
-                            });
-                          },
-                        ),
+                    _inputSource == ExtractInputSource.upload
+                        ? _ExtractTypeTabs(
+                            value: _type,
+                            onChanged: _isAnalyzing ? null : _handleTypeChanged,
+                          )
+                        : _TextExtractTypeTabs(
+                            selected: _textExtractType,
+                            onChanged: (value) {
+                              setState(() {
+                                _textExtractType = value;
+                              });
+                            },
+                          ),
+                  ],
                   if (_inputSource == ExtractInputSource.upload &&
                       _type == AutoExtractType.timetable) ...[
                     const SizedBox(height: AppSpacing.md),

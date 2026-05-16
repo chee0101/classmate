@@ -22,7 +22,7 @@ import '../../core/utils/session_term_resolver.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/models/session_term_ref.dart';
 import '../../core/utils/day_bounds_utils.dart';
-import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
+import '../../core/widgets/common/add_new_bottom_sheet.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/common/session_term_context_label.dart';
 import '../../core/widgets/schedule/class_slot_sheet.dart';
@@ -79,7 +79,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   padding: const EdgeInsets.all(AppSpacing.md),
                   child: EmptyStateCard(
                     onPressed: () {
-                      AcademicSessionSetupBottomSheet.show(context);
+                      AddNewBottomSheet.show(context);
                     },
                   ),
                 ),

@@ -13,7 +13,7 @@ import '../../core/services/course_store.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/widgets/add/add_course_dialog.dart';
 import '../../core/widgets/add/class_form.dart';
-import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
+import '../../core/widgets/common/add_new_bottom_sheet.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/home/session_header.dart';
 import '../../core/widgets/schedule/class_slot_sheet.dart';
@@ -106,16 +106,17 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          IconButton(
-            tooltip: 'Import from file',
-            icon: const Icon(Icons.upload_file_outlined),
-            onPressed: () {
-              Navigator.of(context).pushNamed(
-                AppRoutes.autoExtract,
-                arguments: AutoExtractType.timetable,
-              );
-            },
-          ),
+          if (currentAcademicSessionNotifier.value != null)
+            IconButton(
+              tooltip: 'Import from file',
+              icon: const Icon(Icons.upload_file_outlined),
+              onPressed: () {
+                Navigator.of(context).pushNamed(
+                  AppRoutes.autoExtract,
+                  arguments: AutoExtractType.timetable,
+                );
+              },
+            ),
         ],
       ),
       body: ValueListenableBuilder<List<AcademicSession>>(
@@ -139,7 +140,7 @@ class _TimetablesScreenState extends State<TimetablesScreen> {
                   buttonText: 'Add session',
                   icon: Icons.calendar_today_outlined,
                   onPressed: () {
-                    AcademicSessionSetupBottomSheet.show(context);
+                    AddNewBottomSheet.show(context);
                   },
                 ),
               ),

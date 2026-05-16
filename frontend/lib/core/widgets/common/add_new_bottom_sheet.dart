@@ -4,15 +4,12 @@ import '../../constants/app_spacing.dart';
 import '../../constants/routes.dart';
 import '../../services/academic_session_store.dart';
 import 'academic_session_setup_bottom_sheet.dart';
+import '../../../screens/extract/auto_extract_screen.dart';
 
 class AddNewBottomSheet extends StatelessWidget {
   const AddNewBottomSheet({super.key});
 
   static void show(BuildContext context) {
-    if (!hasAcademicSession()) {
-      AcademicSessionSetupBottomSheet.show(context);
-      return;
-    }
 
     showModalBottomSheet(
       context: context,
@@ -25,6 +22,7 @@ class AddNewBottomSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final bool noSession = !hasAcademicSession();
 
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -67,7 +65,17 @@ class AddNewBottomSheet extends StatelessWidget {
                   subtitle: 'Upload files or describe naturally',
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.pushNamed(context, AppRoutes.autoExtract);
+                    if (noSession) {
+                      // Navigate directly to constrained AutoExtractScreen
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AutoExtractScreen(sessionOnly: true),
+                        ),
+                      );
+                    } else {
+                      Navigator.pushNamed(context, AppRoutes.autoExtract);
+                    }
                   },
                 ),
               ),
@@ -79,7 +87,12 @@ class AddNewBottomSheet extends StatelessWidget {
                   subtitle: 'Enter details manually',
                   onTap: () {
                     Navigator.pop(context);
-                    Navigator.pushNamed(context, AppRoutes.addNew);
+                    if (noSession) {
+                      // Open manual session setup bottom sheet
+                      AcademicSessionSetupBottomSheet.show(context);
+                    } else {
+                      Navigator.pushNamed(context, AppRoutes.addNew);
+                    }
                   },
                 ),
               ),

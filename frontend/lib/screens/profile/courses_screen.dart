@@ -5,7 +5,7 @@ import '../../core/services/academic_session_store.dart';
 import '../../core/services/course_store.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/widgets/add/add_course_dialog.dart';
-import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
+import '../../core/widgets/common/add_new_bottom_sheet.dart';
 import '../../core/widgets/common/confirm_dialog.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/home/session_header.dart';
@@ -52,7 +52,7 @@ class _CoursesScreenState extends State<CoursesScreen> {
                   buttonText: 'Add session',
                   icon: Icons.calendar_today_outlined,
                   onPressed: () {
-                    AcademicSessionSetupBottomSheet.show(context);
+                    AddNewBottomSheet.show(context);
                   },
                 ),
               ),

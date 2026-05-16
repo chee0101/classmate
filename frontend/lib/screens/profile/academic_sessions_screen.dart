@@ -11,6 +11,7 @@ import '../../core/widgets/common/confirm_dialog.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/common/label_chip.dart';
 import '../../core/widgets/common/white_card.dart';
+import '../../core/widgets/common/add_new_bottom_sheet.dart';
 
 class AcademicSessionsScreen extends StatefulWidget {
   const AcademicSessionsScreen({super.key});
@@ -52,8 +53,7 @@ class _AcademicSessionsScreenState extends State<AcademicSessionsScreen> {
                   buttonText: 'Add Session',
                   icon: Icons.calendar_today_outlined,
                   onPressed: () {
-                    AcademicSessionSetupBottomSheet.show(context,
-                        title: 'Add New Academic Session');
+                    AddNewBottomSheet.show(context);
                   },
                 ),
               ),

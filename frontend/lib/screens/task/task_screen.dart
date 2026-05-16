@@ -13,7 +13,7 @@ import '../../core/services/task_store.dart';
 import '../../core/utils/course_display.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/utils/task_utils.dart';
-import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
+import '../../core/widgets/common/add_new_bottom_sheet.dart';
 import '../../core/widgets/common/animated_segmented_switch.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/common/session_term_context_label.dart';
@@ -181,7 +181,7 @@ class _TaskScreenState extends State<TaskScreen> {
                 padding: const EdgeInsets.all(AppSpacing.md),
                 child: EmptyStateCard(
                   onPressed: () {
-                    AcademicSessionSetupBottomSheet.show(context);
+                    AddNewBottomSheet.show(context);
                   },
                   subtitle:
                       'Add your academic calendar to begin tracking tasks in your semester.',

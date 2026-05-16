@@ -12,7 +12,7 @@ import '../../core/services/class_slot_store.dart';
 import '../../core/services/course_store.dart';
 import '../../core/services/task_store.dart';
 import '../../core/utils/term_windows.dart';
-import '../../core/widgets/common/academic_session_setup_bottom_sheet.dart';
+import '../../core/widgets/common/add_new_bottom_sheet.dart';
 import '../../core/widgets/common/animated_segmented_switch.dart';
 import '../../core/widgets/common/empty_state_card.dart';
 import '../../core/widgets/common/form_fields.dart';
@@ -441,7 +441,7 @@ class _AddNewScreenState extends State<AddNewScreen> {
                   'Set up your academic session first before adding task, class, or event.',
               buttonText: 'Set up session',
               onPressed: () {
-                AcademicSessionSetupBottomSheet.show(context);
+                AddNewBottomSheet.show(context);
               },
             ),
           ),
