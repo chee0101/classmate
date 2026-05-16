@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import tempfile
+from datetime import datetime
 
 from fastapi import (
     APIRouter,
@@ -19,6 +20,7 @@ from app.services.extraction.gemini_service import (
     extract_task_with_gemini,
     extract_timetable_with_gemini,
 )
+from app.services.extraction.session_helper import _assign_term_id_to_event, _build_term_windows
 
 router = APIRouter()
 
@@ -213,6 +215,63 @@ async def extract_calendar_route(
                 in payload.events
             ]
 
+        # assume `payload` is GeminiFullCalendarPayload and `calendar_events` is list of event dicts (title/start/end)
+        session_name = None
+        sess_start = payload.session_start
+        sess_end = payload.session_end
+
+        terms = []
+        if sess_start and sess_end:
+            terms = _build_term_windows(sess_start, sess_end)
+
+        # Build event dicts with ISO datetimes and term_id
+        events_out = []
+        for e in calendar_events:
+            # e should contain e['title'], e['start_date'] / 'start_datetime', etc.
+            # convert date -> datetime at start of day; adapt if you already have datetimes
+            start_dt = e.get("start_datetime") or e.get("start_date")
+            end_dt = e.get("end_datetime") or e.get("end_date")
+            # parse to datetime if strings:
+            if isinstance(start_dt, str):
+                start_dt_parsed = datetime.fromisoformat(start_dt)
+            else:
+                start_dt_parsed = start_dt
+            if isinstance(end_dt, str):
+                end_dt_parsed = datetime.fromisoformat(end_dt)
+            else:
+                end_dt_parsed = end_dt
+
+            term_id = _assign_term_id_to_event(start_dt_parsed, end_dt_parsed, terms) if terms else (terms[0]["id"] if terms else "sem1")
+
+            events_out.append({
+                "title": e.get("title"),
+                "location": e.get("location"),
+                "start_datetime": start_dt_parsed.isoformat() if start_dt_parsed else None,
+                "end_datetime": end_dt_parsed.isoformat() if end_dt_parsed else None,
+                "all_day": e.get("all_day", True),
+                "hide_classes_during_event": e.get("hide_classes_during_event", True),
+                "is_academic_break": e.get("is_academic_break", False),
+                "term_id": term_id,
+            })
+
+        # Finally set extraction_result:
+        extraction_result = {
+            "kind": "calendar",
+            "confidence": 0.9,
+            "academic_session": {
+                "name": session_name or "",
+                "start_date": sess_start.isoformat() if sess_start else None,
+                "end_date": sess_end.isoformat() if sess_end else None,
+                "terms": terms,            # list of {id,label,start_date,end_date}
+                "is_current": None,
+                "events": events_out,
+            },
+            "assignment": None,
+            "tasks": [],
+            "timetable": None,
+            "notes": "source=file_upload",
+        }
+
         return {
 
             "document_kind":
@@ -230,70 +289,7 @@ async def extract_calendar_route(
             "remark_text_for_gemini":
                 "",
 
-            "extraction": {
-
-                "kind":
-                    "calendar",
-
-                "confidence":
-                    0.9,
-
-                "academic_session": {
-
-                    "session_name":
-                        (
-                            payload
-                            .session_name
-                            if payload
-                            else None
-                        ),
-
-                    "session_start":
-                        (
-                            payload
-                            .session_start
-                            .isoformat()
-                            if (
-                                payload
-                                and payload
-                                .session_start
-                            )
-                            else None
-                        ),
-
-                    "session_end":
-                        (
-                            payload
-                            .session_end
-                            .isoformat()
-                            if (
-                                payload
-                                and payload
-                                .session_end
-                            )
-                            else None
-                        ),
-
-                    "events":
-                        calendar_events,
-                },
-
-                "assignment":
-                    None,
-
-                "tasks":
-                    [],
-
-                "timetable":
-                    None,
-
-                "notes":
-                    (
-                        "source=text_input"
-                        if text
-                        else "source=file_upload"
-                    ),
-            },
+            "extraction": extraction_result,
 
             "warnings": (
                 []

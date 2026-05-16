@@ -479,7 +479,7 @@ async def extract_full_academic_calendar_with_gemini(
 
       Schema:
       {
-        "session_name": string|null,
+        "session_name": null,
         "session_start": "YYYY-MM-DD"|null,
         "session_end": "YYYY-MM-DD"|null,
         "events": [

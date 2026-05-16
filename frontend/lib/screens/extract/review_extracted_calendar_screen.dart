@@ -363,17 +363,22 @@ class _ReviewExtractedCalendarScreenState
   }
 
   Future<void> _saveCalendar() async {
-    if (_parsed == null || _terms.isEmpty) return;
+    if (_parsed == null) return;
     setState(() => _saving = true);
     try {
-      final earliest =
-          _terms.map((t) => t.start).reduce((a, b) => a.isBefore(b) ? a : b);
-      final latest =
-          _terms.map((t) => t.end).reduce((a, b) => a.isAfter(b) ? a : b);
+      final earliest = _terms.isNotEmpty
+          ? _terms.map((t) => t.start).reduce((a, b) => a.isBefore(b) ? a : b)
+          : _parsed!.sessionStart;
+      final latest = _terms.isNotEmpty
+          ? _terms.map((t) => t.end).reduce((a, b) => a.isAfter(b) ? a : b)
+          : _parsed!.sessionEnd;
 
+      final parsedName = _parsed!.sessionName.trim();
       final session = AcademicSession(
         id: DateTime.now().microsecondsSinceEpoch.toString(),
-        name: _parsed!.sessionName,
+        name: parsedName.isNotEmpty
+            ? parsedName
+            : '${earliest.year}/${latest.year}',
         startDate: startOfDay(earliest),
         endDate: endOfDayInclusive(latest),
         terms: _terms,
