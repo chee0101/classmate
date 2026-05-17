@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/utils/date_time_format.dart';
 import '../../core/constants/app_spacing.dart';
+import '../../core/constants/routes.dart';
+import '../extract/auto_extract_screen.dart';
 import '../../core/services/academic_session_store.dart';
 import '../../core/models/academic_session.dart';
 import '../../core/utils/term_windows.dart';
@@ -34,6 +36,19 @@ class _AcademicSessionsScreenState extends State<AcademicSessionsScreen> {
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
         ),
+        actions: [
+          if (currentAcademicSessionNotifier.value != null)
+            IconButton(
+              tooltip: 'Import from file',
+              icon: const Icon(Icons.upload_file_outlined),
+              onPressed: () {
+                Navigator.of(context).pushNamed(
+                  AppRoutes.autoExtract,
+                  arguments: AutoExtractType.academicCalendar,
+                );
+              },
+            ),
+        ],
       ),
       body: ValueListenableBuilder<List<AcademicSession>>(
         valueListenable: academicSessionsNotifier,
@@ -68,8 +83,8 @@ class _AcademicSessionsScreenState extends State<AcademicSessionsScreen> {
           // Find session where today is within a term window
           for (final session in sessions) {
             final termWindows = buildTermWindows(session);
-            final isCurrent = termWindows.any((term) =>
-                !now.isBefore(term.start) && !now.isAfter(term.end));
+            final isCurrent = termWindows.any(
+                (term) => !now.isBefore(term.start) && !now.isAfter(term.end));
             if (isCurrent) {
               currentSessionId = session.id;
               break;
@@ -98,7 +113,8 @@ class _AcademicSessionsScreenState extends State<AcademicSessionsScreen> {
           }
 
           return ListView.builder(
-            padding: const EdgeInsets.fromLTRB(AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
+            padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
             itemCount: sessions.length,
             itemBuilder: (context, index) {
               final session = sessions[index];
@@ -193,107 +209,107 @@ class _AcademicSessionsScreenState extends State<AcademicSessionsScreen> {
                           _expandedSessions[session.id] = expanded;
                         });
                       },
-                        children: termWindows.asMap().entries.map((entry) {
-                          final index = entry.key;
-                          final term = entry.value;
-                          final now = DateTime.now();
-                          final isCurrent =
-                              !now.isBefore(term.start) && !now.isAfter(term.end);
-                          final isFirst = index == 0;
-                          final isLast = index == termWindows.length - 1;
+                      children: termWindows.asMap().entries.map((entry) {
+                        final index = entry.key;
+                        final term = entry.value;
+                        final now = DateTime.now();
+                        final isCurrent =
+                            !now.isBefore(term.start) && !now.isAfter(term.end);
+                        final isFirst = index == 0;
+                        final isLast = index == termWindows.length - 1;
 
-                          return Padding(
-                            padding: EdgeInsets.only(
-                              left: AppSpacing.lg,
-                              right: AppSpacing.lg,
-                            ),
-                            child: Row(
-                              crossAxisAlignment: isFirst
-                                  ? CrossAxisAlignment.end
-                                  : CrossAxisAlignment.start,
-                              children: [
-                                // Timeline column with bullet and connecting line
-                                Column(
-                                    mainAxisSize: MainAxisSize.min,
-                                    crossAxisAlignment: CrossAxisAlignment.center,
-                                    children: [
-                                      // Connecting line (dotted) - above the circle for second item
-                                      if (!isFirst)
-                                        Container(
-                                          width: 2,
-                                          margin: const EdgeInsets.only(bottom: 0),
-                                          child: SizedBox(
-                                            height: 17,
-                                            child: CustomPaint(
-                                              painter: _DottedLinePainter(),
-                                            ),
-                                          ),
-                                        ),
-                                      // Timeline bullet point
-                                      Container(
-                                        width: 12,
-                                        height: 12,
-                                        decoration: BoxDecoration(
-                                          shape: BoxShape.circle,
-                                          color: isCurrent
-                                              ? appPrimarySwatch.shade700
-                                              : Colors.transparent,
-                                          border: Border.all(
-                                            color: isCurrent
-                                                ? appPrimarySwatch.shade700
-                                                : Colors.grey.shade400,
-                                            width: 2,
-                                          ),
+                        return Padding(
+                          padding: EdgeInsets.only(
+                            left: AppSpacing.lg,
+                            right: AppSpacing.lg,
+                          ),
+                          child: Row(
+                            crossAxisAlignment: isFirst
+                                ? CrossAxisAlignment.end
+                                : CrossAxisAlignment.start,
+                            children: [
+                              // Timeline column with bullet and connecting line
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // Connecting line (dotted) - above the circle for second item
+                                  if (!isFirst)
+                                    Container(
+                                      width: 2,
+                                      margin: const EdgeInsets.only(bottom: 0),
+                                      child: SizedBox(
+                                        height: 17,
+                                        child: CustomPaint(
+                                          painter: _DottedLinePainter(),
                                         ),
                                       ),
-                                      // Connecting line (dotted) - below the circle for first item
-                                      if (!isLast)
-                                        Container(
-                                          width: 2,
-                                          margin: const EdgeInsets.only(top: 0),
-                                          child: SizedBox(
-                                            height: 33,
-                                            child: CustomPaint(
-                                              painter: _DottedLinePainter(),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
                                     ),
-                               const SizedBox(width: AppSpacing.md),
-                               Expanded(
-                                 child: Column(
-                                   crossAxisAlignment: CrossAxisAlignment.start,
-                                   mainAxisSize: MainAxisSize.min,
-                                   children: [
-                                     Text(
-                                       term.label,
-                                       style: textTheme.bodyLarge?.copyWith(
-                                         fontWeight: isCurrent
-                                             ? FontWeight.w700
-                                             : FontWeight.w400,
-                                         color: isCurrent
-                                             ? Colors.black87
-                                             : Colors.grey.shade600,
-                                       ),
-                                     ),
-                                     const SizedBox(height: 4),
-                                     Text(
-                                       '${_formatDate(term.start)} – ${_formatDate(term.end)}',
-                                       style: textTheme.bodyMedium?.copyWith(
-                                         color: isCurrent
-                                             ? appPrimarySwatch.shade600
-                                             : Colors.grey.shade500,
-                                       ),
-                                     ),
-                                     const SizedBox(height: AppSpacing.md),
-                                   ],
-                                 ),
-                               ),
-                             ],
+                                  // Timeline bullet point
+                                  Container(
+                                    width: 12,
+                                    height: 12,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: isCurrent
+                                          ? appPrimarySwatch.shade700
+                                          : Colors.transparent,
+                                      border: Border.all(
+                                        color: isCurrent
+                                            ? appPrimarySwatch.shade700
+                                            : Colors.grey.shade400,
+                                        width: 2,
+                                      ),
+                                    ),
+                                  ),
+                                  // Connecting line (dotted) - below the circle for first item
+                                  if (!isLast)
+                                    Container(
+                                      width: 2,
+                                      margin: const EdgeInsets.only(top: 0),
+                                      child: SizedBox(
+                                        height: 33,
+                                        child: CustomPaint(
+                                          painter: _DottedLinePainter(),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(width: AppSpacing.md),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      term.label,
+                                      style: textTheme.bodyLarge?.copyWith(
+                                        fontWeight: isCurrent
+                                            ? FontWeight.w700
+                                            : FontWeight.w400,
+                                        color: isCurrent
+                                            ? Colors.black87
+                                            : Colors.grey.shade600,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      '${_formatDate(term.start)} – ${_formatDate(term.end)}',
+                                      style: textTheme.bodyMedium?.copyWith(
+                                        color: isCurrent
+                                            ? appPrimarySwatch.shade600
+                                            : Colors.grey.shade500,
+                                      ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.md),
+                                  ],
+                                ),
+                              ),
+                            ],
                           ),
                         );
-                       }).toList(),
+                      }).toList(),
                     ),
                   ),
                 ),
@@ -354,4 +370,3 @@ class _DottedLinePainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
-
