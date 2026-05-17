@@ -918,9 +918,10 @@ Schema:
     {
       "title":"string",
       "location":"string|null",
-      "start_datetime":"YYYY-MM-DDTHH:MM:SS|null",
-      "end_datetime":"YYYY-MM-DDTHH:MM:SS|null",
+      "start_datetime":"YYYY-MM-DDTHH:MM:SS",
+      "end_datetime":"YYYY-MM-DDTHH:MM:SS",
       "all_day":false
+      "hide_classes_during_event":true
     }
   ]
 }
@@ -934,6 +935,16 @@ Rules:
 - hackathons
 - competitions
 - student events
+- start_datetime and end_datetime MUST NEVER be null.
+- If exact time is unknown but a date is known:
+          assume an all-day event.
+
+        - If only date exists:
+          set all_day=true.
+- If only start time exists:
+          infer a reasonable end time.
+- Convert titles into proper letter casing.
+- Extract events even if they are written casually, briefly, or without punctuation.
 
 - Return ONLY valid JSON.
 """

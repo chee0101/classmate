@@ -160,6 +160,14 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
           );
         }
 
+        final selection = _resolvedSessionTermSelection();
+
+        if (selection == null) {
+          throw Exception(
+            'Please select a valid session and term first.',
+          );
+        }
+
         if (!mounted) return;
 
         await Navigator.push(

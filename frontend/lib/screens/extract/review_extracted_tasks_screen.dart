@@ -10,6 +10,7 @@ import '../../core/services/course_store.dart';
 import '../../core/services/extraction_job_store.dart';
 import '../../core/services/session_term_selection_store.dart';
 import '../../core/services/task_store.dart';
+import '../../core/utils/term_windows.dart';
 import '../../core/utils/date_time_format.dart';
 import '../../core/utils/task_extraction_json.dart';
 import '../../core/widgets/common/confirm_dialog.dart';
@@ -42,6 +43,65 @@ class _ReviewExtractedTasksScreenState
   final Map<int, Set<int>> _selectedSubtaskIndexesByTask = <int, Set<int>>{};
   bool _showSaveBarShadow = false;
   bool _saving = false;
+
+  TermWindow? get _selectedTermWindow {
+    final selection = selectedSessionTermNotifier.value;
+    if (selection == null) return null;
+    final session = _selectedSession;
+    if (session == null) return null;
+    final windows = buildTermWindows(session);
+    for (final w in windows) {
+      if (w.id == selection.termId) return w;
+    }
+    return null;
+  }
+
+  bool _isWithinSelectedTerm(DateTime? date) {
+    if (date == null) return true; // Let it pass if no date (fallback handles it)
+    final term = _selectedTermWindow;
+    if (term == null) return true;
+    return !date.isBefore(term.start) && !date.isAfter(term.end);
+  }
+
+  bool get _hasSelectedTasksOutsideTerm {
+    for (var i = 0; i < _tasks.length; i++) {
+      if (!_selectedTaskIndexes.contains(i)) continue;
+
+      final task = _tasks[i];
+      final parentDue = _resolvedDueDateTime(task.dueDateTime);
+      if (!_isWithinSelectedTerm(parentDue)) return true;
+
+      // Also validate selected subtasks
+      final selectedSubtasks =
+          _selectedSubtaskIndexesByTask[i] ?? const <int>{};
+      for (final subIndex in selectedSubtasks) {
+        final subtask = task.subtasks[subIndex];
+        final subDue =
+            _resolvedDueDateTime(subtask.dueDateTime, fallback: parentDue);
+        if (!_isWithinSelectedTerm(subDue)) return true;
+      }
+    }
+    return false;
+  }
+
+  bool get _hasSubtaskDueAfterParent {
+    for (var i = 0; i < _tasks.length; i++) {
+      if (!_selectedTaskIndexes.contains(i)) continue;
+      
+      final task = _tasks[i];
+      if (task.dueDateTime == null) continue; // If parent has no due date, skip check
+
+      final selectedSubtasks = _selectedSubtaskIndexesByTask[i] ?? const <int>{};
+      for (final subIndex in selectedSubtasks) {
+        final subtask = task.subtasks[subIndex];
+        // If subtask explicit due date is after parent explicit due date
+        if (subtask.dueDateTime != null && subtask.dueDateTime!.isAfter(task.dueDateTime!)) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
 
   bool get _hasSelectedTasksMissingCourseCode {
     for (var i = 0; i < _tasks.length; i++) {
@@ -191,8 +251,8 @@ class _ReviewExtractedTasksScreenState
       sheetTitle: 'Edit Task',
       scopeSessionId: selectedSessionTermNotifier.value?.sessionId,
       scopeTermId: selectedSessionTermNotifier.value?.termId,
-      minDueDateTime: _selectedSession?.startDate,
-      maxDueDateTime: _selectedSession?.endDate,
+      minDueDateTime: _selectedTermWindow?.start,
+      maxDueDateTime: _selectedTermWindow?.end,
     );
     if (updated == null || !mounted) return;
     setState(() {
@@ -231,8 +291,8 @@ class _ReviewExtractedTasksScreenState
       isSubtask: true,
       scopeSessionId: selectedSessionTermNotifier.value?.sessionId,
       scopeTermId: selectedSessionTermNotifier.value?.termId,
-      minDueDateTime: _selectedSession?.startDate,
-      maxDueDateTime: _selectedSession?.endDate,
+      minDueDateTime: _selectedTermWindow?.start,
+      maxDueDateTime: _selectedTermWindow?.end,
       parentDueDateTime: _resolvedDueDateTime(parent.dueDateTime),
     );
     if (updated == null || !mounted) return;
@@ -244,7 +304,7 @@ class _ReviewExtractedTasksScreenState
   }
 
   Future<void> _saveTasks() async {
-    if (_saving || _hasSelectedTasksMissingCourseCode) return;
+    if (_saving || _hasSelectedTasksMissingCourseCode || _hasSelectedTasksOutsideTerm || _hasSubtaskDueAfterParent) return;
     setState(() => _saving = true);
     try {
       var savedCount = 0;
@@ -551,6 +611,24 @@ class _ReviewExtractedTasksScreenState
                                                                       0xFFD32F2F),
                                                                 ),
                                                         ),
+                                                        if (!_isWithinSelectedTerm(
+                                                            _resolvedDueDateTime(
+                                                                task.dueDateTime)))
+                                                          const Padding(
+                                                            padding:
+                                                                EdgeInsets.only(
+                                                                    bottom:
+                                                                        AppSpacing
+                                                                            .xs),
+                                                            child: LabelChip(
+                                                              label:
+                                                                  'OUTSIDE TERM',
+                                                              background: Color(
+                                                                  0xFFFFE5E5),
+                                                              foreground: Color(
+                                                                  0xFFD32F2F),
+                                                            ),
+                                                          ),
                                                         Text(
                                                           task.title,
                                                           style: Theme.of(
@@ -618,7 +696,29 @@ class _ReviewExtractedTasksScreenState
                                                                           .w500,
                                                                 ),
                                                           ),
-                                                        ],
+                                                        ] else if (task
+                                                                    .dueDateTime !=
+                                                                null &&
+                                                            !_isWithinSelectedTerm(
+                                                                task.dueDateTime!)) ...[
+                                                          const SizedBox(
+                                                              height: 4),
+                                                          Text(
+                                                            'Due date is outside the selected term.',
+                                                            style: Theme.of(
+                                                                    context)
+                                                                .textTheme
+                                                                .bodySmall
+                                                                ?.copyWith(
+                                                                  color: Colors
+                                                                      .red
+                                                                      .shade700,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w500,
+                                                                ),
+                                                          ),
+                                                        ]
                                                       ],
                                                     ),
                                                   ),
@@ -779,6 +879,43 @@ class _ReviewExtractedTasksScreenState
                                                                 ),
                                                           ),
                                                         ],
+                                                        if (!_isWithinSelectedTerm(
+                                                            _resolvedDueDateTime(
+                                                          subtask.dueDateTime,
+                                                          fallback:
+                                                              _resolvedDueDateTime(
+                                                                  task.dueDateTime),
+                                                        ))) ...[
+                                                          const SizedBox(
+                                                              height: 4),
+                                                          Text(
+                                                            'Due date is outside the selected term.',
+                                                            style: Theme.of(
+                                                                    context)
+                                                                .textTheme
+                                                                .bodySmall
+                                                                ?.copyWith(
+                                                                  color: Colors
+                                                                      .red
+                                                                      .shade700,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w500,
+                                                                ),
+                                                          ),
+                                                        ]
+                                                        else if (task.dueDateTime != null && 
+                                                                 subtask.dueDateTime != null && 
+                                                                 subtask.dueDateTime!.isAfter(task.dueDateTime!)) ...[
+                                                          const SizedBox(height: 4),
+                                                          Text(
+                                                            'Due date cannot be after the main task.',
+                                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                                                  color: Colors.red.shade700,
+                                                                  fontWeight: FontWeight.w500,
+                                                                ),
+                                                          ),
+                                                        ],
                                                       ],
                                                     ),
                                                   ),
@@ -825,11 +962,12 @@ class _ReviewExtractedTasksScreenState
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    if (_hasSelectedTasksMissingCourseCode)
+                    if (_hasSelectedTasksMissingCourseCode ||
+                        _hasSelectedTasksOutsideTerm || _hasSubtaskDueAfterParent)
                       Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                         child: Text(
-                          'Please add a course for selected tasks before saving.',
+                          'Please resolve the errors before saving.',
                           style:
                               Theme.of(context).textTheme.bodySmall?.copyWith(
                                     color: Colors.red.shade700,
@@ -841,10 +979,11 @@ class _ReviewExtractedTasksScreenState
                     SizedBox(
                       width: double.infinity,
                       child: ElevatedButton(
-                        onPressed:
-                            (_saving || _hasSelectedTasksMissingCourseCode)
-                                ? null
-                                : _saveTasks,
+                        onPressed: (_saving ||
+                                _hasSelectedTasksMissingCourseCode ||
+                                _hasSelectedTasksOutsideTerm || _hasSubtaskDueAfterParent)
+                            ? null
+                            : _saveTasks,
                         child: _saving
                             ? const SizedBox(
                                 width: 20,

@@ -5,11 +5,11 @@ import 'package:flutter/material.dart';
 
 import '../../core/constants/app_spacing.dart';
 import '../../core/models/academic_event.dart';
-import '../../core/models/academic_session.dart';
 import '../../core/services/academic_event_store.dart';
 import '../../core/services/academic_session_store.dart';
 import '../../core/services/session_term_selection_store.dart';
 import '../../core/widgets/common/white_card.dart';
+import '../../core/widgets/common/label_chip.dart';
 import '../../core/utils/term_windows.dart';
 import '../../core/utils/date_time_format.dart';
 import '../../screens/schedule/schedule_event_editor_screen.dart';
@@ -84,6 +84,33 @@ class _ReviewExtractedEventsScreenState
         );
   }
 
+  String? matchedTermDateRange() {
+    final sessions = academicSessionsNotifier.value;
+
+    TermWindow? matchedTerm;
+
+    for (final session in sessions) {
+      if (session.id != widget.sessionId) {
+        continue;
+      }
+
+      final windows = buildTermWindows(session);
+
+      for (final term in windows) {
+        if (term.id == widget.termId) {
+          matchedTerm = term;
+          break;
+        }
+      }
+    }
+
+    if (matchedTerm == null) {
+      return null;
+    }
+
+    return formatDateRangeDdMmYyyy(matchedTerm.start, matchedTerm.end);
+  }
+
   List<_ExtractedEventItem> _parseEvents() {
     log(widget.responseJson);
 
@@ -143,13 +170,6 @@ class _ReviewExtractedEventsScreenState
           continue;
         }
 
-        // if (!_isWithinSelectedTerm(
-        //   start,
-        //   end,
-        // )) {
-        //   continue;
-        // }
-
         parsed.add(
           _ExtractedEventItem(
             title: (e['title'] ?? '').toString(),
@@ -157,7 +177,7 @@ class _ReviewExtractedEventsScreenState
             startDateTime: start,
             endDateTime: end,
             allDay: e['all_day'] == true,
-            hideClassesDuringEvent: e['hide_classes_during_event'] == true,
+            hideClassesDuringEvent: true,
             isAcademicBreak: e['is_academic_break'] == true,
             selected: true,
           ),
@@ -352,6 +372,17 @@ class _ReviewExtractedEventsScreenState
     });
   }
 
+  bool get _hasSelectedEventsOutsideTerm {
+    for (final event in _events) {
+      if (!event.selected) continue;
+      if (event.startDateTime == null || event.endDateTime == null) return true;
+      if (!_isWithinSelectedTerm(event.startDateTime!, event.endDateTime!)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -452,6 +483,13 @@ class _ReviewExtractedEventsScreenState
                               event.selected = value;
                             });
                           },
+                          isOutsideTerm: (event) {
+                            if (event.startDateTime == null ||
+                                event.endDateTime == null) return true;
+                            return !_isWithinSelectedTerm(
+                                event.startDateTime!, event.endDateTime!);
+                          },
+                          matchedTermDateRange: matchedTermDateRange(),
                         ),
                       ),
                     ),
@@ -460,23 +498,43 @@ class _ReviewExtractedEventsScreenState
                       minimum: const EdgeInsets.all(
                         AppSpacing.md,
                       ),
-                      child: SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: _isSaving ? null : _handleSave,
-                          child: _isSaving
-                              ? const SizedBox(
-                                  height: 20,
-                                  width: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Text(
-                                  'Import Events',
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (_hasSelectedEventsOutsideTerm)
+                              Padding(
+                                padding: const EdgeInsets.only(
+                                    bottom: AppSpacing.xs),
+                                child: Text(
+                                  'Please resolve the errors before saving.',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: Colors.red.shade700,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                  textAlign: TextAlign.center,
                                 ),
-                        ),
-                      ),
+                              ),
+                            ElevatedButton(
+                              onPressed:
+                                  (_isSaving || _hasSelectedEventsOutsideTerm)
+                                      ? null
+                                      : _handleSave,
+                              child: _isSaving
+                                  ? const SizedBox(
+                                      height: 20,
+                                      width: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Text(
+                                      'Import Events',
+                                    ),
+                            ),
+                          ]),
                     ),
                   ],
                 ),
@@ -518,6 +576,8 @@ class _ExtractedEventsPage extends StatelessWidget {
     required this.events,
     required this.onEdit,
     required this.onToggleSelected,
+    required this.isOutsideTerm,
+    required this.matchedTermDateRange,
   });
 
   final List<_ExtractedEventItem> events;
@@ -530,6 +590,10 @@ class _ExtractedEventsPage extends StatelessWidget {
     _ExtractedEventItem event,
     bool value,
   ) onToggleSelected;
+
+  final bool Function(_ExtractedEventItem event) isOutsideTerm;
+
+  final String? matchedTermDateRange;
 
   @override
   Widget build(BuildContext context) {
@@ -578,6 +642,18 @@ class _ExtractedEventsPage extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
+                              if (isOutsideTerm(event)) ...[
+                                const Padding(
+                                  padding: EdgeInsets.only(
+                                    bottom: AppSpacing.xs,
+                                  ),
+                                  child: LabelChip(
+                                    label: 'OUTSIDE TERM',
+                                    background: Color(0xFFFFE5E5),
+                                    foreground: Color(0xFFD32F2F),
+                                  ),
+                                ),
+                              ],
                               Text(
                                 event.title,
                                 style: textTheme.titleMedium?.copyWith(
@@ -617,6 +693,19 @@ class _ExtractedEventsPage extends StatelessWidget {
                                     color: Colors.grey.shade600,
                                     fontStyle: FontStyle.italic,
                                   ),
+                                ),
+                              ],
+                              if (isOutsideTerm(event)) ...[
+                                const SizedBox(height: 4),
+                                Text(
+                                  'Event dates must be within the selected term ($matchedTermDateRange)',
+                                  style: Theme.of(context)
+                                      .textTheme
+                                      .bodySmall
+                                      ?.copyWith(
+                                        color: Colors.red.shade700,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                 ),
                               ],
                               if (event.isAcademicBreak) ...[
