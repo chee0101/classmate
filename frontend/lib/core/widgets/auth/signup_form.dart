@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../constants/app_spacing.dart';
 import '../../constants/routes.dart';
 import '../../services/user_profile_store.dart';
+import '../../services/notification_preferences_store.dart';
 import '../../validators/auth_validators.dart';
 import '../common/form_fields.dart';
 
@@ -205,6 +206,8 @@ class _SignUpFormState extends State<SignUpForm> {
           createdUser,
           preferredUsername: usernameController.text.trim(),
         );
+
+        await updateNotificationPreferences(NotificationPreferences.defaults);
       }
       await credential.user?.sendEmailVerification();
       if (!mounted) return;
