@@ -104,11 +104,12 @@ String _termLabelWithWeek(TermWindow term, DateTime now) {
   if (day.isBefore(term.start) || day.isAfter(term.end)) {
     return '${term.label} · Week -';
   }
-  final weekNumber =
-      (day.difference(DateTime(term.start.year, term.start.month, term.start.day))
-                  .inDays ~/
-              7) +
-          1;
+  final weekNumber = (day
+              .difference(
+                  DateTime(term.start.year, term.start.month, term.start.day))
+              .inDays ~/
+          7) +
+      1;
   return '${term.label} · Week $weekNumber';
 }
 
@@ -199,7 +200,8 @@ class _TaskScreenState extends State<TaskScreen> {
           }
           var selectedRef = refs.first;
           final current = refs.where(
-            (ref) => !now.isBefore(ref.term.start) && !now.isAfter(ref.term.end),
+            (ref) =>
+                !now.isBefore(ref.term.start) && !now.isAfter(ref.term.end),
           );
           if (current.isNotEmpty) selectedRef = current.first;
 
@@ -229,240 +231,259 @@ class _TaskScreenState extends State<TaskScreen> {
               return ValueListenableBuilder(
                 valueListenable: tasksNotifier,
                 builder: (context, allTasks, _) {
-              return ValueListenableBuilder(
-                valueListenable: coursesNotifier,
-                builder: (context, _, __) {
-              final termCourses = coursesForSessionAndTerm(
-                sessionId: selectedRef.session.id,
-                termId: selectedRef.term.id,
-              );
-              // Only show top-level tasks in the list (subtasks are shown in detail view).
-              final topLevelTasks = allTasks
-                  .where(
-                    (task) =>
-                        task.parentTaskId == null &&
-                        isInTerm(task.dueDateTime, selectedRef.term),
-                  )
-                  .toList();
-              final pendingTasks = topLevelTasks
-                  .where((t) =>
-                      TaskUtils.effectiveStatus(t) != TaskStatus.completed)
-                  .toList(growable: false)
-                ..sort((a, b) => a.dueDateTime.compareTo(b.dueDateTime));
-              final overdueTasks = pendingTasks
-                  .where((t) => TaskUtils.effectiveStatus(t) == TaskStatus.overdue)
-                  .toList(growable: false)
-                ..sort((a, b) => a.dueDateTime.compareTo(b.dueDateTime));
-              final nextRecommendedTask = overdueTasks.isNotEmpty
-                  ? overdueTasks.first
-                  : (pendingTasks.isNotEmpty ? pendingTasks.first : null);
-              final workloadBuckets = _next4WeekWorkloadBuckets(
-                pendingTasks: pendingTasks,
-                selectedTerm: selectedRef.term,
-                now: now,
-              );
-              final busiestWeekLabel = _busiestWeekLabel(workloadBuckets);
-              final busiestWeekCount = _busiestWeekCount(workloadBuckets);
-              final weekCounts = workloadBuckets
-                  .map((b) => b.count)
-                  .toList(growable: false);
-              final weekLabels = workloadBuckets
-                  .map((b) => b.label)
-                  .toList(growable: false);
-
-              // Build distinct display course codes for the filter.
-              final courseCodes = topLevelTasks
-                  .map((t) => displayCourseCodeForTask(t, termCourses))
-                  .toSet()
-                  .toList()
-                ..sort();
-
-              final tasks = topLevelTasks.where((t) {
-                final matchesStatus =
-                    TaskUtils.effectiveStatus(t) == _selectedStatus;
-                final displayCode =
-                    displayCourseCodeForTask(t, termCourses);
-                final matchesCourse =
-                    _selectedCourseCode == null ||
-                    displayCode == _selectedCourseCode;
-                return matchesStatus && matchesCourse;
-              }).toList()
-                ..sort((a, b) => a.dueDateTime.compareTo(b.dueDateTime));
-
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.md,
-                      0,
-                      AppSpacing.md,
-                      0,
-                    ),
-                    child: AnimatedSegmentedSwitch<_TaskViewMode>(
-                      value: _selectedViewMode,
-                      onChanged: (value) {
-                        setState(() => _selectedViewMode = value);
-                      },
-                      options: const [
-                        SegmentedSwitchOption<_TaskViewMode>(
-                          value: _TaskViewMode.tasks,
-                          label: 'Tasks',
-                        ),
-                        SegmentedSwitchOption<_TaskViewMode>(
-                          value: _TaskViewMode.insights,
-                          label: 'Insights',
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.sm),
-                  Expanded(
-                    child: _selectedViewMode == _TaskViewMode.tasks
-                        ? CustomScrollView(
-                            slivers: [
-                              SliverToBoxAdapter(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.md,
-                                  ),
-                                  child: SessionTermContextLabel(
-                                    sessionName: selectedRef.session.name,
-                                    termLabel: _termLabelWithWeek(
-                                      selectedRef.term,
-                                      now,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SliverToBoxAdapter(
-                                child: SizedBox(height: AppSpacing.sm),
-                              ),
-                              SliverToBoxAdapter(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.md,
-                                  ),
-                                  child: _buildStatusChipRow(),
-                                ),
-                              ),
-                              const SliverToBoxAdapter(
-                                child: SizedBox(height: AppSpacing.sm),
-                              ),
-                              SliverToBoxAdapter(
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: AppSpacing.md,
-                                  ),
-                                  child: TaskCourseFilter(
-                                    courseCodes: courseCodes,
-                                    selectedCourseCode: _selectedCourseCode,
-                                    onChanged: (code) {
-                                      setState(() => _selectedCourseCode = code);
-                                    },
-                                  ),
-                                ),
-                              ),
-                              const SliverToBoxAdapter(
-                                child: SizedBox(height: AppSpacing.sm),
-                              ),
-                              if (tasks.isEmpty)
-                                SliverFillRemaining(
-                                  hasScrollBody: false,
-                                  child: Center(
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: AppSpacing.md,
-                                      ),
-                                      child: Text(
-                                        'No tasks found. Looks like you\'re all caught up!',
-                                        style: textTheme.bodyLarge,
-                                        textAlign: TextAlign.center,
-                                      ),
-                                    ),
-                                  ),
-                                )
-                              else
-                                SliverPadding(
-                                  padding: const EdgeInsets.only(
-                                    left: AppSpacing.md,
-                                    right: AppSpacing.md,
-                                    bottom: AppSpacing.md,
-                                  ),
-                                  sliver: SliverList.separated(
-                                    itemCount: tasks.length,
-                                    separatorBuilder: (_, __) =>
-                                        const SizedBox(height: AppSpacing.sm),
-                                    itemBuilder: (context, index) {
-                                      final task = tasks[index];
-                                      final nextSubtaskTitle =
-                                          _getNextSubtaskTitle(task.id, allTasks);
-                                      return TaskCard(
-                                        task: task,
-                                        onMarkDone: () async =>
-                                            _markTaskAsCompleted(task),
-                                        onTap: () => _navigateToTaskDetail(task),
-                                        nextSubtaskTitle: nextSubtaskTitle,
-                                        courses: termCourses,
-                                      );
-                                    },
-                                  ),
-                                ),
-                            ],
+                  return ValueListenableBuilder(
+                    valueListenable: coursesNotifier,
+                    builder: (context, _, __) {
+                      final termCourses = coursesForSessionAndTerm(
+                        sessionId: selectedRef.session.id,
+                        termId: selectedRef.term.id,
+                      );
+                      // Only show top-level tasks in the list (subtasks are shown in detail view).
+                      final topLevelTasks = allTasks
+                          .where(
+                            (task) =>
+                                task.parentTaskId == null &&
+                                isInTerm(task.dueDateTime, selectedRef.term),
                           )
-                        : SingleChildScrollView(
-                            padding: const EdgeInsets.only(
-                              top: 0,
-                              left: AppSpacing.md,
-                              right: AppSpacing.md,
-                              bottom: AppSpacing.md,
+                          .toList();
+                      final pendingTasks = topLevelTasks
+                          .where((t) =>
+                              TaskUtils.effectiveStatus(t) ==
+                              TaskStatus
+                                  .ongoing)
+                          .toList(growable: false)
+                        ..sort(
+                            (a, b) => a.dueDateTime.compareTo(b.dueDateTime));
+                      final overdueTasks = topLevelTasks
+                          .where((t) =>
+                              TaskUtils.effectiveStatus(t) ==
+                              TaskStatus.overdue)
+                          .toList(growable: false)
+                        ..sort(
+                            (a, b) => a.dueDateTime.compareTo(b.dueDateTime));
+                      final nextRecommendedTask = overdueTasks.isNotEmpty
+                          ? overdueTasks.first
+                          : (pendingTasks.isNotEmpty
+                              ? pendingTasks.first
+                              : null);
+                      final workloadBuckets = _next4WeekWorkloadBuckets(
+                        pendingTasks: pendingTasks,
+                        selectedTerm: selectedRef.term,
+                        now: now,
+                      );
+                      final busiestWeekLabel =
+                          _busiestWeekLabel(workloadBuckets);
+                      final busiestWeekCount =
+                          _busiestWeekCount(workloadBuckets);
+                      final weekCounts = workloadBuckets
+                          .map((b) => b.count)
+                          .toList(growable: false);
+                      final weekLabels = workloadBuckets
+                          .map((b) => b.label)
+                          .toList(growable: false);
+
+                      // Build distinct display course codes for the filter.
+                      final courseCodes = topLevelTasks
+                          .map((t) => displayCourseCodeForTask(t, termCourses))
+                          .toSet()
+                          .toList()
+                        ..sort();
+
+                      final tasks = topLevelTasks.where((t) {
+                        final matchesStatus =
+                            TaskUtils.effectiveStatus(t) == _selectedStatus;
+                        final displayCode =
+                            displayCourseCodeForTask(t, termCourses);
+                        final matchesCourse = _selectedCourseCode == null ||
+                            displayCode == _selectedCourseCode;
+                        return matchesStatus && matchesCourse;
+                      }).toList()
+                        ..sort(
+                            (a, b) => a.dueDateTime.compareTo(b.dueDateTime));
+
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              AppSpacing.md,
+                              0,
+                              AppSpacing.md,
+                              0,
                             ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                SessionTermContextLabel(
-                                  sessionName: selectedRef.session.name,
-                                  termLabel: _termLabelWithWeek(
-                                    selectedRef.term,
-                                    now,
-                                  ),
+                            child: AnimatedSegmentedSwitch<_TaskViewMode>(
+                              value: _selectedViewMode,
+                              onChanged: (value) {
+                                setState(() => _selectedViewMode = value);
+                              },
+                              options: const [
+                                SegmentedSwitchOption<_TaskViewMode>(
+                                  value: _TaskViewMode.tasks,
+                                  label: 'Tasks',
                                 ),
-                                const SizedBox(height: AppSpacing.sm),
-                                HomeOverviewCards(
-                                  pendingCount: pendingTasks.length,
-                                  overdueCount: overdueTasks.length,
-                                  busiestWeekLabel: busiestWeekLabel,
-                                  busiestWeekCount: busiestWeekCount,
-                                ),
-                                const SizedBox(height: AppSpacing.sm),
-                                HomeNextActionCard(
-                                  nextTask: nextRecommendedTask,
-                                  onOpenTask: () {
-                                    final task = nextRecommendedTask;
-                                    if (task == null) return;
-                                    _navigateToTaskDetail(task);
-                                  },
-                                  onAddTask: () {
-                                    Navigator.pushNamed(
-                                      context,
-                                      AppRoutes.addNew,
-                                      arguments: AddType.task,
-                                    );
-                                  },
-                                ),
-                                const SizedBox(height: AppSpacing.sm),
-                                HomeWorkloadChartCard(
-                                  weekLabels: weekLabels,
-                                  weekCounts: weekCounts,
+                                SegmentedSwitchOption<_TaskViewMode>(
+                                  value: _TaskViewMode.insights,
+                                  label: 'Insights',
                                 ),
                               ],
                             ),
                           ),
-                  ),
-                ],
-              );
-                },
-              );
+                          const SizedBox(height: AppSpacing.sm),
+                          Expanded(
+                            child: _selectedViewMode == _TaskViewMode.tasks
+                                ? CustomScrollView(
+                                    slivers: [
+                                      SliverToBoxAdapter(
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: AppSpacing.md,
+                                          ),
+                                          child: SessionTermContextLabel(
+                                            sessionName:
+                                                selectedRef.session.name,
+                                            termLabel: _termLabelWithWeek(
+                                              selectedRef.term,
+                                              now,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SliverToBoxAdapter(
+                                        child: SizedBox(height: AppSpacing.sm),
+                                      ),
+                                      SliverToBoxAdapter(
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: AppSpacing.md,
+                                          ),
+                                          child: _buildStatusChipRow(),
+                                        ),
+                                      ),
+                                      const SliverToBoxAdapter(
+                                        child: SizedBox(height: AppSpacing.sm),
+                                      ),
+                                      SliverToBoxAdapter(
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: AppSpacing.md,
+                                          ),
+                                          child: TaskCourseFilter(
+                                            courseCodes: courseCodes,
+                                            selectedCourseCode:
+                                                _selectedCourseCode,
+                                            onChanged: (code) {
+                                              setState(() =>
+                                                  _selectedCourseCode = code);
+                                            },
+                                          ),
+                                        ),
+                                      ),
+                                      const SliverToBoxAdapter(
+                                        child: SizedBox(height: AppSpacing.sm),
+                                      ),
+                                      if (tasks.isEmpty)
+                                        SliverFillRemaining(
+                                          hasScrollBody: false,
+                                          child: Center(
+                                            child: Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                horizontal: AppSpacing.md,
+                                              ),
+                                              child: Text(
+                                                'No tasks found. Looks like you\'re all caught up!',
+                                                style: textTheme.bodyLarge,
+                                                textAlign: TextAlign.center,
+                                              ),
+                                            ),
+                                          ),
+                                        )
+                                      else
+                                        SliverPadding(
+                                          padding: const EdgeInsets.only(
+                                            left: AppSpacing.md,
+                                            right: AppSpacing.md,
+                                            bottom: AppSpacing.md,
+                                          ),
+                                          sliver: SliverList.separated(
+                                            itemCount: tasks.length,
+                                            separatorBuilder: (_, __) =>
+                                                const SizedBox(
+                                                    height: AppSpacing.sm),
+                                            itemBuilder: (context, index) {
+                                              final task = tasks[index];
+                                              final nextSubtaskTitle =
+                                                  _getNextSubtaskTitle(
+                                                      task.id, allTasks);
+                                              return TaskCard(
+                                                task: task,
+                                                onMarkDone: () async =>
+                                                    _markTaskAsCompleted(task),
+                                                onTap: () =>
+                                                    _navigateToTaskDetail(task),
+                                                nextSubtaskTitle:
+                                                    nextSubtaskTitle,
+                                                courses: termCourses,
+                                              );
+                                            },
+                                          ),
+                                        ),
+                                    ],
+                                  )
+                                : SingleChildScrollView(
+                                    padding: const EdgeInsets.only(
+                                      top: 0,
+                                      left: AppSpacing.md,
+                                      right: AppSpacing.md,
+                                      bottom: AppSpacing.md,
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        SessionTermContextLabel(
+                                          sessionName: selectedRef.session.name,
+                                          termLabel: _termLabelWithWeek(
+                                            selectedRef.term,
+                                            now,
+                                          ),
+                                        ),
+                                        const SizedBox(height: AppSpacing.sm),
+                                        HomeOverviewCards(
+                                          pendingCount: pendingTasks.length,
+                                          overdueCount: overdueTasks.length,
+                                          busiestWeekLabel: busiestWeekLabel,
+                                          busiestWeekCount: busiestWeekCount,
+                                        ),
+                                        const SizedBox(height: AppSpacing.sm),
+                                        HomeNextActionCard(
+                                          nextTask: nextRecommendedTask,
+                                          onOpenTask: () {
+                                            final task = nextRecommendedTask;
+                                            if (task == null) return;
+                                            _navigateToTaskDetail(task);
+                                          },
+                                          onAddTask: () {
+                                            Navigator.pushNamed(
+                                              context,
+                                              AppRoutes.addNew,
+                                              arguments: AddType.task,
+                                            );
+                                          },
+                                        ),
+                                        const SizedBox(height: AppSpacing.sm),
+                                        HomeWorkloadChartCard(
+                                          weekLabels: weekLabels,
+                                          weekCounts: weekCounts,
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                          ),
+                        ],
+                      );
+                    },
+                  );
                 },
               );
             },
