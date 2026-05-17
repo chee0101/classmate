@@ -96,13 +96,21 @@ class _ScheduleEventEditorScreenState extends State<ScheduleEventEditorScreen> {
 
   Future<void> _pickStartDate() async {
     final term = widget.selectedTerm;
+    
+    // 1. Clamp initial date to strictly fall within term start and end
+    DateTime safeInitial = _eventStartDate;
+    if (safeInitial.isBefore(term.start)) safeInitial = term.start;
+    if (safeInitial.isAfter(term.end)) safeInitial = term.end;
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: _eventStartDate,
+      initialDate: safeInitial,
       firstDate: term.start,
       lastDate: term.end,
     );
+    
     if (picked == null) return;
+    
     setState(() {
       _eventStartDate = _startOfDay(picked);
       if (_eventEndDate != null && _eventEndDate!.isBefore(_eventStartDate)) {
@@ -113,13 +121,26 @@ class _ScheduleEventEditorScreenState extends State<ScheduleEventEditorScreen> {
 
   Future<void> _pickEndDate() async {
     final term = widget.selectedTerm;
+    
+    // 1. Calculate a safe firstDate: must be >= term.start and <= term.end
+    DateTime safeFirst = _eventStartDate;
+    if (safeFirst.isBefore(term.start)) safeFirst = term.start;
+    if (safeFirst.isAfter(term.end)) safeFirst = term.end;
+
+    // 2. Calculate a safe initialDate: must be >= safeFirst and <= term.end
+    DateTime safeInitial = _eventEndDate ?? safeFirst;
+    if (safeInitial.isBefore(safeFirst)) safeInitial = safeFirst;
+    if (safeInitial.isAfter(term.end)) safeInitial = term.end;
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: _eventEndDate ?? _eventStartDate,
-      firstDate: _eventStartDate.isBefore(term.start) ? term.start : _eventStartDate,
+      initialDate: safeInitial,
+      firstDate: safeFirst,
       lastDate: term.end,
     );
+    
     if (picked == null) return;
+    
     setState(() => _eventEndDate = _endOfDay(picked));
   }
 
