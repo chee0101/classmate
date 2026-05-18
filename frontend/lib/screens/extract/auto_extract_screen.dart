@@ -529,7 +529,7 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
         apiPath: apiPath,
         typeLabel: typeLabel,
         files: _selectedFiles,
-        useMultiFilesField: true,
+        useMultiFilesField: false,
         assignedCourseCode:
             _type == AutoExtractType.task ? _taskAssignedCourseCode : null,
         courseCodesAllowedCsv: courseCodesAllowedCsv,
