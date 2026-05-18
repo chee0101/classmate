@@ -215,17 +215,6 @@ class _ReviewExtractedTimetableScreenState
       termId: termId,
     ).length;
 
-    final confirmed = await showConfirmDialog(
-      context,
-      title: mode == _TimetableImportMode.replace
-          ? 'Replace timetables?'
-          : 'Merge timetables?',
-      message: mode == _TimetableImportMode.replace
-          ? 'Existing class slots for each imported course will be removed and replaced.'
-          : 'New slots will be added; duplicates are skipped.',
-      confirmText: 'Save',
-    );
-    if (!confirmed || !mounted) return;
 
     setState(() => _saving = true);
     var saved = 0;
@@ -342,19 +331,53 @@ class _ReviewExtractedTimetableScreenState
     required String sessionId,
     required String termId,
   }) async {
-    final mode = await _pickSaveMode();
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    // Identify which selected courses already have a timetable entry in the DB
+    // Check against the courseId to ensure don't mix up sessions with same codes (if any)
+    final List<String> existingTimetableCourseIds = timetablesNotifier.value
+        .where((e) => e.sessionId == sessionId && e.termId == termId)
+        .map((e) => e.id)
+        .toList();
+
+    bool hasConflicts = false;
+    for (final code in _selectedCourseCodes) {
+      final courseId = await findCourseIdBySessionTermCode(
+        uid: user.uid,
+        sessionId: sessionId,
+        termId: termId,
+        normalizedCourseCode: code,
+      );
+
+      if (courseId != null && existingTimetableCourseIds.contains(courseId)) {
+        hasConflicts = true;
+        break;
+      }
+    }
+
+    _TimetableImportMode? mode;
+
+    if (!hasConflicts) {
+      mode = _TimetableImportMode.replace;
+    } else {
+      mode = await _pickSaveMode();
+    }
+
     if (!mounted || mode == null) return;
-    if (mode == _TimetableImportMode.replace) {
+
+    if (mode == _TimetableImportMode.replace && hasConflicts) {
       final destructiveConfirmed = await showConfirmDialog(
         context,
-        title: 'Confirm replace',
+        title: 'Replace timetable?',
         message:
-            'This will overwrite existing class slots for selected courses. Continue?',
-        confirmText: 'Yes, replace',
+            'This will overwrite existing class slots for the selected courses. This action cannot be undone.',
+        confirmText: 'Replace',
         destructive: true,
       );
       if (!destructiveConfirmed || !mounted) return;
     }
+
     await _save(
       sessionId: sessionId,
       termId: termId,
@@ -386,34 +409,6 @@ class _ReviewExtractedTimetableScreenState
         body: const Center(child: Text('Could not read extraction data.')),
       );
     }
-
-    // final hasEditableSlots = _editableByCourse.values.any((s) => s.isNotEmpty);
-    // if (!hasEditableSlots || parsed.documentKind == 'unknown') {
-    //   return Scaffold(
-    //     appBar: AppBar(title: const Text('Review timetable')),
-    //     body: Padding(
-    //       padding: const EdgeInsets.all(AppSpacing.md),
-    //       child: Column(
-    //         crossAxisAlignment: CrossAxisAlignment.start,
-    //         children: [
-    //           Text(
-    //             'No timetable slots were found.',
-    //             style: textTheme.titleMedium,
-    //           ),
-    //           if (parsed.warnings.isNotEmpty) ...[
-    //             const SizedBox(height: AppSpacing.md),
-    //             ...parsed.warnings.map(
-    //               (w) => Padding(
-    //                 padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-    //                 child: Text('• $w', style: textTheme.bodySmall),
-    //               ),
-    //             ),
-    //           ],
-    //         ],
-    //       ),
-    //     ),
-    //   );
-    // }
 
     final hasEditableSlots = _editableByCourse.values.any((s) => s.isNotEmpty);
 
@@ -592,8 +587,8 @@ class _ReviewExtractedTimetableScreenState
                                     TimetableCourseCard(
                                       courseCode: code,
                                       slots: slots,
-                                      courseColor:colorByCode[code] ??
-                                              const Color(0xFF6C4DD9),
+                                      courseColor: colorByCode[code] ??
+                                          const Color(0xFF6C4DD9),
                                       courseNotFound: !isMatched,
                                       onTap: () => _openCourseEditor(code),
                                     ),
