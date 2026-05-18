@@ -57,7 +57,7 @@ class _ReviewExtractedTasksScreenState
   }
 
   bool _isWithinSelectedTerm(DateTime? date) {
-    if (date == null) return true; // Let it pass if no date (fallback handles it)
+    if (date == null) return true;
     final term = _selectedTermWindow;
     if (term == null) return true;
     return !date.isBefore(term.start) && !date.isAfter(term.end);
@@ -87,15 +87,18 @@ class _ReviewExtractedTasksScreenState
   bool get _hasSubtaskDueAfterParent {
     for (var i = 0; i < _tasks.length; i++) {
       if (!_selectedTaskIndexes.contains(i)) continue;
-      
-      final task = _tasks[i];
-      if (task.dueDateTime == null) continue; // If parent has no due date, skip check
 
-      final selectedSubtasks = _selectedSubtaskIndexesByTask[i] ?? const <int>{};
+      final task = _tasks[i];
+      if (task.dueDateTime == null)
+        continue; // If parent has no due date, skip check
+
+      final selectedSubtasks =
+          _selectedSubtaskIndexesByTask[i] ?? const <int>{};
       for (final subIndex in selectedSubtasks) {
         final subtask = task.subtasks[subIndex];
         // If subtask explicit due date is after parent explicit due date
-        if (subtask.dueDateTime != null && subtask.dueDateTime!.isAfter(task.dueDateTime!)) {
+        if (subtask.dueDateTime != null &&
+            subtask.dueDateTime!.isAfter(task.dueDateTime!)) {
           return true;
         }
       }
@@ -303,10 +306,79 @@ class _ReviewExtractedTasksScreenState
     });
   }
 
+  final List<Color> _autoCourseColors = const [
+    Color(0xFF3B82F6),
+    Color(0xFF22C55E),
+    Color(0xFFF97316),
+    Color(0xFFEAB308),
+    Color(0xFF6366F1),
+    Color(0xFFEF4444),
+    Color(0xFF14B8A6),
+    Color(0xFFEC4899),
+  ];
+
+  String _toHex(Color color) {
+    return '#${color.value.toRadixString(16).padLeft(8, '0').substring(2).toUpperCase()}';
+  }
+
   Future<void> _saveTasks() async {
-    if (_saving || _hasSelectedTasksMissingCourseCode || _hasSelectedTasksOutsideTerm || _hasSubtaskDueAfterParent) return;
+    if (_saving ||
+        _hasSelectedTasksMissingCourseCode ||
+        _hasSelectedTasksOutsideTerm ||
+        _hasSubtaskDueAfterParent) return;
     setState(() => _saving = true);
     try {
+      final selection = selectedSessionTermNotifier.value;
+      if (selection == null) return;
+
+      final existingCodes = coursesForSessionAndTerm(
+        sessionId: selection.sessionId,
+        termId: selection.termId,
+      ).map((c) => c.courseCode.trim().toUpperCase()).toSet();
+
+      final unmatchedCodes = <String>{};
+      for (var taskIndex = 0; taskIndex < _tasks.length; taskIndex++) {
+        if (!_selectedTaskIndexes.contains(taskIndex)) continue;
+        final code = _tasks[taskIndex].courseCode.trim().toUpperCase();
+        if (code.isNotEmpty && !existingCodes.contains(code)) {
+          unmatchedCodes.add(code);
+        }
+      }
+
+      if (unmatchedCodes.isNotEmpty) {
+        final shouldCreate = await showConfirmDialog(
+          context,
+          title: 'Create missing courses?',
+          message:
+              'The following courses were detected but don\'t exist yet:\n\n'
+              '${unmatchedCodes.map((e) => '• $e').join('\n')}\n\n'
+              'They will be created automatically before saving tasks.',
+          confirmText: 'Create & Save',
+        );
+
+        if (!shouldCreate || !mounted) {
+          setState(() => _saving = false);
+          return;
+        }
+
+        final existingCount = existingCodes.length;
+        var createdCount = 0;
+
+        for (final code in unmatchedCodes) {
+          final color = _autoCourseColors[
+              (existingCount + createdCount) % _autoCourseColors.length];
+
+          await addCourse(
+            sessionId: selection.sessionId,
+            termId: selection.termId,
+            courseCode: code,
+            courseColor: _toHex(color),
+          );
+
+          createdCount++;
+        }
+      }
+
       var savedCount = 0;
       for (var taskIndex = 0; taskIndex < _tasks.length; taskIndex++) {
         if (!_selectedTaskIndexes.contains(taskIndex)) continue;
@@ -903,16 +975,29 @@ class _ReviewExtractedTasksScreenState
                                                                           .w500,
                                                                 ),
                                                           ),
-                                                        ]
-                                                        else if (task.dueDateTime != null && 
-                                                                 subtask.dueDateTime != null && 
-                                                                 subtask.dueDateTime!.isAfter(task.dueDateTime!)) ...[
-                                                          const SizedBox(height: 4),
+                                                        ] else if (task
+                                                                    .dueDateTime !=
+                                                                null &&
+                                                            subtask.dueDateTime !=
+                                                                null &&
+                                                            subtask.dueDateTime!
+                                                                .isAfter(task
+                                                                    .dueDateTime!)) ...[
+                                                          const SizedBox(
+                                                              height: 4),
                                                           Text(
                                                             'Due date cannot be after the main task.',
-                                                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                                                  color: Colors.red.shade700,
-                                                                  fontWeight: FontWeight.w500,
+                                                            style: Theme.of(
+                                                                    context)
+                                                                .textTheme
+                                                                .bodySmall
+                                                                ?.copyWith(
+                                                                  color: Colors
+                                                                      .red
+                                                                      .shade700,
+                                                                  fontWeight:
+                                                                      FontWeight
+                                                                          .w500,
                                                                 ),
                                                           ),
                                                         ],
@@ -963,7 +1048,8 @@ class _ReviewExtractedTasksScreenState
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     if (_hasSelectedTasksMissingCourseCode ||
-                        _hasSelectedTasksOutsideTerm || _hasSubtaskDueAfterParent)
+                        _hasSelectedTasksOutsideTerm ||
+                        _hasSubtaskDueAfterParent)
                       Padding(
                         padding: const EdgeInsets.only(bottom: AppSpacing.xs),
                         child: Text(
@@ -981,7 +1067,8 @@ class _ReviewExtractedTasksScreenState
                       child: ElevatedButton(
                         onPressed: (_saving ||
                                 _hasSelectedTasksMissingCourseCode ||
-                                _hasSelectedTasksOutsideTerm || _hasSubtaskDueAfterParent)
+                                _hasSelectedTasksOutsideTerm ||
+                                _hasSubtaskDueAfterParent)
                             ? null
                             : _saveTasks,
                         child: _saving
