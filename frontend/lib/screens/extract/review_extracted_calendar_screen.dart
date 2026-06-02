@@ -334,16 +334,20 @@ class _ReviewExtractedCalendarScreenState
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      builder: (sheetContext) => _EditAcademicPeriodSheet(
-        headerTitle: 'Edit academic session',
-        allowEditTitle: false,
-        allowDelete: false,
-        initialTitle: _parsed!.sessionName,
-        sessionFirst: first,
-        sessionLast: last,
-        initialStart: _parsed!.sessionStart,
-        initialEnd: _parsed!.sessionEnd,
-      ),
+      builder: (sheetContext) {
+        final unlimitedFirst = DateTime(1900, 1, 1);
+        final unlimitedLast = DateTime(2100, 12, 31);
+        return _EditAcademicPeriodSheet(
+          headerTitle: 'Edit academic session',
+          allowEditTitle: false,
+          allowDelete: false,
+          initialTitle: _parsed!.sessionName,
+          sessionFirst: unlimitedFirst,
+          sessionLast: unlimitedLast,
+          initialStart: _parsed!.sessionStart,
+          initialEnd: _parsed!.sessionEnd,
+        );
+      },
     );
     if (result == null || !mounted) return;
 
