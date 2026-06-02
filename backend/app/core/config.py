@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     # Gemini: full academic-calendar JSON extraction when a key is set (see .env.example).
     gemini_api_key: str | None = None
     gemini_model: str = "gemini-3.1-flash-lite-preview"
+    gemini_backup_models: str = "gemini-3-flash,gemini-3.5-flash,gemini-2.5-flash,gemini-2.5-flash-lite"
     use_gemini_holiday_extraction: bool = True
 
     @field_validator("gemini_api_key", mode="before")

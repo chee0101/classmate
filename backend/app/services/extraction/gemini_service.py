@@ -29,6 +29,25 @@ _MAX_TEXT_LENGTH = 250_000
 _GEMINI_MAX_RETRIES = 3
 
 
+def _get_model_candidates() -> list[str]:
+    """Get primary model and backup models as a list of candidates to try."""
+    settings = get_settings()
+    
+    # Start with primary model
+    candidates = [settings.gemini_model]
+    
+    # Add backup models from config
+    if settings.gemini_backup_models:
+        backup_models = [
+            m.strip() 
+            for m in settings.gemini_backup_models.split(",")
+            if m.strip()
+        ]
+        candidates.extend(backup_models)
+    
+    return candidates
+
+
 # =========================================================
 # GEMINI PAYLOAD MODELS
 # =========================================================
@@ -331,77 +350,98 @@ async def _generate_gemini_response(
         file_paths=file_paths,
     )
 
-    model_name = settings.gemini_model
-
     client = genai.Client(
         api_key=settings.gemini_api_key,
     )
 
     t0 = perf_counter()
-
+    
+    # Get list of model candidates: primary + backups
+    model_candidates = _get_model_candidates()
+    
     response = None
-
     last_error = ""
+    model_name = ""
+    
+    # =====================================================
+    # TRY EACH MODEL CANDIDATE
+    # =====================================================
+    
+    for candidate_model in model_candidates:
+        
+        model_name = candidate_model
+        last_error = ""
+        
+        # =================================================
+        # RETRY LOGIC FOR CURRENT MODEL
+        # =================================================
+        
+        for attempt in range(
+            1,
+            _GEMINI_MAX_RETRIES + 1,
+        ):
 
-    for attempt in range(
-        1,
-        _GEMINI_MAX_RETRIES + 1,
-    ):
+            try:
 
-        try:
+                response = await asyncio.to_thread(
+                    client.models.generate_content,
+                    model=model_name,
+                    contents=contents,
+                )
 
-            response = await asyncio.to_thread(
-                client.models.generate_content,
-                model=model_name,
-                contents=contents,
-            )
+                # =========================================
+                # CLEANUP GEMINI FILES (success case)
+                # =========================================
 
-            # =========================================
-            # CLEANUP GEMINI FILES
-            # =========================================
+                for uploaded_file in uploaded_files:
 
-            for uploaded_file in uploaded_files:
+                    try:
 
-                try:
+                        client.files.delete(
+                            name=uploaded_file.name
+                        )
 
-                    client.files.delete(
-                        name=uploaded_file.name
-                    )
+                    except Exception:
+                        pass
 
-                except Exception:
-                    pass
+                # Successfully got response, break out of both loops
+                break
 
-            break
+            except Exception as e:
 
-        except Exception as e:
+                last_error = (
+                    f"{type(e).__name__}: {e}"
+                )
 
-            last_error = (
-                f"{type(e).__name__}: {e}"
-            )
-
-            if (
-                attempt >= _GEMINI_MAX_RETRIES
-                or not _is_transient_gemini_error(
+                is_transient = _is_transient_gemini_error(
                     last_error
                 )
-            ):
 
-                gemini_ms_err = (
-                    perf_counter() - t0
-                ) * 1000.0
+                # =========================================
+                # TRANSIENT ERROR: RETRY SAME MODEL
+                # =========================================
+                
+                if attempt < _GEMINI_MAX_RETRIES and is_transient:
+                    
+                    await asyncio.sleep(
+                        0.8 * attempt
+                    )
+                    continue
 
-                return (
-                    None,
-                    gemini_ms_err,
-                    "api_error",
-                    last_error,
-                    model_name,
-                )
+                # =========================================
+                # PERMANENT ERROR OR MAX RETRIES REACHED
+                # =========================================
+                # Try next model candidate
+                break
+        
+        # If we got a successful response, exit the model loop
+        if response is not None:
+            break
 
-            await asyncio.sleep(
-                0.8 * attempt
-            )
-
+    # =====================================================
+    # CLEANUP AND RETURN
+    # =====================================================
+    
     if response is None:
 
         gemini_ms_err = (
