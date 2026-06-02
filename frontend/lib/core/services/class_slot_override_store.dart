@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
 import '../models/class_slot_override.dart';
+import '../models/class_type.dart';
 
 final ValueNotifier<List<ClassSlotOverride>> classSlotOverridesNotifier =
     ValueNotifier<List<ClassSlotOverride>>([]);
@@ -57,6 +58,7 @@ ClassSlotOverride? _overrideFromDoc(DocumentSnapshot<Map<String, dynamic>> doc) 
       : ClassSlotOverrideAction.edit;
   final occurrenceDate = occurrenceDateRaw.toDate().toLocal();
   final overrideDate = overrideDateRaw?.toDate().toLocal();
+  final overrideClassTypeRaw = (data['overrideClassType'] as String?)?.trim();
 
   return ClassSlotOverride(
     id: doc.id,
@@ -70,7 +72,19 @@ ClassSlotOverride? _overrideFromDoc(DocumentSnapshot<Map<String, dynamic>> doc) 
     overrideEndMinutes: (data['overrideEndMinutes'] as num?)?.toInt(),
     overrideMode: (data['overrideMode'] as String?)?.trim(),
     overrideVenue: (data['overrideVenue'] as String?)?.trim(),
+    overrideClassType: _parseClassType(overrideClassTypeRaw),
   );
+}
+
+ClassType? _parseClassType(String? raw) {
+  if (raw == null || raw.trim().isEmpty) return null;
+  final normalized = raw.trim().toLowerCase();
+  for (final type in ClassType.values) {
+    if (type.name.toLowerCase() == normalized || type.label.toLowerCase() == normalized) {
+      return type;
+    }
+  }
+  return null;
 }
 
 Future<void> upsertClassSlotOverride(ClassSlotOverride override) async {
@@ -104,6 +118,7 @@ Future<void> upsertClassSlotOverride(ClassSlotOverride override) async {
     'overrideVenue': (override.overrideVenue ?? '').trim().isEmpty
         ? null
         : override.overrideVenue!.trim(),
+    'overrideClassType': override.overrideClassType?.name,
     'updatedAt': FieldValue.serverTimestamp(),
     'createdAt': FieldValue.serverTimestamp(),
   }, SetOptions(merge: true));

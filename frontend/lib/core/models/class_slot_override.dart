@@ -1,5 +1,7 @@
-enum ClassSlotOverrideAction { edit, cancel }
 
+import 'class_type.dart';
+
+enum ClassSlotOverrideAction { edit, cancel } 
 class ClassSlotOverride {
   const ClassSlotOverride({
     required this.id,
@@ -11,6 +13,7 @@ class ClassSlotOverride {
     this.overrideEndMinutes,
     this.overrideMode,
     this.overrideVenue,
+    this.overrideClassType,
   });
 
   final String id;
@@ -22,6 +25,7 @@ class ClassSlotOverride {
   final int? overrideEndMinutes;
   final String? overrideMode;
   final String? overrideVenue;
+  final ClassType? overrideClassType;
 
   String get occurrenceKey => buildClassSlotOccurrenceKey(
         classSlotId: classSlotId,

@@ -81,6 +81,7 @@ class ScheduleAppointmentBuilder {
           final effectiveEndMinutes = override?.overrideEndMinutes ?? slot.endMinutes;
           final effectiveMode = override?.overrideMode ?? slot.mode;
           final effectiveVenue = override?.overrideVenue ?? slot.venue;
+          final effectiveClassType = override?.overrideClassType ?? slot.classType;
           final start = DateTime(
             renderDate.year,
             renderDate.month,
@@ -160,7 +161,7 @@ class ScheduleAppointmentBuilder {
                 classSourceDay: sourceDay,
                 classSourceStartMinutes: slot.startMinutes,
                 classSourceEndMinutes: slot.endMinutes,
-                classType: slot.classType.label,
+                classType: effectiveClassType.label,
               ),
             ),
           );

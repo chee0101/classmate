@@ -824,6 +824,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         overrideEndMinutes: overrideEnd,
         overrideMode: result.updatedDraft.mode,
         overrideVenue: result.updatedDraft.venue,
+        overrideClassType: result.updatedDraft.classType,
       );
       await upsertClassSlotOverride(override);
       if (!mounted) return;
