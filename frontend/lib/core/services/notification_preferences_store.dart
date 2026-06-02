@@ -21,7 +21,7 @@ class NotificationPreferences {
       leadTimeMinutes: 60,
     ),
     classReminder: NotificationTypePreferences(
-      enabled: false,
+      enabled: true,
       leadTimeMinutes: 10,
     ),
   );

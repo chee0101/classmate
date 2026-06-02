@@ -8,7 +8,7 @@ import '../../core/widgets/common/white_card.dart';
 class NotificationSettingsScreen extends StatelessWidget {
   const NotificationSettingsScreen({super.key});
 
-  static const List<int> _leadTimeOptions = <int>[60, 45, 30, 15, 10];
+  static const List<int> _leadTimeOptions = <int>[1440, 180, 60, 45, 30, 15, 10];
 
   @override
   Widget build(BuildContext context) {
@@ -102,6 +102,9 @@ class NotificationSettingsScreen extends StatelessWidget {
   }
 
   static String _formatLeadTime(int minutes) {
+    if (minutes == 1440) {
+      return '1 day before';
+    }
     if (minutes % 60 == 0) {
       final hours = minutes ~/ 60;
       return hours == 1 ? '1 hour before' : '$hours hours before';
