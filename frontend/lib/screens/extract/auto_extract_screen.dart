@@ -40,7 +40,7 @@ enum TextExtractType {
   academicEvent,
 }
 
-enum AutoExtractType { academicCalendar, timetable, task }
+enum AutoExtractType { academicCalendar, timetable, task, academicEvent }
 
 class AutoExtractScreen extends StatefulWidget {
   const AutoExtractScreen({
@@ -305,6 +305,9 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
 
         case AutoExtractType.task:
           return 'Upload task documents or screenshots.';
+
+        case AutoExtractType.academicEvent:
+          return 'Upload academic event documents or screenshots.';
       }
     }
 
@@ -480,18 +483,22 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
       AutoExtractType.academicCalendar => 'gemini/calendar',
       AutoExtractType.timetable => 'gemini/timetable',
       AutoExtractType.task => 'gemini/task',
+      AutoExtractType.academicEvent => 'gemini/event',
     };
     final typeLabel = switch (_type) {
       AutoExtractType.academicCalendar => 'Academic calendar',
       AutoExtractType.timetable => 'Timetable',
       AutoExtractType.task => 'Task',
+      AutoExtractType.academicEvent => 'Academic Event',
     };
 
     String? courseCodesAllowedCsv;
     String? aiNotes;
     String? sessionId;
     String? termId;
-    if (_type == AutoExtractType.timetable) {
+    if (_type == AutoExtractType.timetable ||
+        _type == AutoExtractType.task ||
+        _type == AutoExtractType.academicEvent) {
       final sel = _resolvedSessionTermSelection();
       if (sel != null && selectedSessionTermNotifier.value == null) {
         setSelectedSessionTerm(sessionId: sel.sessionId, termId: sel.termId);
@@ -502,25 +509,27 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
         await _notImplementedYet('Please select a valid session/term first');
         return;
       }
-      final codes = coursesForSessionAndTerm(
-        sessionId: sel.sessionId,
-        termId: sel.termId,
-      )
-          .map((c) => c.courseCode.trim().toUpperCase())
-          .where((c) => c.isNotEmpty)
-          .toList()
-        ..sort();
-      if (codes.isNotEmpty) {
-        courseCodesAllowedCsv = codes.join(', ');
+      if (_type == AutoExtractType.timetable) {
+        final codes = coursesForSessionAndTerm(
+          sessionId: sel.sessionId,
+          termId: sel.termId,
+        )
+            .map((c) => c.courseCode.trim().toUpperCase())
+            .where((c) => c.isNotEmpty)
+            .toList()
+          ..sort();
+        if (codes.isNotEmpty) {
+          courseCodesAllowedCsv = codes.join(', ');
+        }
+        if (codes.isEmpty) {
+          await _notImplementedYet(
+            'No courses found for selected session/term. Add courses first.',
+          );
+          return;
+        }
+        final remark = _remarkFilterController.text.trim();
+        if (remark.isNotEmpty) aiNotes = remark;
       }
-      if (codes.isEmpty) {
-        await _notImplementedYet(
-          'No courses found for selected session/term. Add courses first.',
-        );
-        return;
-      }
-      final remark = _remarkFilterController.text.trim();
-      if (remark.isNotEmpty) aiNotes = remark;
     }
 
     unawaited(
@@ -605,7 +614,7 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
                     ),
                   ),
                   if (!widget.sessionOnly) ...[
-                  const SizedBox(height: AppSpacing.sm),
+                    const SizedBox(height: AppSpacing.sm),
                     _inputSource == ExtractInputSource.upload
                         ? _ExtractTypeTabs(
                             value: _type,
@@ -1118,6 +1127,11 @@ class _AutoExtractScreenState extends State<AutoExtractScreen> {
                       },
                     ),
                   ],
+                  if (_inputSource == ExtractInputSource.upload &&
+                      _type == AutoExtractType.academicEvent) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    _buildSessionSelector(),
+                  ],
                   if (_inputSource == ExtractInputSource.upload) ...[
                     const SizedBox(height: AppSpacing.md),
                     WhiteCard(
@@ -1420,6 +1434,10 @@ class _ExtractTypeTabs extends StatelessWidget {
         Text('Extract Type', style: textTheme.titleSmall),
         const SizedBox(height: AppSpacing.sm),
         AnimatedSegmentedSwitch<AutoExtractType>(
+          height: 44, // Reduced from default 50 for a sleeker look
+          textStyle: textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w700,
+          ),
           options: const [
             SegmentedSwitchOption(
               value: AutoExtractType.academicCalendar,
@@ -1432,6 +1450,10 @@ class _ExtractTypeTabs extends StatelessWidget {
             SegmentedSwitchOption(
               value: AutoExtractType.task,
               label: 'Task',
+            ),
+            SegmentedSwitchOption(
+              value: AutoExtractType.academicEvent,
+              label: 'Event',
             ),
           ],
           value: value,

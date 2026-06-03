@@ -864,6 +864,7 @@ Examples:
 IMPORTANT:
 - Determine duration using the visual table span, NOT only nearest text alignment.
 - Use the timetable header row as the source of truth for start/end time.
+- The "day" field MUST ALWAYS be in English (e.g., Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, Sunday). If the original day is in another language, translate it to English.
 {whitelist_lines}
 {notes}
 """
@@ -942,8 +943,9 @@ IMPORTANT:
 # =========================================================
 
 async def extract_event_with_gemini(
-    text: str,
     *,
+    file_paths: list[str] | None = None,
+    text: str | None = None,
     current_datetime: str | None = None,
 ):
 
@@ -960,7 +962,7 @@ Schema:
       "location":"string|null",
       "start_datetime":"YYYY-MM-DDTHH:MM:SS",
       "end_datetime":"YYYY-MM-DDTHH:MM:SS",
-      "all_day":false
+      "all_day":false,
       "hide_classes_during_event":true
     }
   ]
@@ -1006,7 +1008,7 @@ Current datetime:
     ) = await _generate_gemini_response(
         prompt=prompt,
         text=text,
-        file_paths=None,
+        file_paths=file_paths,
     )
 
     if parsed is None:

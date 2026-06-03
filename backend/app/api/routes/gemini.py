@@ -773,116 +773,202 @@ async def extract_timetable_route(
     "/gemini/event"
 )
 async def extract_event_route(
-    text: str = Form(...),
+    file: UploadFile | None = File(default=None),
+    files: list[UploadFile] | None = File(default=None),
+    text: str | None = Form(default=None),
     current_datetime: str | None = Form(default=None),
 ):
 
-    (
-        events,
-        gemini_ms,
-        status,
-        error_message,
-        model_name,
-    ) = await (
-        extract_event_with_gemini(
-            text=text,
-            current_datetime=current_datetime,
+    if (
+        not file
+        and not files
+        and not text
+    ):
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Either file/files or text "
+                "must be provided."
+            ),
         )
-    )
 
-    return {
+    file_paths: list[str] = []
 
-        "document_kind":
-            "event",
+    uploads: list[
+        UploadFile
+    ] = []
 
-        "source_filename":
-            "text_input",
+    try:
 
-        "markdown_from_docling":
-            text,
+        # =============================================
+        # SINGLE FILE
+        # =============================================
 
-        "sliced_text_for_gemini":
-            text,
+        if file:
+            uploads.append(file)
 
-        "remark_text_for_gemini":
-            "",
+        # =============================================
+        # MULTIPLE FILES
+        # =============================================
 
-        "extraction": {
+        if files:
+            uploads.extend(files)
 
-            "kind":
+        # =============================================
+        # SAVE TEMP FILES
+        # =============================================
+
+        if uploads:
+
+            file_paths = (
+                await _save_upload_files(
+                    uploads
+                )
+            )
+
+        (
+            events,
+            gemini_ms,
+            status,
+            error_message,
+            model_name,
+        ) = await (
+            extract_event_with_gemini(
+                file_paths=file_paths,
+                text=text,
+                current_datetime=current_datetime,
+            )
+        )
+
+        # =============================================
+        # SOURCE INFO
+        # =============================================
+
+        if uploads:
+
+            source_filename = (
+                uploads[0].filename
+                or "uploaded_file"
+            )
+
+        else:
+
+            source_filename = (
+                "text_input"
+            )
+
+        # =============================================
+        # RAW SOURCE TEXT
+        # =============================================
+
+        raw_source_text = (
+            text or ""
+        )
+
+        return {
+
+            "document_kind":
                 "event",
 
-            "confidence":
-                0.9,
+            "source_filename":
+                source_filename,
 
-            "academic_session":
-                None,
+            "markdown_from_docling":
+                raw_source_text,
 
-            "assignment":
-                None,
+            "sliced_text_for_gemini":
+                raw_source_text,
 
-            "tasks":
-                [],
+            "remark_text_for_gemini":
+                "",
 
-            "timetable":
-                None,
+            "extraction": {
 
-            "events": [
+                "kind":
+                    "event",
 
-                {
-                    "title":
-                        event.title,
+                "confidence":
+                    0.9,
 
-                    "location":
-                        event.location,
+                "academic_session":
+                    None,
 
-                    "start_datetime":
-                        (
-                            event
-                            .start_datetime
-                            .isoformat()
-                            if event
-                            .start_datetime
-                            else None
-                        ),
+                "assignment":
+                    None,
 
-                    "end_datetime":
-                        (
-                            event
-                            .end_datetime
-                            .isoformat()
-                            if event
-                            .end_datetime
-                            else None
-                        ),
+                "tasks":
+                    [],
 
-                    "all_day":
-                        event.all_day,
-                }
+                "timetable":
+                    None,
 
-                for event
-                in events
-            ],
+                "events": [
 
-            "notes":
-                "source=text_input",
-        },
+                    {
+                        "title":
+                            event.title,
 
-        "warnings": (
-            []
-            if status == "ok"
-            else [error_message]
-        ),
+                        "location":
+                            event.location,
 
-        "timing_ms": {
+                        "start_datetime":
+                            (
+                                event
+                                .start_datetime
+                                .isoformat()
+                                if event
+                                .start_datetime
+                                else None
+                            ),
 
-            "gemini":
-                gemini_ms,
-        },
+                        "end_datetime":
+                            (
+                                event
+                                .end_datetime
+                                .isoformat()
+                                if event
+                                .end_datetime
+                                else None
+                            ),
 
-        "status":
-            status,
+                        "all_day":
+                            event.all_day,
+                    }
 
-        "model_used":
-            model_name,
-    }
+                    for event
+                    in events
+                ],
+
+                "notes":
+                    (
+                        "source=text_input"
+                        if text
+                        else "source=file_upload"
+                    ),
+            },
+
+            "warnings": (
+                []
+                if status == "ok"
+                else [error_message]
+            ),
+
+            "timing_ms": {
+
+                "gemini":
+                    gemini_ms,
+            },
+
+            "status":
+                status,
+
+            "model_used":
+                model_name,
+        }
+        
+    finally:
+
+        _cleanup_temp_files(
+            file_paths
+        )

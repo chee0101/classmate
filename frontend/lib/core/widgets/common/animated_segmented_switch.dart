@@ -49,8 +49,8 @@ class AnimatedSegmentedSwitch<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final baseTextStyle =
-        textStyle ?? Theme.of(context).textTheme.labelLarge?.copyWith(
+    final baseTextStyle = textStyle ??
+        Theme.of(context).textTheme.labelLarge?.copyWith(
               fontWeight: FontWeight.w700,
             );
     final selectedIndex = _selectedIndex();
@@ -64,8 +64,7 @@ class AnimatedSegmentedSwitch<T> extends StatelessWidget {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final availableWidth =
-              constraints.maxWidth;
+          final availableWidth = constraints.maxWidth;
           final totalGap = gap * (options.length - 1);
           final itemWidth = (availableWidth - totalGap) / options.length;
           return Stack(
@@ -93,12 +92,21 @@ class AnimatedSegmentedSwitch<T> extends StatelessWidget {
                         onTap: () => onChanged(options[i].value),
                         borderRadius: BorderRadius.circular(itemBorderRadius),
                         child: Center(
-                          child: Text(
-                            options[i].label,
-                            style: baseTextStyle?.copyWith(
-                              color: i == selectedIndex
-                                  ? (selectedTextColor ?? Colors.white)
-                                  : (unselectedTextColor ?? colorScheme.primary),
+                          child: Padding(
+                            padding:
+                                const EdgeInsets.symmetric(horizontal: 4.0),
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                options[i].label,
+                                maxLines: 1,
+                                style: baseTextStyle?.copyWith(
+                                  color: i == selectedIndex
+                                      ? (selectedTextColor ?? Colors.white)
+                                      : (unselectedTextColor ??
+                                          colorScheme.primary),
+                                ),
+                              ),
                             ),
                           ),
                         ),
