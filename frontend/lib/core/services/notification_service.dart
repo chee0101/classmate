@@ -1,8 +1,11 @@
 import 'dart:async';
-
+import 'dart:io';
+import 'package:android_intent_plus/android_intent.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:timezone/timezone.dart' as tz;
 
@@ -24,6 +27,7 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   bool _initialized = false;
+  bool _exactAlarmPermissionRequested = false;
   StreamSubscription<RemoteMessage>? _foregroundFcmSubscription;
 
   Future<void> initialize() async {
@@ -36,7 +40,8 @@ class NotificationService {
     } catch (_) {
       // Fallback from offset (e.g. UTC+8 => Etc/GMT-8; sign is reversed in Etc/GMT IDs).
       final offsetHours = DateTime.now().timeZoneOffset.inHours;
-      final etcName = offsetHours >= 0 ? 'Etc/GMT-$offsetHours' : 'Etc/GMT+${-offsetHours}';
+      final etcName =
+          offsetHours >= 0 ? 'Etc/GMT-$offsetHours' : 'Etc/GMT+${-offsetHours}';
       try {
         tz.setLocalLocation(tz.getLocation(etcName));
       } catch (_) {
@@ -77,6 +82,11 @@ class NotificationService {
       ),
     );
 
+    if (!_exactAlarmPermissionRequested) {
+      await requestExactAlarmPermission();
+      _exactAlarmPermissionRequested = true;
+    }
+
     final iosPlugin = _plugin.resolvePlatformSpecificImplementation<
         IOSFlutterLocalNotificationsPlugin>();
     await iosPlugin?.requestPermissions(
@@ -86,7 +96,8 @@ class NotificationService {
     );
 
     _foregroundFcmSubscription?.cancel();
-    _foregroundFcmSubscription = FirebaseMessaging.onMessage.listen((message) async {
+    _foregroundFcmSubscription =
+        FirebaseMessaging.onMessage.listen((message) async {
       final notification = message.notification;
       final title = (notification?.title ?? 'ClassMate').trim();
       final body = (notification?.body ?? '').trim();
@@ -103,6 +114,25 @@ class NotificationService {
 
   Future<void> cancelAllTaskReminders() async {
     await _plugin.cancelAll();
+  }
+
+  Future<void> requestExactAlarmPermission() async {
+    if (!Platform.isAndroid) return;
+
+    // Check if we've already requested this in a previous app session
+    final prefs = await SharedPreferences.getInstance();
+    final alreadyRequested = prefs.getBool('exact_alarm_permission_requested') ?? false;
+    if (alreadyRequested) return;
+
+    // Mark as requested so we don't prompt again
+    await prefs.setBool('exact_alarm_permission_requested', true);
+
+    final packageInfo = await PackageInfo.fromPlatform();
+    final intent = AndroidIntent(
+      action: 'android.settings.REQUEST_SCHEDULE_EXACT_ALARM',
+      data: 'package:${packageInfo.packageName}',
+    );
+    await intent.launch();
   }
 
   Future<void> scheduleTaskReminder({
@@ -162,7 +192,8 @@ class NotificationService {
     await _plugin.zonedSchedule(
       id: id,
       title: 'Upcoming event: ${event.title}',
-      body: 'Starts in ${_formatLeadTime(leadTime)} at ${_formatTime(event.startDateTime)}',
+      body:
+          'Starts in ${_formatLeadTime(leadTime)} at ${_formatTime(event.startDateTime)}',
       scheduledDate: tz.TZDateTime.from(remindAt, tz.local),
       notificationDetails: details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
@@ -183,7 +214,8 @@ class NotificationService {
       scheduledAt = remindAt;
     } else {
       if (!classStart.isAfter(now)) return;
-      final oneMinuteBeforeStart = classStart.subtract(const Duration(minutes: 1));
+      final oneMinuteBeforeStart =
+          classStart.subtract(const Duration(minutes: 1));
       scheduledAt = oneMinuteBeforeStart.isAfter(now)
           ? oneMinuteBeforeStart
           : now.add(const Duration(seconds: 5));
@@ -206,7 +238,8 @@ class NotificationService {
     await _plugin.zonedSchedule(
       id: id,
       title: 'Class starting soon: $courseCode',
-      body: 'Starts in ${_formatLeadTime(leadTime)} at ${_formatTime(classStart)}',
+      body:
+          'Starts in ${_formatLeadTime(leadTime)} at ${_formatTime(classStart)}',
       scheduledDate: tz.TZDateTime.from(scheduledAt, tz.local),
       notificationDetails: details,
       androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
