@@ -141,31 +141,61 @@ class NotificationService {
   }) async {
     final remindAt = task.dueDateTime.subtract(leadTime);
     final now = DateTime.now();
-    if (!remindAt.isAfter(now)) return;
 
-    final id = _taskNotificationId(task.id);
-    const androidDetails = AndroidNotificationDetails(
-      'task_reminders',
-      _taskReminderChannelName,
-      channelDescription: _taskReminderChannelDescription,
-      importance: Importance.high,
-      priority: Priority.high,
-    );
-    const iosDetails = DarwinNotificationDetails();
-    const details = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
+    // Schedule primary reminder at configured lead time
+    if (remindAt.isAfter(now)) {
+      final id = _taskNotificationId(task.id);
+      const androidDetails = AndroidNotificationDetails(
+        'task_reminders',
+        _taskReminderChannelName,
+        channelDescription: _taskReminderChannelDescription,
+        importance: Importance.high,
+        priority: Priority.high,
+      );
+      const iosDetails = DarwinNotificationDetails();
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
 
-    await _plugin.zonedSchedule(
-      id: id,
-      title: '${task.title} due in ${_formatLeadTime(leadTime)}',
-      body: '${task.courseCode} • ${_formatTime(task.dueDateTime)}',
-      scheduledDate: tz.TZDateTime.from(remindAt, tz.local),
-      notificationDetails: details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      payload: 'task:${task.id}',
-    );
+      await _plugin.zonedSchedule(
+        id: id,
+        title: '${task.title} due in ${_formatLeadTime(leadTime)}',
+        body: '${task.courseCode} • ${_formatTime(task.dueDateTime)}',
+        scheduledDate: tz.TZDateTime.from(remindAt, tz.local),
+        notificationDetails: details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: 'task:${task.id}',
+      );
+    }
+
+    // Schedule 5-minute fallback reminder if primary reminder is missed
+    final fallbackRemindAt = task.dueDateTime.subtract(const Duration(minutes: 5));
+    if (fallbackRemindAt.isAfter(now) && (!remindAt.isAfter(now) || leadTime.inMinutes > 5)) {
+      final fallbackId = _taskNotificationId(task.id) + 100000;
+      const androidDetails = AndroidNotificationDetails(
+        'task_reminders',
+        _taskReminderChannelName,
+        channelDescription: _taskReminderChannelDescription,
+        importance: Importance.high,
+        priority: Priority.high,
+      );
+      const iosDetails = DarwinNotificationDetails();
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      await _plugin.zonedSchedule(
+        id: fallbackId,
+        title: '${task.title} due in 5 minutes',
+        body: '${task.courseCode} • ${_formatTime(task.dueDateTime)}',
+        scheduledDate: tz.TZDateTime.from(fallbackRemindAt, tz.local),
+        notificationDetails: details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: 'task:${task.id}:fallback',
+      );
+    }
   }
 
   Future<void> scheduleEventReminder({
@@ -173,32 +203,63 @@ class NotificationService {
     required Duration leadTime,
   }) async {
     final remindAt = event.startDateTime.subtract(leadTime);
-    if (!remindAt.isAfter(DateTime.now())) return;
+    final now = DateTime.now();
 
-    final id = _eventNotificationId(event.id);
-    const androidDetails = AndroidNotificationDetails(
-      'task_reminders',
-      _taskReminderChannelName,
-      channelDescription: _taskReminderChannelDescription,
-      importance: Importance.high,
-      priority: Priority.high,
-    );
-    const iosDetails = DarwinNotificationDetails();
-    const details = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
+    // Schedule primary reminder at configured lead time
+    if (remindAt.isAfter(now)) {
+      final id = _eventNotificationId(event.id);
+      const androidDetails = AndroidNotificationDetails(
+        'task_reminders',
+        _taskReminderChannelName,
+        channelDescription: _taskReminderChannelDescription,
+        importance: Importance.high,
+        priority: Priority.high,
+      );
+      const iosDetails = DarwinNotificationDetails();
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
 
-    await _plugin.zonedSchedule(
-      id: id,
-      title: 'Upcoming event: ${event.title}',
-      body:
-          'Starts in ${_formatLeadTime(leadTime)} at ${_formatTime(event.startDateTime)}',
-      scheduledDate: tz.TZDateTime.from(remindAt, tz.local),
-      notificationDetails: details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      payload: 'event:${event.id}',
-    );
+      await _plugin.zonedSchedule(
+        id: id,
+        title: 'Upcoming event: ${event.title}',
+        body:
+            'Starts in ${_formatLeadTime(leadTime)} at ${_formatTime(event.startDateTime)}',
+        scheduledDate: tz.TZDateTime.from(remindAt, tz.local),
+        notificationDetails: details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: 'event:${event.id}',
+      );
+    }
+
+    // Schedule 5-minute fallback reminder if primary reminder is missed
+    final fallbackRemindAt = event.startDateTime.subtract(const Duration(minutes: 5));
+    if (fallbackRemindAt.isAfter(now) && (!remindAt.isAfter(now) || leadTime.inMinutes > 5)) {
+      final fallbackId = _eventNotificationId(event.id) + 100000;
+      const androidDetails = AndroidNotificationDetails(
+        'task_reminders',
+        _taskReminderChannelName,
+        channelDescription: _taskReminderChannelDescription,
+        importance: Importance.high,
+        priority: Priority.high,
+      );
+      const iosDetails = DarwinNotificationDetails();
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      await _plugin.zonedSchedule(
+        id: fallbackId,
+        title: 'Upcoming event: ${event.title}',
+        body: 'Starts in 5 minutes at ${_formatTime(event.startDateTime)}',
+        scheduledDate: tz.TZDateTime.from(fallbackRemindAt, tz.local),
+        notificationDetails: details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: 'event:${event.id}:fallback',
+      );
+    }
   }
 
   Future<void> scheduleClassReminder({
@@ -209,42 +270,63 @@ class NotificationService {
   }) async {
     final now = DateTime.now();
     final remindAt = classStart.subtract(leadTime);
-    DateTime scheduledAt;
+
+    // Schedule primary reminder at configured lead time
     if (remindAt.isAfter(now)) {
-      scheduledAt = remindAt;
-    } else {
-      if (!classStart.isAfter(now)) return;
-      final oneMinuteBeforeStart =
-          classStart.subtract(const Duration(minutes: 1));
-      scheduledAt = oneMinuteBeforeStart.isAfter(now)
-          ? oneMinuteBeforeStart
-          : now.add(const Duration(seconds: 5));
+      final id = _classNotificationId(classSlotId, classStart);
+      const androidDetails = AndroidNotificationDetails(
+        'task_reminders',
+        _taskReminderChannelName,
+        channelDescription: _taskReminderChannelDescription,
+        importance: Importance.high,
+        priority: Priority.high,
+      );
+      const iosDetails = DarwinNotificationDetails();
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
+
+      await _plugin.zonedSchedule(
+        id: id,
+        title: 'Class starting soon: $courseCode',
+        body:
+            'Starts in ${_formatLeadTime(leadTime)} at ${_formatTime(classStart)}',
+        scheduledDate: tz.TZDateTime.from(remindAt, tz.local),
+        notificationDetails: details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: 'class:$classSlotId:${classStart.toIso8601String()}',
+      );
     }
 
-    final id = _classNotificationId(classSlotId, classStart);
-    const androidDetails = AndroidNotificationDetails(
-      'task_reminders',
-      _taskReminderChannelName,
-      channelDescription: _taskReminderChannelDescription,
-      importance: Importance.high,
-      priority: Priority.high,
-    );
-    const iosDetails = DarwinNotificationDetails();
-    const details = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
+    // Schedule 5-minute fallback reminder if primary reminder is missed
+    final fallbackRemindAt = classStart.subtract(const Duration(minutes: 5));
+    if (!classStart.isAfter(now)) return; // Class already started, no reminders
+    if (fallbackRemindAt.isAfter(now) && (!remindAt.isAfter(now) || leadTime.inMinutes > 5)) {
+      final fallbackId = _classNotificationId(classSlotId, classStart) + 100000;
+      const androidDetails = AndroidNotificationDetails(
+        'task_reminders',
+        _taskReminderChannelName,
+        channelDescription: _taskReminderChannelDescription,
+        importance: Importance.high,
+        priority: Priority.high,
+      );
+      const iosDetails = DarwinNotificationDetails();
+      const details = NotificationDetails(
+        android: androidDetails,
+        iOS: iosDetails,
+      );
 
-    await _plugin.zonedSchedule(
-      id: id,
-      title: 'Class starting soon: $courseCode',
-      body:
-          'Starts in ${_formatLeadTime(leadTime)} at ${_formatTime(classStart)}',
-      scheduledDate: tz.TZDateTime.from(scheduledAt, tz.local),
-      notificationDetails: details,
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      payload: 'class:$classSlotId:${classStart.toIso8601String()}',
-    );
+      await _plugin.zonedSchedule(
+        id: fallbackId,
+        title: 'Class starting soon: $courseCode',
+        body: 'Starts in 5 minutes at ${_formatTime(classStart)}',
+        scheduledDate: tz.TZDateTime.from(fallbackRemindAt, tz.local),
+        notificationDetails: details,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        payload: 'class:$classSlotId:${classStart.toIso8601String()}:fallback',
+      );
+    }
   }
 
   Future<void> scheduleDebugTestNotification({
