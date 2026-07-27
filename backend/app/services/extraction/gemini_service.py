@@ -11,6 +11,7 @@ from pathlib import Path
 from time import perf_counter
 
 from docx import Document
+from pypdf import PdfReader
 from pydantic import BaseModel, Field
 
 from app.core.config import get_settings
@@ -186,6 +187,52 @@ def _read_txt_file(
     )
 
 
+def _read_pdf_text(
+    file_path: str,
+) -> str:
+    try:
+        reader = PdfReader(file_path)
+        extracted_pages: list[str] = []
+        total_length = 0
+
+        for page in reader.pages:
+            try:
+                text = page.extract_text() or ""
+            except Exception:
+                continue
+
+            if not text.strip():
+                continue
+
+            extracted_pages.append(text)
+            total_length += len(text)
+
+            if total_length >= _MAX_TEXT_LENGTH:
+                break
+
+        return "\n".join(extracted_pages)
+
+    except Exception:
+        return ""
+
+
+def _build_file_summary(
+    file_paths: list[str],
+) -> str:
+    lines = []
+    for index, file_path in enumerate(file_paths, start=1):
+        suffix = Path(file_path).suffix.lower().lstrip('.') or 'file'
+        lines.append(
+            f"{index}. {Path(file_path).name} ({suffix.upper()})"
+        )
+
+    return (
+        "Attached files:\n"
+        + "\n".join(lines)
+        + "\n\nProcess all attached files and extract information from every file in the batch."
+    )
+
+
 def _upload_file_to_gemini(
     file_path: str,
 ):
@@ -269,7 +316,39 @@ def _build_contents(
                   )
 
           # =====================================
-          # PDF / IMAGE
+          # PDF
+          # =====================================
+
+          elif suffix == ".pdf":
+
+              extracted_text = _read_pdf_text(
+                  file_path
+              )
+
+              if extracted_text.strip():
+
+                  contents.append(
+                      extracted_text[:_MAX_TEXT_LENGTH]
+                  )
+
+              else:
+
+                  uploaded_file = (
+                      _upload_file_to_gemini(
+                          file_path
+                      )
+                  )
+
+                  contents.append(
+                      uploaded_file
+                  )
+
+                  uploaded_files.append(
+                      uploaded_file
+                  )
+
+          # =====================================
+          # IMAGE / OTHER FILES
           # =====================================
 
           else:
@@ -287,6 +366,13 @@ def _build_contents(
               uploaded_files.append(
                   uploaded_file
               )
+
+    if file_paths:
+        contents.append(
+            _build_file_summary(
+                file_paths
+            )
+        )
 
     # =====================================================
     # NATURAL LANGUAGE TEXT INPUT
