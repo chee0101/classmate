@@ -1,6 +1,6 @@
 # ClassMate - Study Schedule Assistant
 
-ClassMate is a mobile application developed using Flutter to assist students in managing their academic activities through automated data extraction.
+ClassMate is a mobile application developed using Flutter to assist USM students in managing their academic activities through automated data extraction.
 
 ---
 
